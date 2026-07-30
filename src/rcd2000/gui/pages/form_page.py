@@ -40,7 +40,9 @@ class DesignFormPage(QWidget):
         self._last_input = None
         self._last_result = None
         self._history_cb = None
+        self._status_cb = None
         self._last_save_dir = None
+        self._history_viewed = False
         self._build_ui()
 
     # ── UI construction ──────────────────────────────────────────────
@@ -142,6 +144,7 @@ class DesignFormPage(QWidget):
 
     def _on_calculate(self):
         self._clear_results()
+        self._history_viewed = False
         try:
             self._last_input, self._last_result = self.calculate()
         except Exception as exc:
@@ -166,6 +169,18 @@ class DesignFormPage(QWidget):
         if self._history_cb:
             self._history_cb(self.module_name, self._last_input, self._last_result)
 
+    def _show_result(self, result):
+        """Display a stored result dict without re-running the calculation."""
+        self._clear_results()
+        rows = self._build_result_rows(result)
+        if rows:
+            from rcd2000.gui.widgets import make_table
+            self.results_area.addWidget(
+                make_table(["Parameter", "Value", "Status"], rows)
+            )
+        self.save_btn.setVisible(True)
+        self.pdf_btn.setVisible(True)
+
     # ── Save / export ────────────────────────────────────────────────
 
     def _default_save_filename(self, ext: str) -> str:
@@ -183,7 +198,6 @@ class DesignFormPage(QWidget):
         ext = "txt" if fmt_type == "txt" else "pdf"
         default_path = self._default_save_filename(ext)
 
-        # Remember the last folder the user picked for this session.
         start_dir = self._last_save_dir or os.path.dirname(default_path)
         default_name = os.path.basename(default_path)
 
@@ -198,12 +212,22 @@ class DesignFormPage(QWidget):
 
         self._last_save_dir = os.path.dirname(path)
 
-        if fmt_type == "txt":
-            with open(path, "w") as f:
-                f.write(text)
-        else:
-            from rcd2000.report import export_pdf
-            export_pdf(text, path)
+        try:
+            if fmt_type == "txt":
+                with open(path, "w") as f:
+                    f.write(text)
+            else:
+                from rcd2000.report import export_pdf
+
+                export_pdf(text, path)
+            label = fmt_type.upper()
+            msg = f"{label} saved: {os.path.basename(path)}"
+            if self._status_cb:
+                self._status_cb(msg, False)
+        except Exception as exc:
+            msg = f"Save failed: {exc}"
+            if self._status_cb:
+                self._status_cb(msg, True)
 
     # ── Helpers ──────────────────────────────────────────────────────
 
@@ -218,3 +242,7 @@ class DesignFormPage(QWidget):
     def set_history_callback(self, cb):
         """Set the callback invoked after a successful calculation."""
         self._history_cb = cb
+
+    def set_status_callback(self, cb):
+        """Set the callback invoked for save-status messages (msg, is_error)."""
+        self._status_cb = cb

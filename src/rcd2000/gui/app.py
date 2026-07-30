@@ -187,6 +187,15 @@ class MainWindow(QMainWindow):
 
         outer.addWidget(self._build_header())
 
+        self._status_banner = QLabel()
+        self._status_banner.setFixedHeight(36)
+        self._status_banner.setAlignment(Qt.AlignCenter)
+        self._status_banner.setVisible(False)
+        self._status_banner.setStyleSheet(
+            "font-size: 13px; font-weight: 600; background: transparent;"
+        )
+        outer.addWidget(self._status_banner)
+
         body = QWidget()
         body_layout = QHBoxLayout(body)
         body_layout.setContentsMargins(0, 0, 0, 0)
@@ -330,6 +339,7 @@ class MainWindow(QMainWindow):
         for _, page_class, *_rest in MODULES:
             page = page_class()
             page._history_cb = self._add_history
+            page._status_cb = self.show_status_banner
             scroll = QScrollArea()
             scroll.setWidget(page)
             scroll.setWidgetResizable(True)
@@ -450,12 +460,15 @@ class MainWindow(QMainWindow):
         """Convert history entries to JSON-serializable dicts."""
         out = []
         for entry in self._history:
-            module_name, inp, result = entry
+            module_name, inp, result = entry[:3]
+            state_dict = entry[3] if len(entry) > 3 else None
             rec = {"module": module_name}
             if is_dataclass(inp):
                 rec["input"] = asdict(inp)
             if is_dataclass(result):
                 rec["result"] = asdict(result)
+            if state_dict:
+                rec["state"] = state_dict
             out.append(rec)
         return out
 
@@ -472,8 +485,9 @@ class MainWindow(QMainWindow):
             module_name = rec.get("module", "Unknown")
             ts = rec.get("timestamp", "??")
             display = f"{module_name}  ·  {ts}"
+            state_dict = rec.get("state")
             # Store the dicts as-is; _history_clicked will use module_name
-            self._history.append((module_name, rec.get("input"), rec.get("result")))
+            self._history.append((module_name, rec.get("input"), rec.get("result"), state_dict))
             self.history_list.insertItem(0, display)
             while self.history_list.count() > 20:
                 self.history_list.takeItem(self.history_list.count() - 1)
@@ -495,12 +509,15 @@ class MainWindow(QMainWindow):
             from datetime import datetime
             history_serializable = []
             for entry in self._history:
-                module_name, inp, result = entry
+                module_name, inp, result = entry[:3]
+                state_dict = entry[3] if len(entry) > 3 else None
                 rec = {"module": module_name, "timestamp": datetime.now().strftime("%H:%M:%S")}
                 if is_dataclass(inp):
                     rec["input"] = asdict(inp)
                 if is_dataclass(result):
                     rec["result"] = asdict(result)
+                if state_dict:
+                    rec["state"] = state_dict
                 history_serializable.append(rec)
             payload = {
                 "drafts": self._drafts,
@@ -537,17 +554,43 @@ class MainWindow(QMainWindow):
         self._write_state()
         super().closeEvent(event)
 
+    def show_status_banner(self, message: str, is_error: bool = False):
+        """Show a temporary status banner above the page content."""
+        self._status_banner.setText(f"  {message}  ")
+        if is_error:
+            self._status_banner.setStyleSheet(
+                f"background: #5c1a1a; color: #ff6b6b; font-size: 13px;"
+                f" font-weight: 600; border-bottom: 1px solid #8b2525;"
+            )
+        else:
+            self._status_banner.setStyleSheet(
+                f"background: #1a3d1a; color: #6bff6b; font-size: 13px;"
+                f" font-weight: 600; border-bottom: 1px solid #2a5c2a;"
+            )
+        self._status_banner.setVisible(True)
+        QTimer.singleShot(4000, lambda: self._status_banner.setVisible(False))
+
     def _add_history(self, module_name: str, inp, result):
         from datetime import datetime
         # Map short module_name (e.g. "Column") to display name (e.g. "Column Design")
         display_name = module_name
+        page = None
         for mod in MODULES:
             if mod[1].module_name == module_name:
                 display_name = mod[0]
                 break
+        # Capture the current widget state for exact history restore
+        state_dict = None
+        for i, mod in enumerate(MODULES):
+            if mod[0] == display_name:
+                try:
+                    state_dict = self.pages[i].get_state()
+                except Exception:
+                    pass
+                break
         ts = datetime.now().strftime("%H:%M:%S")
         display = f"{display_name}  ·  {ts}"
-        self._history.append((display_name, inp, result))
+        self._history.append((display_name, inp, result, state_dict))
         self.history_list.insertItem(0, display)
         while self.history_list.count() > 20:
             self.history_list.takeItem(self.history_list.count() - 1)
@@ -561,10 +604,25 @@ class MainWindow(QMainWindow):
         idx = self.history_list.row(item)
         entry = self._history[idx] if idx < len(self._history) else None
         if entry:
-            module_name, inp, result = entry
+            module_name, inp, result, state_dict = entry
             for i, mod in enumerate(MODULES):
                 if mod[0] == module_name:
+                    # Pop draft so _restore_draft won't reapply it on nav
+                    self._drafts.pop(module_name, None)
+                    # Switch page (triggers _on_page_switched → _restore_draft,
+                    # which will skip because draft is gone)
                     self.sidebar_list.setCurrentRow(i)
+                    # Restore exact history state
+                    page = self.pages[i]
+                    try:
+                        page._history_viewed = True
+                        if state_dict:
+                            page.set_state(state_dict)
+                        page._show_result(result)
+                    except Exception as exc:
+                        logging.error(
+                            f"Failed to restore history for {module_name}", exc_info=True
+                        )
                     self.status.showMessage(f"Recalled {module_name} from history")
                     break
 
