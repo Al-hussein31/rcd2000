@@ -1,4 +1,0 @@
-F
-cl2000_in.txt
-F
-cl2000_out.txt
