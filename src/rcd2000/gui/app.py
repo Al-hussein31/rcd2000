@@ -2,6 +2,9 @@
 
 import sys
 import os
+import json
+import logging
+from dataclasses import asdict, is_dataclass
 from importlib.resources import files
 
 from PySide6.QtWidgets import (
@@ -9,7 +12,7 @@ from PySide6.QtWidgets import (
     QListWidget, QListWidgetItem, QStackedWidget, QLabel, QScrollArea,
     QStatusBar, QSplashScreen, QDialog, QMessageBox, QToolButton, QSizePolicy,
 )
-from PySide6.QtCore import Qt, QTimer, QSize
+from PySide6.QtCore import Qt, QTimer, QSize, QStandardPaths
 from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence, QColor, QFont
 
 try:
@@ -44,6 +47,18 @@ SHORTCUT_KEYS = {
     Qt.Key_1: 0, Qt.Key_2: 1, Qt.Key_3: 2,
     Qt.Key_4: 3, Qt.Key_5: 4, Qt.Key_6: 5,
 }
+
+_PERSIST_FILE = "rcd2000_state.json"
+
+
+def _persist_path() -> str:
+    """Return the platform-appropriate path for the state JSON file."""
+    base = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+    if not base:
+        base = os.path.expanduser("~")
+    full = os.path.join(base, "RCD2000")
+    os.makedirs(full, exist_ok=True)
+    return os.path.join(full, _PERSIST_FILE)
 
 
 def _find_icon(name: str) -> str:
@@ -133,11 +148,16 @@ class MainWindow(QMainWindow):
         self.setWindowTitle(f"RCD2000 v{__version__} - BS 8110 Design")
         self.setMinimumSize(1000, 720)
         self._history = []
+        self._drafts: dict[str, dict] = {}
+        self._last_active_page: int | None = None
+        self._persist_timer: QTimer | None = None
         self._sidebar_expanded = True
         self._setup_icon()
         self._setup_stylesheet()
         self._setup_ui()
         self._setup_shortcuts()
+        self._last_active_page = 0
+        self._load_state()
 
     def _setup_icon(self):
         icon_path = _find_icon("logo.png")
@@ -184,7 +204,8 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.status)
         self.status.showMessage("Ready")
 
-        self.sidebar_list.currentRowChanged.connect(self.stack.setCurrentIndex)
+        self.sidebar_list.currentRowChanged.connect(self._on_page_switched)
+        self.stack.currentChanged.connect(self._on_stack_changed)
 
     def _build_header(self):
         header = QWidget()
@@ -369,17 +390,174 @@ class MainWindow(QMainWindow):
                 self.status.showMessage(f"Switched to {MODULES[idx][0]}")
         super().keyPressEvent(event)
 
+    # ── Draft autosave ────────────────────────────────────────────────
+
+    def _on_page_switched(self, new_idx: int):
+        """Save the old page's draft and restore the new page's draft."""
+        old_idx = self._last_active_page
+        if old_idx is not None and old_idx != new_idx:
+            self._save_draft(old_idx)
+        self.stack.setCurrentIndex(new_idx)
+        self._restore_draft(new_idx)
+        self._last_active_page = new_idx
+
+    def _on_stack_changed(self, idx: int):
+        """Sync sidebar selection when stack changes programmatically."""
+        if self.sidebar_list.currentRow() != idx:
+            self.sidebar_list.setCurrentRow(idx)
+
+    def _save_draft(self, idx: int):
+        """Capture the current page's state into self._drafts."""
+        if idx < 0 or idx >= len(self.pages):
+            return
+        page = self.pages[idx]
+        name = MODULES[idx][0]
+        try:
+            self._drafts[name] = page.get_state()
+        except Exception:
+            logging.error(f"Failed to capture draft for {name}", exc_info=True)
+        self._schedule_persist()
+
+    def _restore_draft(self, idx: int):
+        """Restore a page's draft from self._drafts, if one exists."""
+        if idx < 0 or idx >= len(self.pages):
+            return
+        page = self.pages[idx]
+        name = MODULES[idx][0]
+        state = self._drafts.get(name)
+        if state is None:
+            return
+        try:
+            page.set_state(state)
+            self._clear_invalid_flags(page)
+        except Exception:
+            logging.error(f"Failed to restore draft for {name}", exc_info=True)
+
+    def _clear_invalid_flags(self, page):
+        """Clear any 'invalid' property flags on spinboxes after restore."""
+        from rcd2000.gui.widgets import mark_invalid
+        for attr_name in dir(page):
+            widget = getattr(page, attr_name, None)
+            if hasattr(widget, "setProperty"):
+                try:
+                    mark_invalid(widget, False)
+                except Exception:
+                    pass
+
+    # ── History persistence ──────────────────────────────────────────
+
+    def _history_to_serializable(self):
+        """Convert history entries to JSON-serializable dicts."""
+        out = []
+        for entry in self._history:
+            module_name, inp, result = entry
+            rec = {"module": module_name}
+            if is_dataclass(inp):
+                rec["input"] = asdict(inp)
+            if is_dataclass(result):
+                rec["result"] = asdict(result)
+            out.append(rec)
+        return out
+
+    def _history_from_serializable(self, data):
+        """Rebuild history entries from JSON-serializable dicts.
+
+        Uses the raw dicts (not dataclass instances) so that the history
+        display still works without needing to reconstruct the dataclasses.
+        """
+        self._history = []
+        self.history_list.clear()
+        from datetime import datetime
+        for rec in data:
+            module_name = rec.get("module", "Unknown")
+            ts = rec.get("timestamp", "??")
+            display = f"{module_name}  ·  {ts}"
+            # Store the dicts as-is; _history_clicked will use module_name
+            self._history.append((module_name, rec.get("input"), rec.get("result")))
+            self.history_list.insertItem(0, display)
+            while self.history_list.count() > 20:
+                self.history_list.takeItem(self.history_list.count() - 1)
+
+    # ── Disk persistence ──────────────────────────────────────────────
+
+    def _schedule_persist(self):
+        """Debounced write: restart the timer for 2 s."""
+        if self._persist_timer is None:
+            self._persist_timer = QTimer(self)
+            self._persist_timer.setSingleShot(True)
+            self._persist_timer.timeout.connect(self._write_state)
+        self._persist_timer.start(2000)
+
+    def _write_state(self):
+        """Write drafts + history to the JSON state file."""
+        try:
+            path = _persist_path()
+            from datetime import datetime
+            history_serializable = []
+            for entry in self._history:
+                module_name, inp, result = entry
+                rec = {"module": module_name, "timestamp": datetime.now().strftime("%H:%M:%S")}
+                if is_dataclass(inp):
+                    rec["input"] = asdict(inp)
+                if is_dataclass(result):
+                    rec["result"] = asdict(result)
+                history_serializable.append(rec)
+            payload = {
+                "drafts": self._drafts,
+                "history": history_serializable,
+                "last_page": self._last_active_page,
+            }
+            with open(path, "w") as f:
+                json.dump(payload, f, indent=2)
+        except Exception:
+            logging.error("Failed to write state file", exc_info=True)
+
+    def _load_state(self):
+        """Load drafts + history from the JSON state file on startup."""
+        path = _persist_path()
+        if not os.path.exists(path):
+            return
+        try:
+            with open(path) as f:
+                payload = json.load(f)
+            self._drafts = payload.get("drafts", {})
+            last_page = payload.get("last_page")
+            self._history_from_serializable(payload.get("history", []))
+            # Restore the last-active page's draft
+            if last_page is not None and 0 <= last_page < len(self.pages):
+                self._restore_draft(last_page)
+                self._last_active_page = last_page
+        except (json.JSONDecodeError, KeyError, TypeError):
+            logging.error("State file corrupt — starting fresh", exc_info=True)
+            self._drafts = {}
+            self._history = []
+
+    def closeEvent(self, event):
+        """Persist state on close."""
+        self._write_state()
+        super().closeEvent(event)
+
     def _add_history(self, module_name: str, inp, result):
         from datetime import datetime
+        # Map short module_name (e.g. "Column") to display name (e.g. "Column Design")
+        display_name = module_name
+        for mod in MODULES:
+            if mod[1].module_name == module_name:
+                display_name = mod[0]
+                break
         ts = datetime.now().strftime("%H:%M:%S")
-        display = f"{module_name}  ·  {ts}"
-        self._history.append((module_name, inp, result))
+        display = f"{display_name}  ·  {ts}"
+        self._history.append((display_name, inp, result))
         self.history_list.insertItem(0, display)
         while self.history_list.count() > 20:
             self.history_list.takeItem(self.history_list.count() - 1)
-        self.status.showMessage(f"{module_name} designed - {ts}")
+        self.status.showMessage(f"{display_name} designed - {ts}")
+        self._schedule_persist()
 
     def _history_clicked(self, item):
+        # Save current page draft before switching
+        if self._last_active_page is not None:
+            self._save_draft(self._last_active_page)
         idx = self.history_list.row(item)
         entry = self._history[idx] if idx < len(self._history) else None
         if entry:
