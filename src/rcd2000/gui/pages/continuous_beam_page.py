@@ -1,12 +1,15 @@
 """Continuous beam analysis form page."""
 
+import os
+
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QGridLayout, QGroupBox, QLabel,
+    QWidget, QVBoxLayout, QFormLayout, QGridLayout, QGroupBox, QLabel, QFileDialog,
 )
 
 from rcd2000.continuous_beam import (
     ContinuousBeamAnalyzer, ContinuousBeamInput, ContinuousBeamMember,
 )
+from rcd2000.report import format_continuous_beam
 from rcd2000.gui.theme import GROUP_BOX_STYLE, TEXT_SECONDARY, fmt2
 from rcd2000.gui.widgets import (
     spinbox, spin_int, combo, button, label, header_label, make_table,
@@ -44,11 +47,15 @@ class ContinuousBeamPage(QWidget):
 
         self.calc_btn = button("Analyze Beam")
         self.calc_btn.clicked.connect(self._calculate)
+        self.save_btn = button("Save Report to Desktop")
+        self.save_btn.clicked.connect(self._save_report)
+        self.save_btn.setVisible(False)
         self.results_area = QVBoxLayout()
 
         layout.addWidget(g1)
         layout.addWidget(g2)
         layout.addWidget(self.calc_btn)
+        layout.addWidget(self.save_btn)
         layout.addLayout(self.results_area)
         layout.addStretch()
 
@@ -96,7 +103,7 @@ class ContinuousBeamPage(QWidget):
                 wb=w[6].value(),
                 ab=w[7].value(),
             ))
-        beam = ContinuousBeamInput(
+        self._last_input = ContinuousBeamInput(
             n_supports=self.cb_ns.value(),
             n_members=nm,
             members=members,
@@ -104,7 +111,8 @@ class ContinuousBeamPage(QWidget):
             end2_type=self.cb_end2.currentIndex(),
         )
         analyzer = ContinuousBeamAnalyzer()
-        r = analyzer.analyze(beam)
+        self._last_result = analyzer.analyze(self._last_input)
+        r = self._last_result
 
         if r.support_moments:
             hdrs = ["Support", "Moment (kN·m)", "Reaction (kN)"]
@@ -120,8 +128,21 @@ class ContinuousBeamPage(QWidget):
             self.results_area.addWidget(label("Span Results", bold=True, size=14))
             self.results_area.addWidget(make_table(hdrs, rows))
 
+        self.save_btn.setVisible(True)
+
+    def _save_report(self):
+        text = format_continuous_beam(self._last_input, self._last_result)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_CBEAM.txt"),
+            "Text Files (*.txt)",
+        )
+        if path:
+            with open(path, "w") as f:
+                f.write(text)
+
     def _clear_results(self):
         while self.results_area.count():
             w = self.results_area.takeAt(0).widget()
             if w:
                 w.deleteLater()
+        self.save_btn.setVisible(False)

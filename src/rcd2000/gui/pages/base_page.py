@@ -1,8 +1,11 @@
 """Foundation design form page."""
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox
+import os
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox, QFileDialog
 
 from rcd2000.base import BaseDesigner, BaseInput
+from rcd2000.report import format_base
 from rcd2000.gui.theme import GROUP_BOX_STYLE, fmt, fmt2
 from rcd2000.gui.widgets import spinbox, combo, button, label, header_label, make_table
 
@@ -53,18 +56,22 @@ class BasePage(QWidget):
 
         self.calc_btn = button("Design Foundation")
         self.calc_btn.clicked.connect(self._calculate)
+        self.save_btn = button("Save Report to Desktop")
+        self.save_btn.clicked.connect(self._save_report)
+        self.save_btn.setVisible(False)
         self.results_area = QVBoxLayout()
 
         layout.addWidget(g1)
         layout.addWidget(g2)
         layout.addWidget(self.calc_btn)
+        layout.addWidget(self.save_btn)
         layout.addLayout(self.results_area)
         layout.addStretch()
 
     def _calculate(self):
         self._clear_results()
         btype = self.base_type.currentIndex() + 1
-        b = BaseInput(
+        self._last_input = BaseInput(
             base_id="F1",
             base_type=btype,
             col_type=1 if self.col_shape.currentIndex() == 0 else 2,
@@ -80,7 +87,8 @@ class BasePage(QWidget):
             pb=self.base_pb.value(), fcu=self.base_fcu.value(),
             fy=self.base_fy.value(),
         )
-        r = designer.design([b])[0]
+        self._last_result = designer.design([self._last_input])[0]
+        r = self._last_result
 
         rows = [
             ["Base Length L1 (mm)", fmt(r.l1)],
@@ -100,9 +108,21 @@ class BasePage(QWidget):
             ["Permissible Bond (N/mm²)", fmt2(r.perm_bond)],
         ]
         self.results_area.addWidget(make_table(["Parameter", "Value"], rows))
+        self.save_btn.setVisible(True)
+
+    def _save_report(self):
+        text = format_base(self._last_input, self._last_result)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_BASE.txt"),
+            "Text Files (*.txt)",
+        )
+        if path:
+            with open(path, "w") as f:
+                f.write(text)
 
     def _clear_results(self):
         while self.results_area.count():
             w = self.results_area.takeAt(0).widget()
             if w:
                 w.deleteLater()
+        self.save_btn.setVisible(False)

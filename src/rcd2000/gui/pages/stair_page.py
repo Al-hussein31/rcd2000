@@ -1,8 +1,11 @@
 """Stair design form page."""
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox
+import os
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox, QFileDialog
 
 from rcd2000.stair import StairDesigner, StairInput
+from rcd2000.report import format_stair
 from rcd2000.gui.theme import GROUP_BOX_STYLE, fmt, fmt2
 from rcd2000.gui.widgets import spinbox, button, label, header_label, make_table
 
@@ -35,16 +38,20 @@ class StairPage(QWidget):
 
         self.calc_btn = button("Design Stair")
         self.calc_btn.clicked.connect(self._calculate)
+        self.save_btn = button("Save Report to Desktop")
+        self.save_btn.clicked.connect(self._save_report)
+        self.save_btn.setVisible(False)
         self.results_area = QVBoxLayout()
 
         layout.addWidget(g)
         layout.addWidget(self.calc_btn)
+        layout.addWidget(self.save_btn)
         layout.addLayout(self.results_area)
         layout.addStretch()
 
     def _calculate(self):
         self._clear_results()
-        s = StairInput(
+        self._last_input = StairInput(
             stair_id="ST1",
             span=self.s_span.value(),
             tread=self.s_tread.value(),
@@ -54,7 +61,8 @@ class StairPage(QWidget):
             wld=self.s_wld.value(),
         )
         designer = StairDesigner()
-        r = designer.design([s])[0]
+        self._last_result = designer.design([self._last_input])[0]
+        r = self._last_result
 
         rows = [
             ["Waist Thickness (mm)", fmt(r.waist_thickness)],
@@ -70,9 +78,21 @@ class StairPage(QWidget):
             ["Bar Spacing (mm)", fmt(r.bar_spacing)],
         ]
         self.results_area.addWidget(make_table(["Parameter", "Value"], rows))
+        self.save_btn.setVisible(True)
+
+    def _save_report(self):
+        text = format_stair(self._last_input, self._last_result)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_STAIR.txt"),
+            "Text Files (*.txt)",
+        )
+        if path:
+            with open(path, "w") as f:
+                f.write(text)
 
     def _clear_results(self):
         while self.results_area.count():
             w = self.results_area.takeAt(0).widget()
             if w:
                 w.deleteLater()
+        self.save_btn.setVisible(False)

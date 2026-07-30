@@ -1,8 +1,11 @@
 """Column design form page."""
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox
+import os
+
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox, QFileDialog
 
 from rcd2000.column import ColumnDesigner, ColumnInput
+from rcd2000.report import format_column
 from rcd2000.gui.theme import GROUP_BOX_STYLE, fmt
 from rcd2000.gui.widgets import (
     spinbox, spin_int, combo, button, label, header_label, make_table,
@@ -53,6 +56,9 @@ class ColumnPage(QWidget):
 
         self.calc_btn = button("Design Column")
         self.calc_btn.clicked.connect(self._calculate)
+        self.save_btn = button("Save Report to Desktop")
+        self.save_btn.clicked.connect(self._save_report)
+        self.save_btn.setVisible(False)
 
         self.results_area = QVBoxLayout()
         self.results_area.setContentsMargins(0, 0, 0, 0)
@@ -61,12 +67,13 @@ class ColumnPage(QWidget):
         layout.addWidget(g2)
         layout.addWidget(g3)
         layout.addWidget(self.calc_btn)
+        layout.addWidget(self.save_btn)
         layout.addLayout(self.results_area)
         layout.addStretch()
 
     def _calculate(self):
         self._clear_results()
-        c = ColumnInput(
+        self._last_input = ColumnInput(
             column_id="C1",
             col_type=self.col_type.currentIndex() + 1,
             shape=1 if self.shape.currentIndex() == 0 else 2,
@@ -78,7 +85,9 @@ class ColumnPage(QWidget):
             moment=self.moment.value() or self.moment_x.value(),
         )
         designer = ColumnDesigner()
-        result = designer.design([c])[0]
+        self._last_result = designer.design([self._last_input])[0]
+        result = self._last_result
+        c = self._last_input
 
         rows = [
             ["Steel Required", f"{result.steel_required:,.0f} mm²", ""],
@@ -95,9 +104,21 @@ class ColumnPage(QWidget):
         self.results_area.addWidget(make_table(["Parameter", "Value", "Status"], rows))
         if result.heck:
             self.results_area.addWidget(label("Section inadequate — increase dimensions", size=13))
+        self.save_btn.setVisible(True)
+
+    def _save_report(self):
+        text = format_column(self._last_input, self._last_result)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_COLUMN.txt"),
+            "Text Files (*.txt)",
+        )
+        if path:
+            with open(path, "w") as f:
+                f.write(text)
 
     def _clear_results(self):
         while self.results_area.count():
             w = self.results_area.takeAt(0).widget()
             if w:
                 w.deleteLater()
+        self.save_btn.setVisible(False)

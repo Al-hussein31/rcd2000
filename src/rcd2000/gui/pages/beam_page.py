@@ -1,10 +1,13 @@
 """Beam design form page."""
 
+import os
+
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QGridLayout, QGroupBox, QLabel,
+    QWidget, QVBoxLayout, QFormLayout, QGridLayout, QGroupBox, QLabel, QFileDialog,
 )
 
 from rcd2000.beam import BeamDesigner, BeamInput
+from rcd2000.report import format_beam
 from rcd2000.gui.theme import GROUP_BOX_STYLE, TEXT_SECONDARY, fmt, fmt2
 from rcd2000.gui.widgets import (
     spinbox, spin_int, combo, button, label, header_label, make_table,
@@ -64,6 +67,9 @@ class BeamPage(QWidget):
 
         self.calc_btn = button("Design Beam")
         self.calc_btn.clicked.connect(self._calculate)
+        self.save_btn = button("Save Report to Desktop")
+        self.save_btn.clicked.connect(self._save_report)
+        self.save_btn.setVisible(False)
         self.results_area = QVBoxLayout()
 
         layout.addWidget(g1)
@@ -71,6 +77,7 @@ class BeamPage(QWidget):
         layout.addWidget(g3)
         layout.addWidget(g4)
         layout.addWidget(self.calc_btn)
+        layout.addWidget(self.save_btn)
         layout.addLayout(self.results_area)
         layout.addStretch()
 
@@ -102,7 +109,7 @@ class BeamPage(QWidget):
     def _calculate(self):
         self._clear_results()
         nm = self.n_members.value()
-        beam = BeamInput(
+        self._last_input = BeamInput(
             beam_id="B1",
             n_supports=self.n_supports.value(),
             n_members=nm,
@@ -122,7 +129,8 @@ class BeamPage(QWidget):
             fcu=self.beam_fcu.value(), fy=self.beam_fy.value(),
             fyv=self.beam_fyv.value(),
         )
-        result = designer.design([beam])[0]
+        self._last_result = designer.design([self._last_input])[0]
+        result = self._last_result
 
         if result.spans:
             hdrs = ["Span", "L (m)", "M (kN·m)", "As_bot (mm²)", "As_top (mm²)",
@@ -147,8 +155,21 @@ class BeamPage(QWidget):
             self.results_area.addWidget(label("Support Results", bold=True, size=14))
             self.results_area.addWidget(make_table(hdrs2, rows2))
 
+        self.save_btn.setVisible(True)
+
+    def _save_report(self):
+        text = format_beam(self._last_input, self._last_result)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_BEAM.txt"),
+            "Text Files (*.txt)",
+        )
+        if path:
+            with open(path, "w") as f:
+                f.write(text)
+
     def _clear_results(self):
         while self.results_area.count():
             w = self.results_area.takeAt(0).widget()
             if w:
                 w.deleteLater()
+        self.save_btn.setVisible(False)
