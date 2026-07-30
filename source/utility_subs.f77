@@ -1,0 +1,154 @@
+C
+C SUBROUTINE GAUSS - GAUSSIAN ELIMINATION SOLVER
+C
+
+      SUBROUTINE GAUSS(AG,V,NG,NDIM,SUMAX,X)
+      DIMENSION AG(NDIM,NDIM), V(NDIM), X(NDIM), SUMAX(NDIM)
+      K=0
+    5 K = K+1
+      DO 7 I = K+1, NG
+        Z = AG(I,K) / AG(K,K)
+        DO 17 J = 1, NG
+          AG(I,J) = AG(I,J) - Z * AG(K,J)
+   17   CONTINUE
+    7   V(I) = V(I) - V(K) * Z
+      IF(K .LT. (NG-1)) GO TO 5
+      X(NG) = V(NG) / AG(NG,NG)
+      DO 27 I = (NG-1), 1, -1
+        SUMAX(I) = 0.00
+        DO 37 J = (I+1), NG
+   37     SUMAX(I) = SUMAX(I) + X(J) * AG(I,J)
+   27   X(I) = (V(I) - SUMAX(I)) / AG(I,I)
+      RETURN
+      END
+
+C
+C SUBROUTINE PERMLB - BOND/PERIMETER CHECK
+C
+
+      SUBROUTINE PERMLB(VBL,RDT,SPT,PI,D,FY,FCU,FBS,UBS)
+      RN = 1000.0 / SPT
+      FBS = (VBL * 1000.0) / (RN * RDT * PI * D)
+      IF(FY .LE. 250) THEN
+        IF(FCU .LE. 20.0) UBS = 1.70
+        IF((FCU .GT. 20.0) .AND. (FCU .LE. 25.0)) UBS = 2.0
+        IF((FCU .GT. 25.0) .AND. (FCU .LE. 30.0)) UBS = 2.2
+        IF(FCU .GT. 30.0) UBS = 2.7
+      ELSE
+        IF(FCU .LE. 20.0) UBS = 2.1
+        IF((FCU .GT. 20.0) .AND. (FCU .LE. 25.0)) UBS = 2.5
+        IF((FCU .GT. 25.0) .AND. (FCU .LE. 30.0)) UBS = 2.8
+        IF(FCU .GT. 30.0) UBS = 3.4
+      END IF
+      RETURN
+      END
+
+C
+C SUBROUTINE PERMS - SHEAR CAPACITY
+C
+
+      SUBROUTINE PERMS(HCV,RD,SV,PI,D,VS,VC)
+      AS = (PI * RD**2 / 4.0) * (1000.0 / SV)
+      AC = (AS * 100.0) / (1000.0 * D)
+      IF(AC .GT. 3.00) AC = 3.00
+      AC = AC**(1.0/3.0)
+      OC = 400.0 / D
+      IF(OC .LT. 1.0) OC = 1.0
+      OC = OC**0.25
+      VC = 0.632 * AC * OC
+      RETURN
+      END
+
+C
+C SUBROUTINE RODDIA - BAR DIAMETER AND SPACING
+C
+
+      SUBROUTINE RODDIA(AS,PI,FY,T,RD,SV)
+      CHARACTER*1 T
+      IF(FY .LE. 250) T = 'R'
+      IF(FY .GT. 250) T = 'Y'
+      IF(AS .LE. 905.0) RD = 12.0
+      IF((AS .GT. 905.0) .AND. (AS .LE. 1610.0)) RD = 16.0
+      IF((AS .GT. 1610.0) .AND. (AS .LE. 2510.0)) RD = 20.0
+      IF((AS .GT. 2510.0) .AND. (AS .LE. 3930.0)) RD = 25.0
+      IF((AS .GT. 3930.0) .AND. (AS .LE. 6430.0)) RD = 32.0
+      IF(AS .GT. 6430.0) THEN
+        RD = 40.0
+      END IF
+      AR = (PI * RD**2) / 4.0
+      V = AS / AR
+      V = 1000.0 * V
+      N = INT(V / 25.0) - 25
+      SV = FLOAT(N)
+      RETURN
+      END
+
+C
+C SUBROUTINE STEEL - STEEL AREA CALCULATION
+C
+
+      SUBROUTINE STEEL(M,D,FCU,FY,HECK,AST)
+      REAL M, K, LA
+      INTEGER HECK
+      HECK = 1
+      H = D + 25
+      AST = 0.00
+      K = (M * 1.0E06) / (FCU * 1000.0 * D**2)
+      IF(K .GT. 0.156) HECK = 0
+      IF(HECK .EQ. 0) GO TO 35
+      LA = 0.5 + SQRT(0.25 - K / 0.9)
+      IF(LA .GE. 0.95) LA = 0.95
+      AST = (M * 1.0E06) / (0.95 * FY * LA * D)
+      IF(FY .LE. 250) C = 0.24
+      IF(FY .GT. 250) C = 0.13
+      AM = (C * 1000.0 * H) / 100.0
+      IF(AM .GT. AST) AST = AM
+   35 RETURN
+      END
+
+C
+C FORMAT STATEMENTS
+C
+
+    8 FORMAT(23X,A34)
+   18 FORMAT(23X,A34)
+   28 FORMAT(5X,A9,1X,A20,12X,A8,1X,A20)
+   38 FORMAT(15X,A9,1X,A20,12X,A8,1X,A16)
+   48 FORMAT(/5X,A9,1X,F6.0,1X,A2,1X,F6.0,1X,A2,13X,A8,1X,F5.0,
+     +  1X,A2)
+   58 FORMAT(5X,A9,33X,A8,1X,F8.3,1X,A4)
+   68 FORMAT(/15X,A16,1X,F5.0,A21)
+   78 FORMAT(5X,A21,1X,F8.3,1X,A5)
+   88 FORMAT(15X,A9,1X,A1,F3.0,2X,A1,2X,F4.0,A14)
+   98 FORMAT(5X,10X,A15/)
+  108 FORMAT(/15X,A11/)
+  118 FORMAT(5X,A26,1X,F4.2,1X,A8)
+  128 FORMAT(//50X/)
+  138 FORMAT(5X,A6,1X,F4.1,1X,A8,21X,A6,1X,F5.1,1X,A8/)
+  148 FORMAT(3(/))
+  158 FORMAT(5X,A9,33X,A23,1X,I2)
+  168 FORMAT(5X,A31)
+  178 FORMAT(5X,A31)
+  188 FORMAT(5X,A4,4X,A6,4X,A6,6X,A5,11X,A7)
+  198 FORMAT(6X,A3,3X,A8,3X,A6,4X,A8,8X,A12)
+  208 FORMAT(/6X,I2,5X,F6.0,2X,11X,F8.2,3X,A1,F3.0,4X,A1,2X,
+     +  F4.0,1X,A6)
+  218 FORMAT(/15X,A23)
+  228 FORMAT(5X,A23)
+  238 FORMAT(5X,A4,4X,A6,4X,A6,6X,A5,12X,A7)
+  248 FORMAT(6X,A3,6X,A3,5X,A6,4X,A8,10X,A9)
+  258 FORMAT(/6X,I2,4X,F6.3,3X,F8.3,3X,F8.2,5X,A1,F3.0,2X,A1,2X,
+     +  F4.0,1X,A6)
+  268 FORMAT(/15X,A29)
+  278 FORMAT(5X,A29)
+  288 FORMAT(5X,A22,1X,F7.3,1X,A5)
+  298 FORMAT(15X,A22,1X,F7.2,1X,A6)
+  308 FORMAT(/5X,A7,15X,1X,A1,F3.0,2X,A1,2X,F4.0,1X,A18)
+  318 FORMAT(/15X,A26)
+  328 FORMAT(5X,A26)
+  338 FORMAT(/15X,A12)
+  348 FORMAT(5X,A12)
+  358 FORMAT(15X,A30,1X,F5.1,A81)
+  368 FORMAT(1X)
+  403 FORMAT(2(/))
+  404 FORMAT(7(/))
