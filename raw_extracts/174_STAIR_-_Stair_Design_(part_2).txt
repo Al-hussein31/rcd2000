@@ -1,0 +1,102 @@
+=== PAGE 174: STAIR - Stair Design (part 2) ===
+
+DO 7 I=I,NSTAIR
+WRITE(1, 189) 'Please ensure
+correctness o fentry',
++'before pressing the Enter Key '
+WRITE(1.199)'For Stair No.'.I
+WRITE (1 ,209) 'Enter 1 fo rStraight
+Flight Stair'
+READ(1.*) NTYPE(I)
+7 CONTINUE
+C Now analyse and design each stair .
+WRITE(1.219) 'PROGRAM READY
+TO ANALYSE AND DESIGN STAIRS '
+DO 17I=1.NSTAIR
+IF (NTYPE(I) .EQ. 1)THEN
+TYPE(I)='STRAIGHT FLIGHT STAIR'
+WRITE(1.229) 'No .'.1,'Stair is
+·,TYPE(I). 'Please Enter'C
+C
+5WRITE(1.109) 'Enter your Company"S
+Name'
+READ(1.119) COY
+WRITE(1,129) 'Enter Job Reference'
+READ(1,69) JOB
+WRITE(1.129) 'Enter Design Engineer '
+READ(1.69) ENGR
+WRITE (1.129) 'Enter Date of Design'
+READ(1.69) DATE
+WRITE (1.139) 'Enter Total No. of Stairs'
+READ(1. *) NST AIR
+WRITE(1,149) 'Enter Concrete and Steel
+Stresses. feu. fy'
+READ(1.*)FCU.FY
+WRITE (1,159) 'Arethe above Info.
+correct? - YIN'
+READ(1,179) ANS
+179 FORMAT (AI)
+C IF «ANS .NE. 'Y,) .OR. (ANS .NE.v»
+THEN
+C WRITE (1. 169) 'Please re-enter the
+Input list'
+C ENDIF
+C IF «ANS .NE .'y') .OR. (ANS .NE. 'Y'»
+GOT05
+CC
+777 CONTINUE
+END IFIF «ANSL(I) .EQ. 'Y') .OR. (ANSL(I)
+.EQ.'y'»THEN
+READ (3. *)SPLD(I). WLD(I)
+END IF
+END IFSTAIR DESIIIN
+IF (IN.EQ. 3) THEN
+READ(3,119) COY
+READ(3,69) JOB.
+READ(3. 69) ENGR
+READ(3. 69) DATE
+READ(3. *) FCU. FY
+READ (3. *)NSTAIR
+READ(3.*)(NTYPE(I). I =I,NSTAIR)
+DO 777 I=1.NSTAIR
+IF (NTYPE(I) .EQ. 1)THEN
+READ (3. *)LST(I), TR(I). RS(I),
+LLD(I)
+READ (3.179) ANSL(I)CWRITE (1, 49) 'Please Enter letter -T -
+if the input is',
++'via the Terminal'
+WRITE (1. 49) 'Please Enter letter -F -
+if the input is '.
++'via External File'
+READ(1.179) INP
+IF «INP .EQ .'F).OR. (INP .EQ.'f»
+THEN
+IN=3
+WRITE (1. 59) 'Please Enter the Input
+Filename'
+READ(1.69) FNAMEI
+OPEN (3,FILE =FNAMEl)
+ELSE
+IN=1
+END IF
+WRITE(1,404)
+WRITE (1.404)
+WRITE(1.39) 'OUTPUT IS EXPECTED
+VIAPRINTER OF FILE'
+WRITE(1. 49) 'Please Enter letter -P - if
+the output is'.
++'via the Printer'
+WRITE (1, 49) 'Please Enter letter -F -if
+the output is',
++'via External File'
+READ(1.179)OTP
+IF «OTP .EQ. 'F).OR. (OTP .EQ. 'f»
+THEN
+0=4
+WRITE (1. 59) 'Please Enter the Output
+File Name'
+READ(1,69) FNAME2
+OPEN (4.FILE =FNAME2)
+ELSE
+0=2
+END IF158·Reinforced Concrete Design

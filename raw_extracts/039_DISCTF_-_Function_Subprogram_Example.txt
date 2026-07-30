@@ -1,0 +1,31 @@
+=== PAGE 39: DISCTF - Function Subprogram Example ===
+
+C MAIN PROGRAM
+C Calculate Discount through FUNCI'ION DISCI'F
+AMOUNI'=SALES - DISCI'F(SALES)
+WRITE (2,23) "CUSTOMER TO PAY N.AMOUNT
+STOP
+ENDe.g. Calculation of a discount based on sales:"type" refers to the FUNCTION type .that is REAL .INTEGER. OOUBLE PRECISION or
+COMPLEX.
+"name" refers to the function name (an operand) that returns the value.
+"argument list" refers to the list of dummy arguments.
+"RETURN" is usedto indicate the point in the execution path at which control is returned .
+There may be more that one RETURN.
+"END" tenninates the sub-program.Where:RETURN
+ENDname=expressiontype FUNCTION name (argument list)2.7.3Function Subprogram:
+Like the statement function, function sub-program produces only one result. But unlike statement
+functions. itis external to the calling program (that is. complied separately) and can contain more than
+one expression. It has an associated type like intrins ic function and statement function. The general
+form is:2.7.2Statement Function :
+Astatement function is similar to an intrinsic function except that it is defined by the programmer and
+is part of the main program. It returns a value that is used in the evaluation.
+e.g. AREA (X.Y) =X'" Y (statement function)
+PERI(X,Y)=2.0'" (X+Y) (statement function)
+0027 1=1.10
+AR(I)=AREA (A(I). B(I»
+PR(I)=PERI (A(I). B(I»
+27 CONTINUE .
+Statement functions must follow the header statements (see Section 2.9.1) and must precede any
+executable statement.e.g. C =SQRT (A'" 2.0+ B"'''' 2.0)
+OLU=PAN ...ALOG W(AIB+C)
+NIK=LIT ...LOG(ITA)23COMPUTER PROGRAMMING Reinforced Concrete Design

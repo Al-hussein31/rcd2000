@@ -1,0 +1,53 @@
+=== PAGE 23: BMDSGN - Beam Design (Example 1.1) ===
+
+(iii)The design for reinforcement will follow K = M/f"ubd2 and if K < 0.156,
+la=0.5+~(0.25-K / 0.9) s0.95 and As=M~ 95f I d/0. Y a
+(iv)The shear is designed as follows: v=V/bdand 100As/bdis calculated to obtain Ve'(see
+Table 10.13). If vexceed v e,s, (link spacing) is calculated from Sy=(0.95 fyAsv)/(b(v - ve»wl2 wi
+(ii)The bending moment is calculated from M = -8-and shearing force from V =2'INTRDDUCTIDN 1~.---.-------------------------------~--.-~---Reinforced Concrete Design
+C
+C
+C
+C
+C
+C
+25
+•IPROGRAM BMDSGN
+REAL MMT, K, LA
+C Program for the design of a rectangular beam
+C Input is via the terminal and output via printer.
+OPEN (1,FILE ='CON')
+OPEN (2, FILE ='PRN')
+SPAN - beam length, UDL - Beam load, MMT -Beam moment and SHR - beam shear
+D-Beam effective depth, B-Beam width, FCU - concrete stress and FY -steel stress,
+FYV - steel stress (stirrups).
+Read in all the necessary data.
+READ(1,*) SPAN, UDL, D, B, FCU, FY, FYV
+Calculate the bending moment and shearing force.
+MMT = 0.125 *VDL *SPAN **2.0
+SHR = 0.5 *VDL*SPAN
+Carry out all necessary design checks.
+K = (MMT* I .OE06)/(FCU *B*D**2.0)
+IF(K .LE. 0 .156) GO TO 35
+D = D+50.0
+GO TO 25
+35 LA = 0.5 + (0.25 - KlO.9)**0.5
+IF (LA .GT. 0.95) LA = 0.95
+C Calculate steel area.
+AS = (MMT *1.0E06)/(0.95 *FY*LA *D)
+C Check and design for shear.
+VS = (SHR *LOE03)/(B *D)
+STPER = (100.0 *AS)/(B*D)
+READ(I, *) VC, ASV
+IF (VC .GT. VS) GO TO 45
+SV = (0.95 *FYV * ASV)/(B *(VS-VC»
+GO TO 55
+45 SV = 300.00
+C Write out the results.
+55 WRITE(2, 101) 'MOMENT =',MMT, 'kN.m.'.
+101FORMAT(II AI7, IX, F7.3, AS)
+WRITE (2, 102) 'SHEAR FORCE = ',SHR, 'kN.'
+102 FORMAT(lAI4, IX, F7.3, A3/).
+WRlTE(2, 103) 'STEEL REQUIRED = " AS, '(mm')'
+103 FORMAT(/AI7, IX, F6.I, A5/)
+WRITE(2, 104) 'LINK SPACING = ',SV, 'mm clc'Converting the above into FORTRAN program we have:

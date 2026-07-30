@@ -1,0 +1,91 @@
+=== PAGE 144: SLAB - Slab Analysis and Design ===
+
++'via External File'
+READ (1,239) INP
+239 FORMAT (AI)
+IF((INP .EQ. 'F).OR. (INP .EQ. 'f»1lIEN
+IN=3
+WRITE (1,59) 'Please Enter the Input Filename'
+READ (1,699) FNAMEI
+OPEN (3,FILE= FNAMEI)
+ELSE
+IN=I
+END IF
+WRITE (1,404)
+WRITE (1,404)is',is',
++'via the Terminal'
+WRITE (1,49) 'Please Enter letter - F- if the inputCOMMONHN
+OPEN (I. FILE = 'CON')
+403 FORMAT (3(1))
+WRITE (1,404)
+404 FORMAT(7(/»
+WRITE (1.9) 'WELCOME TO SLAB ANALYSIS
+AND DESIGN TO BS 8110'
+WRITE (I.19)'PROGRAM DEVEWPED AND
+WRITTEN BY ENGR. V .O.OYENUGA.'
+WRITE (I.29) 'NOVEMBER 1998'
+OPEN (2, FILE = 'LPTI ')
+WRITE (1,403)
+829 FORMAT (5X, A341)
+WRITE(1.39) 'INPUT IS EXPECTED VIA
+SCREEN OR FILE'
+WRITE(I,49) 'Please Enter letter -T - if the inputC
+C THIS PROGRAM ANALYSBS AND DESIGN
+SLABTO BS8110
+C 1997. THE PROGRAM DESIGNS UPTO 20
+DIFFERENT PANELS -
+C COMPRISING OF CANTILEVERS, SIMPLY
+SUPPORTED, CONTINUOUS
+C ANDTWO-WAY SLAB.
+REAL LCAN(20). LSS(20). LCON(20.20). LX(20).
+LY(20).LC,
++LCO(20). Lei. Le2. MS. MT.MG. ML, MSC(20).
+MTC(20). MSS.
++MC. MSP(20)
+INTEGERO. IN,NP, PT(20), NPL(20). NSPAN(20),
+NPLC(20.20), CS.
++CASE(20). PC. PCO(20). IX
+CHARACTER·20 FNAMEI. FNAME2. JOB,
+ENGR,DATE
+CHARACTER·3 BX, SPN, BN(20), IN~J, OTp·I,
+,..1,PASS·2
+DIMENSION H(20). UDL(20). PL(20,6). A(20.6),
+UDLC(20.20), .
++UCO(20), PLC(20.20.6). AC(20.20.6).ItCC(20,6),
+PCCO(20.6),
++PCC(20), ASC(20). ATC(20), RCT(20). APC(20),
+API(20).
++APCC(20.20), CANTMT(20.20), CANTLD(20.20),
+CTM(20), CTL(20).
++NS(20), ASP(20), S0(20)PROGRAM SLABProgram SLABListed below is the FORTRAN program to implement slabs as discussed in this Chapter, that is,
+Cantilever slab, simply supported slab, continuous one-way spanning slab and two-way spanning slab.
+The reader could refer to Section 2.12.2 of this book for details. Sample results are also enclosed. ..~-4.2
+10
+25
+250
+150
+26
+124
+22.05
+0.057362
+0.930753
+0.95
+0.930753
+115.4133
+804.4313Design of Simply Supported Slab - BS 8110.
+Span (m)
+Load(kN/m2)
+Concrete stress, feu,
+Steel Stress, fy,
+Depth of concrete (mm)
+Cover to reinforcement (mm)
+Effective Depth (mm)
+Moment,M,
+K-value
+Lever arm factor
+Lever arm factor maximum
+Used lever arm factor
+Lever arm, Z,
+Reinforcement area (mm2)
+Provide @ mmc/c.----End of Design.The reader should endeavour to run this program and print out the result which will be as shown
+below.STAIR DESIGN Reinforced Concrete Design128

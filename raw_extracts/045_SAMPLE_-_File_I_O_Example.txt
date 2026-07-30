@@ -1,0 +1,44 @@
+=== PAGE 45: SAMPLE - File I/O Example ===
+
+The programs .is divided into segments starting with the input segments where all the various
+input/output media are defined, the number and type of panels defined as well as their loading and span
+characteristics. .2.12.2 EnclosedPrograms:
+The programs are listed at the end of each discussion. e.g. SLAB after the chapter on slab design.
+ProgramSLAB: Program SLAB will implement a simply supported slab. cantilever slab. continuous
+slab (up to 20 spans) and two way slab. A total of 20 panels can be executed at a time. This can be
+increased simply by increasing the value in the DIMENSION statements to the required number of
+panels.Note that FNAMEI and FNAME2 are character strings and they enable the programmer to use external
+file names of eleven characters (name plus extensions). Once the names are specified. the program
+assigns the input device number 3 to the input file name and output device number 4 to the output file
+name. This program segment is taken from program SLAB and the reader is advised to study this in its
+full context.The first executable line opens the terminal (console) as a file and the second opens the printer as a file.
+Alternatively. one can use OPEN (2.FILE ='LPTI') or OPEN (2. FILE ='COMI') for printer
+output. PRN and LPTI, LPT2 are for parallel port printers (the most common) while COMI, COM2,
+COM3, are for serial port printers. The user must examine the printer port prior to implementation.PROGRAM SAMPLE
+C This program illustrate the use of OPEN statements to open the terminal, printer and file.
+OPEN (I, FILE ='CON')
+OPEN (2, FILE ='PRN')
+WRITE (I.49) 'Please Enter letter -T- ifthe input is via the Terminal'
+WRITE(1.49) 'Please Enter letter -F- ifthe input is via External File'
+READ (1. 239) INP
+239 FORMAT (AI)
+IF «INP .EQ. 'F') .OR. (INP .EQ. r»THEN
+WRITE (I.59)' Please Enter the Input File name'
+NI=3
+READ (1.249) FNAMEI
+OPEN(3.FILE=FNAMEI)
+ELSE
+NI=1
+WRITE (1, 49) 'Please Enter letter -P- ifthe output is via the Printer'
+WRITE (1, 49) 'Please Enter letter -F- ifthe output is via External File'
+READ (1. 239) OTP
+IF«OTP .EQ. 'P') .OR. (OTP .EQ. 'P'» THEN
+NO=4
+WRITE (1. 59) 'Please Enter the Output file name'
+READ (1.249) FNAME2
+ELSE
+NO=2
+END IF
+49 FORMAT (l5X. A43. IX. AI8I)
+59 FORMAT (15X, A341)
+249 FORMAT (A20)29COMPUTERPROI3RAMMING Reinforced Concrete Design

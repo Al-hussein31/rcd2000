@@ -1,0 +1,1562 @@
+Total pages with FORTRAN code: 19
+Pages: [22, 23, 39, 40, 41, 43, 45, 89, 144, 149, 150, 173, 174, 207, 214, 242, 246, 315, 319]
+
+=========== PAGE 22 ===========
+Solution 1.1:
+The steps to be adopted in solving the above problem include :
+(i)Given items: -- span (6.0m). load (80kN/m); size (450 x 225mm); concrete stress
+(25N/mm2); steel stress (410 N/mm2). We can also adopt a cover of 50mm.Example 1.1:
+Write a FORTRAN PROGRAM to design a 6m beam simply supported and carrying a uniformly
+distributed load of 80 kN/mrum. Take beam size as450x225mm and use feu =25N/mm 2and fy=
+410N/mm2.1.7.2 Computer Programming Using FORTRAN.
+FORTRAN, the language discussed in this book means FORmular TRANslation and by virtue of its
+name is very amenable to mathematical manipulations. The core of the language is summarised in
+Chapter 2of this book. The pro gram written in high level language are converted to machine language
+by converters generally called compilers (for FORTRAN. C, P ASCAL etc.), or interpreters (for
+BASIC) or assemblers (for Asse mbly language) .FORTRAN use scompilers and a good example is
+WATFOR77 or WATFOR87. Program writing generally follows. the sequence of execution of the
+problem itself asshown in Example 1.).The computer system can be said to consist of the hardware system and the software system .The
+Hardware system consists of all the physical machines, which include the computer itself (central
+processing unit, primary memory ,arithmetic and logic unit), the sec ondary memory system (hard disc .
+floppy disc, CDROM), printers a nd plotters and video display unit ( monitors) .Software generally are
+programs written for a specific pu rpose and stored in a secondary sto rage device for later use .Software
+arewritten in a coded language fo r the use of the computers. The special languages are referred toas
+programming languages and typical examples include FORTRAN, B ASIC,COBOL, C, ALGOL and
+PASCAL. FORTRAN, BASIC. PASCAL and C are good for engineering analysis and design.Computers used in structu ral engineering practice can be defined in the same vein as general purpose.
+stored program, and electronic digital computers. Digital means that within the computer .discrete
+digits represent numbers, which is in contrast to analog computers where numbers are represented by
+continuously varying physical quantities. Digital computers can also represent and manipulate symbols
+other than numbers, such as alphabetic characters or geometric entities .Electronic means that
+electronic circuits perform the internal operations. Stored program means that for each application the
+computer is provided with a sequence of steps or instructions, called the program, which defines the
+process of solution. General purpose means that the computer is not built specifically for one type of
+application so that by using different programs it is capable of solving a wide variety of problems .• high speed;
+• high memo ries.• electronic device; • automatic operation;
+• stored program concept;
+• accuracy and prec iseness and1.7 COMPUTER APPLICATION
+1.7.1 The Computer
+The computer can be defined as an automatic and reliable electronic
+...
+
+=========== PAGE 23 ===========
+(iii)The design for reinforcement will follow K = M/f"ubd2 and if K < 0.156,
+la=0.5+~(0.25-K / 0.9) s0.95 and As=M~ 95f I d/0. Y a
+(iv)The shear is designed as follows: v=V/bdand 100As/bdis calculated to obtain Ve'(see
+Table 10.13). If vexceed v e,s, (link spacing) is calculated from Sy=(0.95 fyAsv)/(b(v - ve»wl2 wi
+(ii)The bending moment is calculated from M = -8-and shearing force from V =2'INTRDDUCTIDN 1~.---.-------------------------------~--.-~---Reinforced Concrete Design
+C
+C
+C
+C
+C
+C
+25
+•IPROGRAM BMDSGN
+REAL MMT, K, LA
+C Program for the design of a rectangular beam
+C Input is via the terminal and output via printer.
+OPEN (1,FILE ='CON')
+OPEN (2, FILE ='PRN')
+SPAN - beam length, UDL - Beam load, MMT -Beam moment and SHR - beam shear
+D-Beam effective depth, B-Beam width, FCU - concrete stress and FY -steel stress,
+FYV - steel stress (stirrups).
+Read in all the necessary data.
+READ(1,*) SPAN, UDL, D, B, FCU, FY, FYV
+Calculate the bending moment and shearing force.
+MMT = 0.125 *VDL *SPAN **2.0
+SHR = 0.5 *VDL*SPAN
+Carry out all necessary design checks.
+K = (MMT* I .OE06)/(FCU *B*D**2.0)
+IF(K .LE. 0 .156) GO TO 35
+D = D+50.0
+GO TO 25
+35 LA = 0.5 + (0.25 - KlO.9)**0.5
+IF (LA .GT. 0.95) LA = 0.95
+C Calculate steel area.
+AS = (MMT *1.0E06)/(0.95 *FY*LA *D)
+C Check and design for shear.
+VS = (SHR *LOE03)/(B *D)
+STPER = (100.0 *AS)/(B*D)
+READ(I, *) VC, ASV
+IF (VC .GT. VS) GO TO 45
+SV = (0.95 *FYV * ASV)/(B *(VS-VC»
+GO TO 55
+45 SV = 300.00
+C Write out the results.
+55 WRITE(2, 101) 'MOMENT =',MMT, 'kN.m.'.
+101FORMAT(II AI7, IX, F7.3, AS)
+WRITE (2, 102) 'SHEAR FORCE = ',SHR, 'kN.'
+102 FORMAT(lAI4, IX, F7.3, A3/).
+WRlTE(2, 103) 'STEEL REQUIRED = " AS, '(mm')'
+103 FORMAT(/AI7, IX, F6.I, A5/)
+WRITE(2, 104) 'LINK SPACING = ',SV, 'mm clc'Converting the above into FORTRAN program we have:
+
+...
+
+=========== PAGE 39 ===========
+C MAIN PROGRAM
+C Calculate Discount through FUNCI'ION DISCI'F
+AMOUNI'=SALES - DISCI'F(SALES)
+WRITE (2,23) "CUSTOMER TO PAY N.AMOUNT
+STOP
+ENDe.g. Calculation of a discount based on sales:"type" refers to the FUNCTION type .that is REAL .INTEGER. OOUBLE PRECISION or
+COMPLEX.
+"name" refers to the function name (an operand) that returns the value.
+"argument list" refers to the list of dummy arguments.
+"RETURN" is usedto indicate the point in the execution path at which control is returned .
+There may be more that one RETURN.
+"END" tenninates the sub-program.Where:RETURN
+ENDname=expressiontype FUNCTION name (argument list)2.7.3Function Subprogram:
+Like the statement function, function sub-program produces only one result. But unlike statement
+functions. itis external to the calling program (that is. complied separately) and can contain more than
+one expression. It has an associated type like intrins ic function and statement function. The general
+form is:2.7.2Statement Function :
+Astatement function is similar to an intrinsic function except that it is defined by the programmer and
+is part of the main program. It returns a value that is used in the evaluation.
+e.g. AREA (X.Y) =X'" Y (statement function)
+PERI(X,Y)=2.0'" (X+Y) (statement function)
+0027 1=1.10
+AR(I)=AREA (A(I). B(I»
+PR(I)=PERI (A(I). B(I»
+27 CONTINUE .
+Statement functions must follow the header statements (see Section 2.9.1) and must precede any
+executable statement.e.g. C =SQRT (A'" 2.0+ B"'''' 2.0)
+OLU=PAN ...ALOG W(AIB+C)
+NIK=LIT ...LOG(ITA)23COMPUTER PROGRAMMING Reinforced Concrete Design
+
+...
+
+=========== PAGE 40 ===========
+STOP
+ENDC NP -Number of Pipes in the Loop- ( S 50)
+C~ PLOSS(NP, R~, C, D), Q, H, HQ)
+DELQ=HI.(l.85 ... HQ)C MAIN PROGRAMR=6.78 L (Hazen-William's formula),
+C=Hazen - William's friction factor,
+L=Pipe Lengthe.g. Calculating the loop error in a looped water reticulation network using
+6Q=LH(Loop flow error)
+nL(HIQ)
+H =RQn,
+R=Pipe resistance,
+D=Pipe diameter andSUBROUTINE name (argument list or no list)
+(FORTRAN statements)
+RETURN
+END
+There can bemany RETURN statements depending on the program path. The argument list (if any) is
+a list of dummy arguments separated by commas. The argument can be of any type and also a
+subprogram name. Printing, storing of intermediate results can be executed in a subroutine like in a
+function subprogram. Generally arguments with known values are listed first followed by those whose
+values are required.The general form is:2.7.4 Subroutine Subprogram:
+Asubroutine has the following characteristics:
+(i) has no associated type, hence no implied type;
+(ii)may return more than one results or no result at all;
+(iii) the name is not an operand and has no value assigned to it and
+(iv) it is invoked through a C~ statement.C
+C Function Subprogram Called.
+FUNCTION DISCTF(SL)
+IF (SL .LT. 2000.0) THEN
+DISCTF=0.0 '"SL
+ELSEIF «2000 ..LE. SL) .AND. (SL .LT. 5000.0»THEN
+DISCTF=0.07 '"SL
+ELSE .
+DISCTF =0.10 '"SL
+END IF
+RETURN
+ENDCDMPUTER PRDGRAMMING Reinforced 'Concrete Design '24
+
+...
+
+=========== PAGE 41 ===========
+OrThe FORMAT statement label is a positive integer value
+Examples are:
+READ (5, 100) X, Y, ZThe unit number is a positive integer constant or an integer variable previously assigned some positive
+integer value.2.8.1READStatement: The general format is:
+READ (u, i) input list
+where ",is device unit number (console, external file) and ithe FORMAT statement number.READ/WRITE statements consist of statements that cause the transmission of external data to and from
+the computer system.2.8 INPUT/OUTPUT STATEMENTS
+Input/output statements are READ and WRITE. There are other auxiliary input/output statements such
+as REWIND, BACKSPACE etc.Itshould be noted that one of the arguments of the subroutine is in itself a function subprogram, R(L,
+C,D).FUNCrION R(L,C,D)
+REALL
+R=6.78 ·L
+RD=(C··l.85 • D·· 4.865
+R=RIRD
+RETURN
+ENDC
+C
+CSUBROUTINE PLOSS (NP, R(L,C,D), Q,H,HQ)
+REALL(lO)
+DIMENSION C(50), D(50), HL(50), HLQ(50)
+H=O.oo
+HQ=0.00
+DO 7 I=I, NP
+RL=L(I)
+RC=C(I)
+RD= D(I)
+HL(I) = R(RL, RC,RD) *Q(I)**1.85
+HLQ(I) = HL(I) / Q (I)
+H=H+HL(I)
+HQ = HQ + HLQ(J)
+7 CONTINUE
+RETURN
+ENDC Subprograms called
+C25CDMPUTERPRDBRAMMINB Reinforced Concrete Design
+
+...
+
+=========== PAGE 43 ===========
+2.9.3ClosingStatements: The two closing statements for main programs are :STOP and END ·
+and for sub-programs are: RETURN and END2.9.2Main Body: .The main body is where the logic of the program, the input and output statements
+are expressed. This will also include call to subroutines and functions and format statements.None of these statements is compulsory but whenever any is used, it must appear before any
+executable statement.Header Statement Meaning
+PROGRAM Program name
+INTEGER Declaration statement for i nteger variables .
+REAL Declaration statement for real variables.
+DOUBLE PRECISION Declaration statement for Double precision v ariables.
+COMPLEX Declaration statement for comglex v ariables.
+LOGICAL Declaration statement for logical variables .
+CHARACTER Declaration statement for Character variables.
+DIMENSION Fortran statement for sizing subscripted var iables.
+COMMON Fortran statement for variables to be set aside as common.
+PARAMETER Fortran statement for variables that would have uniquevalue.2.9.1Header Statements: These are statements that must precede any executable statement and the
+list includes, but not limited to those in Table2.1.
+Table2.1:FORTRAN Header Statements2.9FORTRAN STRUCTURE
+All FORTRAN programs can be sa id to consist of three major parts and these are:
+(i)the header statements,
+(ii) the main body of the program and
+(iii) the closing statements.'WELCOME', 'SIR': written as A7, IX, A3
+'ANSWER', '=',73.47: written as A6, IX, AI, IX, F5 .2
+The Slash (I)format: This is used to generate a new line. For example,
+100FORMAT(1I3X, A4) - Two lines arejumped before proceeding.TheX-Format:This is used to specify spaces (i.e. blanks).
+For example-73.23=-7.323 x 101 written as -EIO .3
+The A -format: The A - format is used to specify strings of characters and is of the general form:
+nAw,where nand ware as defined before.
+Examples are: 'THIS LECTURE NOTE IS BIG' represented by A24
+'WELCOME ' represented by A7 and
+'SEE YOU' also represented by A7
+Note that all spaces and characters within the quotes are counted.21CDMPUTERPRDGRAMMING Reinforced Concrete Design
+
+...
+
+=========== PAGE 45 ===========
+The programs .is divided into segments starting with the input segments where all the various
+input/output media are defined, the number and type of panels defined as well as their loading and span
+characteristics. .2.12.2 EnclosedPrograms:
+The programs are listed at the end of each discussion. e.g. SLAB after the chapter on slab design.
+ProgramSLAB: Program SLAB will implement a simply supported slab. cantilever slab. continuous
+slab (up to 20 spans) and two way slab. A total of 20 panels can be executed at a time. This can be
+increased simply by increasing the value in the DIMENSION statements to the required number of
+panels.Note that FNAMEI and FNAME2 are character strings and they enable the programmer to use external
+file names of eleven characters (name plus extensions). Once the names are specified. the program
+assigns the input device number 3 to the input file name and output device number 4 to the output file
+name. This program segment is taken from program SLAB and the reader is advised to study this in its
+full context.The first executable line opens the terminal (console) as a file and the second opens the printer as a file.
+Alternatively. one can use OPEN (2.FILE ='LPTI') or OPEN (2. FILE ='COMI') for printer
+output. PRN and LPTI, LPT2 are for parallel port printers (the most common) while COMI, COM2,
+COM3, are for serial port printers. The user must examine the printer port prior to implementation.PROGRAM SAMPLE
+C This program illustrate the use of OPEN statements to open the terminal, printer and file.
+OPEN (I, FILE ='CON')
+OPEN (2, FILE ='PRN')
+WRITE (I.49) 'Please Enter letter -T- ifthe input is via the Terminal'
+WRITE(1.49) 'Please Enter letter -F- ifthe input is via External File'
+READ (1. 239) INP
+239 FORMAT (AI)
+IF «INP .EQ. 'F') .OR. (INP .EQ. r»THEN
+WRITE (I.59)' Please Enter the Input File name'
+NI=3
+READ (1.249) FNAMEI
+OPEN(3.FILE=FNAMEI)
+ELSE
+NI=1
+WRITE (1, 49) 'Please Enter letter -P- ifthe output is via the Printer'
+WRITE (1, 49) 'Please Enter letter -F- ifthe output is via External File'
+READ (1. 239) OTP
+IF«OTP .EQ. 'P') .OR. (OTP .EQ. 'P'» THEN
+NO=4
+WRITE (1. 59) 'Please Enter the Output file name'
+READ (1.249) FNAME2
+ELSE
+NO=2
+END IF
+49 FORMAT (l5X. A43. IX. AI8I)
+59 FORMAT (15X, A341)
+249 FORMAT (A20)29COMPUTERPROI3RAMMING Reinforced Concrete Design
+
+...
+
+=========== PAGE 89 ===========
+WRITE(6,49) 'IS INPUT DESIRED VIAFILE-
+YESINO'
+READ(6,59) ANSI
+IF(ANSI .EQ. 'YES')THEN
+WRITE(6,79) 'ENTER THE INPUT FILENAME'
+READ(6,59) FNAMEI
+OPEN(I,FILE=FNAMEI)
+NI=I
+END IF
+WRITE(6,49) 'ISOUTPUT DESIRED VIA
+FU..ElPRINTER?'
+WRITE(6,69) 'ENTER 2 FOR PRINTEROUTPtrr
+WRITE(6,69) 'ENTER 4 FOR FILEOUTPlTI'"
+READ(6,·) NO
+IF(NO .EQ. 2)TIlEN
+OPEN (2,FILE= 'PRN')
+ELSEIF(NO .EQ. 4) TIlEN
+WRITE(6,79) 'ENTER THE OUTPUT FU..ENAME'
+READ(6,59) FNAME2
+OPEN (4,FILE= FNAME2)
+END IF
+C ENDOFGENERAL STATEMENTS.
+C
+C MODULE 1 - LAYOUT
+C
+C READ INTIlE BEAM INPUTDATA.
+WRITE(6,129) 'ABOUTTO READ - PRESSANY
+KEYWHENREADY'
+PAUSE
+IF (NI .EQ. I) TIlEN
+READ(I,.)NS,NM
+DO7 I = I,NS,(NS-I)
+7 READ (I,.)TY(I), CANTLD(I), CANTMT(I)
+DO17 1= I,NM
+17 READ(I,·) M(I), N1 (I),N2(1),1..(1), IV(I),E(I)
+DO 27I=I.NM
+READ(I,.)M(I), UO(l), WT(I), WB(I),AB(I),
+NP1..(I)
+IF(NP1..(I).NE. 0) THEN
+READ(I,.)(P(I,J),J=I,NP1..(I», (AP(U),
+J=I,NP1..(I»
+ENOIF
+27 CONTINUE
+ELSEIF(NI .EQ. 6) THEN
+WRITE(6,69) 'ENTER NO. OF SUPPORTS,
+MEMBERS'
+READ(6,·) NS,NM
+WRITE(6,89),ENTEREND SUPPORTS ID.NO.,
+LOADSAND MOMENT,IF ANY'
+DO 37 I = 1,NS,(NS-I)
+37 READ(6,·) TY(I), CANTW(I), CANTMT(I)
+WRITE(6,99) 'ENTER MEMBER PARAMETERS'
+DO 47 1= I,NM
+47 READ(6,·) M(!),NI(I). N2(1),UI), IV(I),E(I)
+WRITE(6,109) 'ENTER MEMBER LOADS'
+~..,C
+C THE PROGRAM ISBROKEN DOWN INTOTHE
+FOLLOWINGMODULES:
+C MODULE I - LAYOUT: TO READTHE
+BEAMSPHYSICALPROPERTIES AND
+C LOADINGSYSTEMS.
+C MODULE 2 - MOMENT: TOCALCULATE
+THEJOINTBENDINGMOMENTS.
+C MODULE 3 - FORCE: TO CALCULATETHE
+SHEARFORCESAND REACTIONS.
+C MODULE 4 - RESULT: TO OUTPUTTHE
+RESULTS.
+C
+CGENERALSTATEMENTS.
+OPEN(6,FILE ='CON')
+NI=6
+WRITE(6,9) 'WELCOME TO CONTINUOUS
+BEAMANALYSISUSINGTHE',
++THREE MOMENTS (CLAPEYRON S)
+EQUATIONSMETHOD'
+WRITE(6,19) 'PROGRAM DEVELOPED AND
+WRI'ITEN BY VOOYENUGA'
+WRITE(6,29) 'JULY 1990'
+WRITE(6,39) 'INPUT/OUTPUT EXPECTED VIA
+FILEOR VIA',
++'SCREEN/PRINTER'NDIM=21REAL1..(20),1V(20),MT(20), Ll, L2
+INTEGERTY(21)
+CHARACTER·20fNAMEI, FNAME2, ANSI,
+ANS2,RUNS
+DIMENSIONM(20), NI(2J), N2(21), E(20), U(20),
+NP1..(20),wr(20),
++WB(20),AP(20,4), FREEMT(20), SRNJ(20),
+SRN2(20), P(20,4),
++RHS(21),XMT(21), SPMT(20), SFN1(20),
+SFN2(20),CANTW(21),
++CAN1MT(21), A(21,21), UD(20),
+AB(20),REACTN(21),SUMAX(21)
+CC
+C ANALYSISOF STATICALLYDETERMINATE &
+INDETERMINATEBEAMS USINGTHE
+C CLAPEYRON'SllIREE MOMENTS
+EQUATIONS.
+C TIfIS PROGRAMCAN HANDLEAMAXIMUM
+OF 20SPANS.
+CTHE PROGRAMDBTBRMINESTHE JOINT
+MOMENTS,SPANMOMENTS, SHEAR AND
+C REACTIONS.
+CPROGRAMTRIMTCV OOYENUGA
+CThis program can handle triangular, trapezoidal, and point loads in addition to the usual uniformly
+distributed load. Both the triangular and trapezoidal loads are converted to equivalent uniformly
+distributed loads. The system of point loads accepts up to 4 number point loads per span. The listing of
+the program follows.48.WB Real- array Tr¥ezoidal load.
+49.WT Real- array Triangular load.
+50.XMT Real- array Working variable as defined.73STRUCTURAL ANALYSIS Reinforced Concrete Design
+
+...
+
+=========== PAGE 144 ===========
++'via External File'
+READ (1,239) INP
+239 FORMAT (AI)
+IF((INP .EQ. 'F).OR. (INP .EQ. 'f»1lIEN
+IN=3
+WRITE (1,59) 'Please Enter the Input Filename'
+READ (1,699) FNAMEI
+OPEN (3,FILE= FNAMEI)
+ELSE
+IN=I
+END IF
+WRITE (1,404)
+WRITE (1,404)is',is',
++'via the Terminal'
+WRITE (1,49) 'Please Enter letter - F- if the inputCOMMONHN
+OPEN (I. FILE = 'CON')
+403 FORMAT (3(1))
+WRITE (1,404)
+404 FORMAT(7(/»
+WRITE (1.9) 'WELCOME TO SLAB ANALYSIS
+AND DESIGN TO BS 8110'
+WRITE (I.19)'PROGRAM DEVEWPED AND
+WRITTEN BY ENGR. V .O.OYENUGA.'
+WRITE (I.29) 'NOVEMBER 1998'
+OPEN (2, FILE = 'LPTI ')
+WRITE (1,403)
+829 FORMAT (5X, A341)
+WRITE(1.39) 'INPUT IS EXPECTED VIA
+SCREEN OR FILE'
+WRITE(I,49) 'Please Enter letter -T - if the inputC
+C THIS PROGRAM ANALYSBS AND DESIGN
+SLABTO BS8110
+C 1997. THE PROGRAM DESIGNS UPTO 20
+DIFFERENT PANELS -
+C COMPRISING OF CANTILEVERS, SIMPLY
+SUPPORTED, CONTINUOUS
+C ANDTWO-WAY SLAB.
+REAL LCAN(20). LSS(20). LCON(20.20). LX(20).
+LY(20).LC,
++LCO(20). Lei. Le2. MS. MT.MG. ML, MSC(20).
+MTC(20). MSS.
++MC. MSP(20)
+INTEGERO. IN,NP, PT(20), NPL(20). NSPAN(20),
+NPLC(20.20), CS.
++CASE(20). PC. PCO(20). IX
+CHARACTER·20 FNAMEI. FNAME2. JOB,
+ENGR,DATE
+CHARACTER·3 BX, SPN, BN(20), IN~J, OTp·I,
+,..1,PASS·2
+DIMENSION H(20). UDL(20). PL(20,6). A(20.6),
+UDLC(20.20), .
++UCO(20), PLC(20.20.6). AC(20.20.6).ItCC(20,6),
+PCCO(20.6),
++PCC(20), ASC(20). ATC(20), RCT(20). APC(20),
+API(20).
++APCC(20.20), CANTMT(20.20), CANTLD(20.20),
+CTM(20), CTL(20).
++NS(20), ASP(20), S0(20)PROGRAM SLABProgram SLABListed below is the FORTRAN program to implement slabs as discussed in this Chapter, that is,
+Cantilever slab, simply supported slab, continuous one-way spanning slab and two-way spanning slab.
+The reader could refer to Section 2.12.2 of this book for details. Sample results are also enclosed. ..~-4.2
+10
+25
+250
+150
+26
+124
+22.05
+0.057362
+0.930753
+0.95
+0.930753
+115.4133
+804.4313Design of Simply Supported Slab - BS 8110.
+Span (m)
+Load(kN/m2)
+Concrete stress, feu,
+Steel Stress, fy,
+Depth of concrete (mm)
+Cover to reinforcement (mm)
+Effective Depth (mm)
+Moment,M,
+K-value
+Lever arm factor
+Lever arm factor maximum
+Used lever arm factor
+Lever arm, Z,
+Reinforcement area (mm2)
+Provide @ mmc/c.----End of Design.The reader should endeavour to run this program and print out the result which will be as shown
+below.STAIR DESIGN Reinforced Concrete Design128
+
+...
+
+=========== PAGE 149 ===========
+SUBROUTINE
+TWOWAY(N,LX,LY,U,CN,HN,FCU,FY ,SR,MS,AS.MT,
+AT,ML,AL,
++MG,AG,AR,WL,WS,DN,FS,FT,FL,FG,ASP,FF,FX)
+REAL LX, LY, K, MT, MS, MG, ML
+INTEGER CN, 0,HECK
+DIMENSION DG(9), DL(9), OT(9), DS(9)
+DATA
+DG/0.032,O.037,O.037,O.047,O.OO,O.04S,O.OO,O.OS7,O.00I
+DATA
+DUO.024,O.028,O.028.0.03S,O.03S,O .03S,O.043,O.043,O.OS
+61
+K =LY/LX
+DS(I) = -0.0384 +0.0816·K - 0.0I9O·K"2.0
+DT(I) = -0.0431 +0.0970·K - 0.0216·K··2.0
+DS(2)= -0.0254 +0.0691·K - 0.01S3·K•• 2.0
+DT(2)= -0.0332 +0.0914·K - 0.020S"'K··2.0
+OS(3) = -0.0471 +O.094S·K - 0.019'·K··2.0
+DT(3)=-0.0620 +0.12S4"'K - 0 .0260·K··2.0
+DS(4)=-0.0321 +0.0843"'K - 0.0169·K •• 2.0
+DT(4)= -0.0467 +0.1184·K - O.0248"'K··2.0
+DS(S)=-0.0003+0.0438"'K - 0.0090...K·... 2.0
+DT(S)= -0.0079 +0.0680·K - 0.0149·K ...·2.0
+DS(6)= -0.0726 +0.13S6"'K - 0.0277"'K··2.0
+OT(6) =0.00
+DS(7)=-0.0314+0.0970·K - 0.0225...K·... 2.0
+DT(7) = -0.0385 +0.1250·K - 0.0287·K"2.0
+DS(8)= -0.0628 +0.1337·K - 0.0271·K.·2.0
+DT(8)=0.00C
+CSUBROUTINE TWTYPE
+OPEN (I,FILE='CON')
+WRITE (1,9) 'ENTER -I- FOR INTERIOR
+PANEL'
+WRITE (1,9) 'ENTER -2- FOR ONE SHORT
+DISCONTINUOUS'
+WRITE (1,9) 'ENTER -3- FOR ONE LONG
+DISCONTINUOUS'
+WRITE (1,9) 'ENTER -4-FOR TWO ADJACENT
+EDGES DISCONTINUOUS'
+WRITE 0,9) 'ENTER -5-FOR TWO SHORT
+EDGES DISCONTINUOUS'
+WRITE (1,9) 'ENTER -6-FOR TWO LONG
+EDGES DISCONTINUOUS'
+WRITE (1,9) 'ENTER -7- FOR THREE EDGES
+DlSCONT.- I LONG CONT.'
+WRITE (1,9) 'ENTER -8- FORTHREE EDGES
+DlSCONT.- I SHORT CONT:
+WRITE (1,9) 'ENTER -9- FOR FOUR EDGES
+DISCONTINUOUS'
+9 FORMAT (ISX,A50)
+RETURN
+ENDCWRITE (1,9) 'ENTER -3- FOR CONTINUOUS
+SLAB'
+WRITE (1,9) 'ENTER -4-FOR TWO WAY
+SLAB'
+READ (I,·) IC
+9 FORMAT (/SX,A32)
+19 FORMAT (ISX,A1911)
+29 FORMAT (A3)
+RETURN
+END133 STAIR OESII3N
+C
+C SUB-PROGRAMS CALLED .
+C
+SUBROUTINE STYPE(IC,BC)
+CHARACfER BC·3
+OPEN (l,F1LE='CON')
+WRITE (1,19) 'ENTER PANEL 10. NO.'
+READ (1,29) BC
+WRITE (1,9) 'ENTER -I- FOR CANTILEVER
+SLAB'
+WRITE (1,9) 'ENTER -2- FOR S. SUPPORTED
+SLAB'STOP
+END39 FORMAT (/SX,A40/)
+49 FORMAT (/SX,A43,IX,AI8I)
+59 FORMAT (/SX,A341)
+69 FORMAT (A30)
+79 FORMAT (/SX.A46/)
+89 FORMAT (/SX,A26/)
+99 FORMAT (/SX,AI4,2X.I2I)
+929 FORMAT (/5X.A14.2X,A3/)
+109 FORMAT (/SX,A39,AI9/)
+119 FORMAT (ISX,A381)
+129 FORMAT (/SX,A14.2X,12,2X,A2S,1X,A 10/)
+139 FORMAT(/5X,A261)
+149 FORMAT (/SX,A381)
+159 FORMAT (SX,AI4,IX,12,2X,A20,IX,AI7/)
+179 FORMAT (/SX,A8,1X,12,2X,A26,2X.A18)
+189 FORMAT (ISX,A14,1X,I2,A1,I1,2X.A14,1X,A221)
+199 FORMAT (/5X,A47,AS/)
+209 FORMAT (/SX;A221)
+219 FORMAT (/SX.A42)
+699 FORMAT (A20)
+8 FORMAT (23X.A34)
+18 FORMAT (23X,A34111)
+28 FORMAT (SX.A9.1X.A20.12X.A8.1 X.A20)
+38 FORMAT (/SX,AI0,1X,A3.28X,A 18,3X ,II)
+48 FORMAT (SX,A7,3SX,A6,1X.F6.2,1 X.A2,6(/»
+58 FORMAT
+(SX,AS,2X.FS .3,A1,8X.AS,2X,FS.3.A1,8X.A9.1X,FS.3)
+68 FORMAT
+(ISX,A6,I X,F4.I,1 X,A8,21X,A6,I X,FS.I,I X,A8)
+78 FORMAT (3SX,AI0)
+88 FORMAT (IIOX,A7,8X,A 13 ,8X,A14,7X,A 7/)
+108 FORMAT (SX,A2S,1X,F6.3,1 X,A4I/)
+118 FORMAT (5X,A28,IX,F8.3,IX,A6)
+138 FORMAT (5X,AIO)
+148 FORMAT (1/80('-'»
+158 FORMAT (2(1)
+168 FORMAT (/SX,AI0,1X,A3,28X,A231)
+178 FORMAT (IISX,AI7,1 X,F
+...
+
+=========== PAGE 150 ===========
+-I'".
+SUBROUTINE STEEL(M,D,FCU,FY,HECK,AST)
+REALM,K,LA
+INTEGER HECK
+H=D+25
+HECK=I
+AST=0.00
+K=(M·1.E06)1(FCU·1000.·D ....2.0)
+IF(K .GT. 0.156) HECK =0
+IF (HECK .EQ. 0)GOTO35
+LA=0.5 + SQRT(0 .25-KlO.9)
+IF(LA .OE. 0.95) LA =0.95
+AST=(M·1.0E06)1(O .95"'FY.LA*D)CCSUBROUTINE
+DEFLEC(N,I,D.AS.FY,SPAN.M,SR.HECK,DI,ASD.A,FS
+.FACf)
+CHARACfER*IANS
+INTEGER HECK
+REALM,KT
+OPEN (l,FlLE ='CON')
+HECK=I
+ASD = AS
+GOT05
+15 WRITE (1,9) 'PANEL
+',N:CALCULATED/CHOSEN STEEL IS:'.ASD
+WRITE (1,19) 'ENTER THE DESIRED STEEL'
+READ(1,"')ASD
+5 KT = M/(I000.oo"'D"''''2.0)
+PS=(0.667·FY)"'(AS/ASD)
+FACT=120.00*(0 .9 + KT)
+FACT=0.55 + (477 .00 -PS)lFACT
+IF(FACT .GT. 2.0) FACT = 2.0
+01 = (SPAN/(SR·FACT»·IOOO.
+IF(DI .GT. D)THEN
+DPS = D+Z5
+WRITE (1,79) 'Present total depth of slab =
+',DPS,'mm'
+WRITE (1,39) 'Deflection not OK - Increase Steel? -
+YIN'
+WRITE (1,29) 'Enter YforYESand N for NO'
+25 READ (1,49) ANS
+IF«ANS .EQ. 'n') .OR. (ANS .EQ. 'N'» HECK ::::0
+79 FORMAT (/IOX,A30.F4.0.A2I)
+IF(HECK .EQ. 0) GO TO35
+IF«ANS .EQ. 'Y').OR. (ANS .EQ. 'y')}GOTO 15
+END IF
+9 FORMAT (/5X,A5,2X,12, IX,A27,2X,F6.1)
+19 FORMAT (/5X,A24)
+29 FORMAT (/5X.A28)
+39 FORMAT (15X.A41)
+49 FORMAT(AI)
+35 RETURN
+ENDC
+SUBROUTINE
+CANTI(N.FCU.FY ,L,HN,U.NPL,PL,APC,SR.MC,ACT,V
+.DN,
++ AXP.FF,FX)
+REALMC,L
+INTEGER HECK
+DIMENSION PL(20), APC(20)
+V=U"'L
+MC = U"'L"'*2.OIZ.0
+IF(NPL .NE. 0) THEN
+007 I=I.NPL
+MC=MC + PL(I)*APC(I)
+7V:: V+ PL(I)
+END IF
+5 D = HN - 25.0
+HECK=I
+CALL STEEL(MC,D,FCU.FY,HECK,AST)C
+C DESIGN - SHORT SPAN.
+MS = DS(CN)"'U"'LX"''''2.0
+FS= DS(CN)
+50=HN -25.
+CALL STEEL(MS.D.FCU.FY,HECK,AST)
+IF(HECK .EQ .0) HN = HN + 25
+IF(HECK .EQ. 0) GO TO 5
+AS = AST
+MT = DT(CN)"'U"'LX"''''2.0
+FT= DT(CN)
+CALL STEEL(MT,D,FCU.FY ,HECK,AST)
+IF(HECK .EQ. 0) HN= HN + 25
+IF(HECK .EQ. 0) GO TO 5
+AT = AST
+CDESIGN - WNG SPAN
+ML = DL(CN)"'U"'L)("''''2 .0
+FL = DL(CN)
+D=D-14.0
+CALL STEEL(ML,D,FCU.FY ,HECK.AST)
+IF(HECK .EQ. 0) HN = HN + 25
+IF(HECK .EQ. 0) GO TO 5
+AL = AST
+MG = DG(CN)"'U"'LX"''''2.0
+FG= DG(CN)
+CALL STEEL(MG.D.FCU.FY.HECK,AST)
+IF(HECK .EQ. 0) HN =HN + 25
+IF(HECK .EQ. 0) GO TO5
+AG=AST
+C
+C CHECK FOR DEFLECTION
+D=D+14
+HECK:: I
+CALL
+DEFLEC(N,4,D,AS.FY.LX,MS.SR,HECK,DN.ASN,ASP,
+FF,FX)
+AS = ASN
+IF(HECK .EQ. 0) HN= HN+ 25
+IF(HECK .EQ. 0) GO TO 5
+C TORSIONAL STEEL.
+AR = 0.75"'AS
+AM = 0.25"'1000."'HNIt00.0
+IF(AR.LT. AM) THEN
+AR=AM
+ENDIF
+C CALC. EQUIVALENT BEAM LOADS
+WS=(1.0I3.0)"'U"'LX
+WL=(0.5·U"'LX)"'(1.0 - (1.0I(3.0*K*·Z.0»)
+RETURN
+ENDIF(FY .LE. 250) C = 0.24
+IF(FY .GT. 250) C =0.13
+AM = (C"'IOOO."'H)/loo.O
+IF(AM .GT .AST) AST = AM
+35 RETURN
+ENDDS(9)= -0.0612 + 0.1509·K - 0 .0335.K ....2.0
+DT(9) =0.00STAIR DESIGN Reinforced Concrete Design134
+
+...
+
+=========== PAGE 173 ===========
+REALMST(lO). MHT(10). MQT(10).
+MSB(lO) ,MCS(lO), MSP(lO),
++LST(lO), LHT(10). LQT(lO). LSB(10).
+LCS(10), LSP(lO), LLD(lO).
++M
+DIMENSION TR(lO). RS(lO). UDL(lO) ,
+WAIST(lO). SLF(lO),ASST(lO).
++SPLD(10), WLD( 10)
+CHARACTER COY*65, ANS*I,
+TYPE(10)*25, r-i,INP"'l, OTP"'I.
++ANSL(lO)*lPROGRAM STAIR
+This Program design Straight flight stair
+I{S 8110: 1997.
+INTEGER HECK. NTYPE(IO). 0,IN,,.CHARACTER*30 FNAME1. FNAME2,
+JOB. ENGR. DATE
+OPEN (1. FILE='CON')
+403 FORMAT (3(1)
+WRITE (1,404)
+404 FORMAT (7(1)
+WRITE (1, 9) 'WELCOME TO STAIR
+ANALYSIS AND DESIGN TO BS 8110'
+WRITE (1.19) 'PROGRAM
+DEVELOPED AND WRITTEN BY VO
+OYENUGA.'
+WRITE (1, 29) 'APRll., 2000'
+OPEN (2. FILE='LPTI')
+WRITE (1,403)
+C829 FORMAT (5 .X.A341)
+WRITE (1. 39) 'INPUT IS EXPECTED
+VIA SCREEN OR FILE'Since Stair Design do not involve any rigorous analysis, itmay be faster to implement such design using
+theM.S.Excel software rather than us inga highlevel language p rogram approach .However, a
+comprehensive hig h levellanguage program can be developed for allthevarious stair typesusing
+various sub-routines .The user will be directed via coding to choose which stair type is de sired. The
+reader should attempt to do this using FORTRAN s tatement for thevarious stair typesdiscussed in this
+chapter. Aprogram to implement Straight Flight is enclosedas Program STAIR with aresult.132.3
+88.2
+47.683
+147
+0.088
+0.89
+130.83
+935.72692.13
+15.45
+24.7220.50032
+0.053331
+0.936742
+116.156
+453.1182157 STAIRDEsnlN
+Total load
+Load per m. run
+Moment. M.=0.125w12
+New Effective Depth (175 -20-8)
+K-value
+Lever arm factor
+Lever arm
+Reinforcement, As
+Provide @ mmc/e.B
+End of Design.Design of Flight 2
+Own load
+Flight1load
+Flight3loadNote that no separate landing is designed for and
+Flight 2 would support loads from flight 1and 3. hence, the
+last tobedesignedMoment. M=0.lOw12
+K- value
+Lever arm factor. la
+Lever arm
+Reinforcement, As.
+Provide @ mmclcB.Reinforced Concrete Design
+
+...
+
+=========== PAGE 174 ===========
+DO 7 I=I,NSTAIR
+WRITE(1, 189) 'Please ensure
+correctness o fentry',
++'before pressing the Enter Key '
+WRITE(1.199)'For Stair No.'.I
+WRITE (1 ,209) 'Enter 1 fo rStraight
+Flight Stair'
+READ(1.*) NTYPE(I)
+7 CONTINUE
+C Now analyse and design each stair .
+WRITE(1.219) 'PROGRAM READY
+TO ANALYSE AND DESIGN STAIRS '
+DO 17I=1.NSTAIR
+IF (NTYPE(I) .EQ. 1)THEN
+TYPE(I)='STRAIGHT FLIGHT STAIR'
+WRITE(1.229) 'No .'.1,'Stair is
+·,TYPE(I). 'Please Enter'C
+C
+5WRITE(1.109) 'Enter your Company"S
+Name'
+READ(1.119) COY
+WRITE(1,129) 'Enter Job Reference'
+READ(1,69) JOB
+WRITE(1.129) 'Enter Design Engineer '
+READ(1.69) ENGR
+WRITE (1.129) 'Enter Date of Design'
+READ(1.69) DATE
+WRITE (1.139) 'Enter Total No. of Stairs'
+READ(1. *) NST AIR
+WRITE(1,149) 'Enter Concrete and Steel
+Stresses. feu. fy'
+READ(1.*)FCU.FY
+WRITE (1,159) 'Arethe above Info.
+correct? - YIN'
+READ(1,179) ANS
+179 FORMAT (AI)
+C IF «ANS .NE. 'Y,) .OR. (ANS .NE.v»
+THEN
+C WRITE (1. 169) 'Please re-enter the
+Input list'
+C ENDIF
+C IF «ANS .NE .'y') .OR. (ANS .NE. 'Y'»
+GOT05
+CC
+777 CONTINUE
+END IFIF «ANSL(I) .EQ. 'Y') .OR. (ANSL(I)
+.EQ.'y'»THEN
+READ (3. *)SPLD(I). WLD(I)
+END IF
+END IFSTAIR DESIIIN
+IF (IN.EQ. 3) THEN
+READ(3,119) COY
+READ(3,69) JOB.
+READ(3. 69) ENGR
+READ(3. 69) DATE
+READ(3. *) FCU. FY
+READ (3. *)NSTAIR
+READ(3.*)(NTYPE(I). I =I,NSTAIR)
+DO 777 I=1.NSTAIR
+IF (NTYPE(I) .EQ. 1)THEN
+READ (3. *)LST(I), TR(I). RS(I),
+LLD(I)
+READ (3.179) ANSL(I)CWRITE (1, 49) 'Please Enter letter -T -
+if the input is',
++'via the Terminal'
+WRITE (1. 49) 'Please Enter letter -F -
+if the input is '.
++'via External File'
+READ(1.179) INP
+IF «INP .EQ .'F).OR. (INP .EQ.'f»
+THEN
+IN=3
+WRITE (1. 59) 'Please Enter the Input
+Filename'
+READ(1.69) FNAMEI
+OPEN (3,FILE =FNAMEl)
+ELSE
+IN=1
+END IF
+WRITE(1,404)
+WRITE (1.404)
+WRITE(1.39) 'OUTPUT IS EXPECTED
+VIAPRINTER OF FILE'
+WRITE(1. 49) 'Please Enter letter -P - if
+the output is'.
++'via the Printer'
+WRITE (1, 49) 'Please Enter letter -F -if
+the output is',
++'via External File'
+READ(1.179)OTP
+IF «OTP .EQ. 'F).OR. (OTP .EQ. 'f»
+THEN
+0=4
+WRITE (1. 59) 'Please Enter the Output
+File Name'
+READ(1,69) FNAME2
+OPEN (4.FILE =FNAME2)
+ELSE
+0=2
+END IF158·Reinforced Concrete Design
+
+...
+
+=========== PAGE 207 ===========
+OPEN (6,FlLE ='CON')
+WRITE (6,403)
+WRITE (6,9)'WELCOME TO BEAM ANALYSIS
+AND DESIGN TOBS 8110'
+WRITE (6,19) 'PROGRAM DEVELOPED AND
+WR11TEN BY V.O. OYENUGA'
+WRITE (6.29) 'January, 1999'
+WRITE (6,403)
+829 FORMAT (5X,A341)
+WRITE (6.39) 'INPUT IS EXPECTED VIA
+SCREEN OR FILE'
+WRITE (6,49) 'Please Enter the letter - T - ifthe
+Input is',
++'via the Terminal'
+WRITE (6,49) 'Please Enter the letter - F- ifthe
+Input is',
++'via External File'
+WRITE (6,403)
+READ (6.899) ANSI
+IF«ANS I .EQ. 'f).OR. (ANS1.EQ. 'P» THEN
+WRITE (6,79) 'Enter the INPUT file name'
+READ (6,59) FNAMEICC
+C ANALYSISOF STATICALLY DETERMINATE &
+INDETERMINATE BEAMS USING
+C THE CLAPEYRON'S THREE MOMENTS
+EQUATIONS.
+C THIS PROGRAM CAN HANDLE A MAXIMUM
+OF20 BEAMS OF 20 SPANS BACH.
+C THE PROGRAM DETERMINS THE JOINT
+MOMENTS. SPAN MOMENTS. SHEAR AND
+C REACTIONS AND DESIGN THE BEAM TO B .S.
+8110:1997.
+C
+.REAL
+L(20.20).1V(20).B(20).BF(20).H(20).HF(20).CLD I(20).
++
+CMTI(20).CLD2(20).CMT2(20).UD(20.20) .WT(20.20)
+REAL
+WB(20.20).AB(20.20).P(20.20.1 0).AP(20.20, I0)
+REALLS(20). UDS(20). WTS(20).
+WBS(20).ABS(20). PS(20.10).
++APS(20.1O)
+INTEGER M(20.20).NPL(20.20). MS(20). NPS(20),
+NS(20),NM(20),C MAIN PROGRAM FOR BEAM DESIGN
+WR11TENBY ENGR. V. O. OYENUGA.
+PROGRAM BEAM+TSI.TS2.TY I(20).TY2(20)
+CHARACfER*20
+JOB.ENGR.DATE.FNAMEI.FNAME2
+CHARACTER NDD*2. BN*30. NQS*2.ANS1*1.
+NOUT*I. BNS*30 .PASS*3
+DIMENSION BN(20). NDD(20.21). NDS(21)Program BEAMAcomprehensive program to implement beam (rectangular or flanged) is written and listed below with a
+sample result (see page 200). The diagram is not part of the results please. The reader should check
+Section 2.12.2 of this book for a brief discussion of the program.This can be converted to formulas in the M.S. Excel. The procedure is similar to that shown under slab
+or stair design. The reader should endeavour to do this as an exercise or refer to Section 2.1S of this
+book.and span moment as:
+wf.2 .
+M=-8--MJ2.0(approximately) where f=max.(.eIt.e2)'EI=Cons tan tThe use of spreadsheet for the purposes of designing a beam is limited to simply supported beams and
+perhaps 2 span beams that can easily be solved using simple calculations. For example, a two-span
+beam supporting only uniformly distributed load willhave the centre support moment as:
+w(f3+e3)M t2.
+5=8(it+i2) ,6.8 COMPUTER PROGRAMS
+Most beams are continuous in nature and carries multiple loads, such as uniformly distributed load,
+point load, trapezoidal and triangular loads. Some even carry loads that are distributed not across the
+entire span. These and many other considerations necessitate the use of computer programs for the
+analysis and design of beams using the high level language approach. Some of the high level languages,
+e.g. BASIC, favour graphics, hence, the bending moment and shear force diagrams of the beam can be
+drawn during the program implementation. This, however, is outside the scope of this book.191BEAM DESIBN Reinforced Concrete Design
+
+...
+
+=========== PAGE 214 ===========
+..
+CHARACTER"'IANS
+INTEGER HECK
+REAL M, KT
+OPEN (I,FILE = 'CON')
+HECK = I
+ASD=AS
+GOTOS
+IS WRITE (1,9) 'MEMBER',N,'CALCULATED
+STEEL IS:',ASO
+WRITE (1,19) 'ENTER THE DESIRED STEEL'
+READ (I, *) ASO
+5 KT = M/(B"'0**2.0)
+FS=(0.667"'FY)*{AS/ASD)
+FACT = 120*{0.9+ M/(B*0**2.00»
+FACT=0.55 + (477.00 - FS)/FACT
+IF(NN .LT .I)SR=)0
+IF(NN.GE. I) SR=26
+IF(FACT .GE .2.0) FACT=2.00
+01 = (SPAN"'lOoo)l(SR*FACT)SUBROUTINE
+OEFLEC(N,NN,B,O,ASB,AS,FY,M.SPAN,HECK,ASO,D
+I)CC
+C SUBROUTINE STEEL.
+SUBROUTINE STEEL
+(M,B,BF,O.H,FCU,FY ,AST,ASB,HECK)
+REAL M, K, LA, KP
+INTEGER HECK
+HECK = )
+AST = 0.00
+ASB = 0 .00
+IF(FY.LE.250.0) THEN
+AMIN= (0.25*B"'0)/100.
+ELSE
+AMIN=(O.IS*B"'O)lIOO
+ENDlF
+AMAX = 0.04*B*H
+K= (M*1.0E06)/{FCU*BF*0*"'2 .00)
+IF(K.GT.0.IS6)THEN
+C DESIGN FOR STEEL INTHE OTHER FACE.
+Z = 0.77688*0
+KP= 0.156
+X={0-Z)/0.4S
+ASB = (K - KP)*FCU*B"'0"''''2.0/(0.9S*FY*(0-
+~® .
+AST = KP"'FCU"'BF*0**2.0/{0.9S*FY*Z) + Asti
+ELSE
+Z = 0*(0.5 + SQRT(0.2S - KlO.9»
+LA=ZlO
+IF(LA .GE. 0.95) Z = 0.95"'0
+X = (0 -Z)l0 .4S
+AST=(M*I.OE06)/(0 .9S"'FY"'Z)
+END IF
+IF(AST .LT. AMIN) AST= AMIN
+IF(ASB .LT. AMIN) ASB =AMIN
+IF(AST .GE. AMAX) HECK = 0
+RETURN
+ENDRETURN
+ENDDO757J= (I+I),NG
+757 SUMAX{I) = SUMAX(I) + X(J)"'AG(J,J)
+747 X(I) = (Y(I) - SUMAX(I»/AG(I,I)
+C.BEAM DESU3N
+X{NG) = Y{NG)/AG(NG,NG)
+DO 747 I = (NG-I),L-l
+SUMAX(I)=0.00CK=O
+5005 K=K+l
+DO 727 I = K+l,NG
+Z = AG{I,K)/AG(K,K)
+DO 737 J = I.NG
+AG(I,J) = AG(I,J) - Z"'AG(K,J)
+737 CONTINUE
+727 Y(I) = Y(I) - Y(K)*Z
+IF (K.LT. (NG-I» GO TO5005c
+C SUB-ROUTINES CALLED
+SUBROUTINE
+GAUSS(AG.Y,NG,NDIM,SUMAX,X)
+DIMENSION AG{NDIM,NDlM), Y{NDIM).
+X(NOIM), SUMAX{NOIM)
+Cc
+C
+C SUB-PROGRAMS CALLED BY SUBROUTINE
+BMADE.
+C
+C FUNCTION SUB-PROGRAM.
+FUNCTION PAF(X,W.D)
+PAF=D*"'2.0 - X**2 .0
+PAF=PAF/D
+PAF=PAF"'W"'X
+RETURN
+ENDRETURN
+END+ 4X,A12)
+188 FORMAT(15X,A4S ,AII.F5.1,IX,A8)
+208 FORMAT (I)
+218 FORMAT
+(3X,A4,1X.A2,2X,F7.I,4X,F4.0,4X,A 12)
+228 FORMAT (5X.A6,lX,FB.3.1X.A61)
+238 FORMAT (/80('-')1)
+403 FORMAT (2(1)
+404 FORMAT (7(/»
+C58 FORMAT
+(SX,A6,1X,F4.I,1 X,AS.21X,A6,IX,F5.I,1 X,AS/)
+68 FORMAT (5X.AIS)
+688 FORMAT (15X.A18)
+7S FORMAT (/5X,A 19)
+88 FORMAT (5X.A4.5X.A6,4X.A6,4X.A 14.1OX.A7)
+98 FORMAT (6X,A3.7X.A3,4X .A7.4X.A6.3X.A3)
+108 FORMAT
+(4X,A2,A3.A2.2X.F6.3.3X.FB.I ,3X .F6.0.2X.F6.0.5X.A 17
+)
+118 FORIVIAT(/5X,A22)
+.128 FORMAT (5X,A4.4X.A8,3X,A6.4X.A 14.IOX.A 7)
+138 FORMAT (6X,A3.5X,A4,5X.A 7,5X,A3,4X,A6)
+148 FORMAT
+(6X,A2.SX,F6.0,3X,FB.I,4X,F6.0,2X,F6.0,SX,A 17)
+158 FORMAT (ISX.A4.8X,AI4,2IX,AI5)
+168 FORMAT
+(6X,A3,4X,AS,3X,A7,SX,A7,SX,AS,3X,A7,SX,A7)
+178 FORMAT
+(4X,A2,A3,A2,IX,F7.I.4X,F4.0,4X,AI2 ,4X,F7.1,4X,F4.0Reinforced Concrete Design198
+
+...
+
+=========== PAGE 242 ===========
+IF(NI .EQ. 3) THEN
+READ (3,59) JOB
+READ (3,59) ENGR
+READ (3,59) DATE
+READ (3,*) PCU,PV,NCOL,PS,DH
+READ (3,*) (TY(I),1= I.NCOL)
+READ (3,*)(CS(I), I= I,NCOL)WRITE(1.39),INPUT IS BXPECTED VIA SCREEN
+OR FILE'
+WRITE (1,49),Please Enter the letter -T - if the input
+is"
++'via the Terminal'
+WRITE (I,49)'Please Enter the letter - P- if the input
+is',
++'via External File'C
+C END OF GENERAL STATEMENTS
+C
+C COLUMN INPUT DATA
+C
+525 DO 7771 = 1,40
+MX(I) = 0.00
+777 MY(I) = 0.00
+C
+CWRITE (1,404)
+WRITE (1,404)
+WRITE (1,39) 'OUTPUT IS BXPECTED VIA
+PRINTER OR FILE'
+WRITE (I,49),Please Enter the letter - P - if the
+output is',
++'via the Printer'
+WRITE(1,49),Please Enter the letter - F - if the
+output is', ..
++'via External File'
+WRITE (1,403)
+READ(I,599) NOUT
+IF«NOUT .EQ. 'F) .OR. (NOUT .EQ. r»THEN
+WRITE (1,79) 'Enter the Output FILE NAME'
+READ (1,59)FNAME2 .
+OPEN (4,FILE = FNAME2)
+NO=4
+ELSE
+NO=2
+END IFCC
+C THIS PROGRAM ANALYSES AND DESIGNS
+AXIAL. UNIAXIAL. AND
+C BIAXIALLY LOADED COLUMNS. ITCAN
+H~DLB UP TO40 COLUMNS.
+IMPLICIT REAL(L-N)
+DIMENSION
+L(4O),LE(4O),M(4O),MX(4O),MY(4O),MADD(40),
++
+LEX(40),LBY(40),CID(4O),MIX(40),MIY(4O),MI(40),
+PC(4O)
+DIMENSION W(40), AX(4O),AY(4O),DIA(4O),
+ASC(4O),SRX(4O),
++SRY(4O),BX(4O),BY(4O),AG(40), NU(4O),
+MUX(4O),MUY(4O)
+COMMON AX, AY, DIA
+INTEGER TY(4O),CS(4O),HECK, BRC(4O),
+UC(4O),NCOL. NO
+CHARACTER*20 FNAMEI, FNAME2,
+JOB,ENGR,DATE,TYPE(40)
+CHARACTER ANSI*I, CID*4O,SLEN*I,
+DECIDE· I, NOUT*I, PASS*2
+PARAMETER (PI = 3.1415927)
+C
+C GENERAL STATEMENTS
+OPEN (I,FILE = 'CON')
+WRITE (1,403)
+WRITE (1,9)'WELCOME TOCOLUMN
+ANALYSIS AND DESIGN TOBS 8110'
+WRITE (1,19),PROGRAM DEVELOPED AND
+WRI'ITEN BY V. O. OYENUGA.'
+WRITE (1,29)'APRIL 1999'
+OPEN (2,FlLE = 'LPTl')
+WRITE (1,403)
+WRITE (1,403)
+403 FORMAT (2(1)
+404 FORMAT(7(/»
+CWRITE (1.403)
+READ (1,599) ANSI
+599 FORMAT (AI)
+IF«ANS I .EQ. or).OR. (ANSI .EQ. 'F» THEN
+WRITE (1,79) 'Enter the INPUT file name'
+READ (1,59) FNAMEI
+OPEN (3 ,FILE = FNAMEI)
+NI=3
+ELSE
+NI = I
+END IFProgram COLUMN
+C
+PROGRAM COLUMNA comprehensive computer package is designed to implement the requirements of the Code and
+produces column design that are comparable to hand calculations. The listing of the program is
+enclosed. The readershouldtum toSection 2.12.2of this bookfor moreinformationon theprogram.
+M.SExcelcanalsobeemployedtoimplementcolumndesignasexplainedunderSlabDesign.7.6 COMPUTER PROGRAMSTheCoderecommendsa reductioninthe live loadof a multi-storeybuildingsincethe entirebuilding
+may not be occupied at the same time. The level of reduction is applicable to both columns and
+foundations. These valuesare shownin Table 10.IS. This Table can be used to reducethe design
+reinforcementespeciallyforbuildingsof largefloorareasor ofstoreysexceedingfive. The useofthis
+reductionfactorisillustratedinExample S.7.226COLUMN DESIGN Reinforced Concrete Design
+
+...
+
+=========== PAGE 246 ===========
+CSUBROUTINE SIZE (I,CS,H,B,NCOL,AX,AY,DIA)
+DIMENSION
+AX(NCOL),AY(NCOL),CS(NCOL),DIA(NCOL)
+INTEGERCS
+OPEN(I,FILE='CON') .,.
+WRITE (1,9)'FOR COLUMN NO.',I
+IF(CS(I) .EQ. I) THEN
+WRITE (1,19),SIZE OF ,H,'BY',B,'mm NOT
+ADEQUATE PLEASE'
+WRITE (1,29),Enter new DIMENSIONS - DEPTH
+AND WIDTH'
+READ (I,"') AX(I),AY(I)
+ELSE
+WRITE (1,39) 'SIZE OF,DIA(I),'mm DIA. NOT
+ADEQUATE PLEASE'
+WRITE (1,29) 'Enter new DIMENSION -
+DIAMETER '
+READ(I,"')DlA(I)
+ENDIF
+9 FORMAT (1I/5X,AI4,lX,I2I1)
+19 FORMAT
+(/SX,A7,IX,FS.O,lX,A2,IX,FS.O,IX,A241)
+29 FORMAT (/SX,A38/)
+39 FORMAT (/SX,A7,1X,FS.O,IX,A27/)
+RETURN
+ENDC
+CSUBROUTINE STEEL(E,FY,FT>
+ES=FY/210000.
+IF(E .LE. ES) FT=e-zeoeoo.o
+IF(E .GT. ES) FT= 0.9S"'FY
+RETURN
+ENDC
+CC
+47 AMIN = O .4"'ARII00.
+AMAX = PS"'ARIIOO .
+IF(ASC .LE. AMIN)ASC = AMIN
+IF(ASC .GT. AMAX) HECK =I
+S RETURN
+ENDIF( (ANBH .GT .NU(9,NN)) .OR.(AMBH .GT .
+MU(9,NN» )THEN
+ASC =0.00
+HECK = I
+GOTOS
+ENDIFNNU = (NU(I,J)"'B"'H)llooO.
+MMU = (MU(I,J)"'B"'H"''''2.0)1I.0E06
+ASC = AS(I,J)"'B"'H
+DD= ),00
+END IF
+IF(DD .EQ. 1.00)GOTO 47
+37 CONTINUE
+CCOLUMN DESIGN
+SUBROUTINE
+UNIAX(P,PS,FCU,FY,AR,DH,H,B.M,NNU,MMU,HECK
+,ASC)
+INTEGER HECK
+REAL
+NU(1O,50),MU(l0,50),KI,K2,AS( 10,1oo),NNU,MMU,M
+OPEN(I,FILE = 'CON')
+ASC = 0.00
+NNU = 0.00
+MMU = 0.00
+HECK=O
+KI =0.4"'FCU
+K2=0.45
+AT=O.OO
+XH=O.IO
+NN = INT(PS/O.IO)
+D071= 1,9
+XH = XH + 0.100
+DO 17J=I,NN
+AT= AT + 0.001
+AS(I,J) = AT
+HX = XH"''''(-1.00)
+ESC = (1.0 - 0.I"'HX)"'0.0035
+ES= (O.90"'HX- 1.0)"'0.0035
+CALL STEEL(ESC,FY,FSC)
+CALL STEEL(ES,FY,FS)
+NU(I,J) = KI"'XH +FSC"'AT - FS"'AT
+MU(I,J) = KI"'XH"'(0.S-K2"'XH) + FSC"'AT"'(DH-
+O.S)
+MU(I,J) = MU(I,J) - FS"'AT"'(O.S-DH)
+17 CONTINUE
+AT =0.003
+7 CONTINUE
+C
+C SEARCHING
+DD=0.00
+ANBH = P"'IOOOJ(B"'H)
+AMBH = M"'I.E06/(B"'H"''''2.0)
+DO 37 J = I,NN
+D0371= 1,9
+IF( (NU(I,J) .GE. ANBH) .AND. (MU(I,J)
+.GE.AMBH) )THENC
+CSUBROUTINE
+AXIAL(I,P,PS,FCU,FY,AG,HECK,AST)
+INTEGER HECK
+HECK=O
+AST = (P'" IOOO.)-(O.35"'FCU· AG)
+AST =AST/(O.7"'FY - 0.35"'FCU)
+AMIN = O.4"'AG/I00.
+AMAX = PS"'AGlJoo.
+IF(AST .LE. AMIN)AST = AMIN
+IF(AST .GT. AMAX)HECK = I
+RETURN
+END'.C
+C SUBROUTINES CALLED
+C
+CReinforced Concrete Design230
+
+...
+
+=========== PAGE 315 ===========
+ELSE IF(NI .EQ. I) THEN .
+WRITE (1,89) 'Enter JOB REFERENCE'
+READ (1.59) JOB' .
+WRITE (1,89) 'Enter DESIGN ENGINEER'
+READ (1,59) ENGR :
+WRITE (1,89) 'Enter DESIGNING DATE'
+READ (1.59) DATE .
+WRITE (1,99) 'Enter No. of BASES. PRESSURE. Concrete &
+Steel', .
++'STRESSES'
+READ(I••)NB.PB,FCU.FY
+DO 27 I =I.NB
+WRITE (1.219) 'FOR BASE' ,I
+WRITE(1.109) 'EDlerBase IDENTIFICATION NO:
+READ 0.59) BN(I) . ..
+WRITE(1.9I9),Enter BaseTYPE I:SQUARE. 2:RECT.
+&'.
++ '3:COMBINED .-.. ;
+READ (I,.) TY(I)
+IF(TY(I) .NE. 3)THEN
+WRITE (1.119) 'Enter base COL.TYPE - I :RECT.•2 :CIRC.'
+READ(I,.)CT(I)
+WRITE (1.129) 'Enter Col. LOAD. DIMENSIONS &DOWEL
+DIAMETER'
+IF(CT(I) .EQ. I) READ (1.*) W(I).AI(1).A2(1).DW(1)
+IF(CT(I) .EQ. 2) READ (I.·) W(I),DIA(I).DW(I)
+ELSE IF<TY(l>.EQ. 3)THEN .
+WRITE (1.139) 'EnterTotal No. ofCOLUMNS on the BASE'
+READ(I••)NC(I} .•
+WRITE (1.149) 'Enter Column.TYPES foreach COLUMN'
+READ (I,·)(CTC(I,J). J =I.NCO» : .
+DO 37 J =I,NC(I)
+WRITE (1,159) 'For BASE',I: -COLUMN '.J:Enter:-' .
+WRITE(1,169),LOAD. DIST. From Col.I. DIMENSIONS &
+DOWELDIA:
+IF(CTC(I.J) .EQ.I)
+READ(I.·)WC(I.J},A(I.J),ACI(1.J).AC2(I.J),
++DWC(I.J)
+IF(CTC(I.J).EQ.2) READ(I••)
+WC(I.J),A(I,J>,DIAC(I.J),DWC(I.J)
+37 CONTINUE
+END IF
+27 CONTINUEIF(NI.EQ.3) nlEN
+READ (3.59) JOB
+READ (3.59) ENGR
+READ (3.59) DATE
+READ (3.·) NB, PB. rcuFY
+READ (3.·)(TY(I).1 =I;NB)
+DO 7 1= I.NB
+READ (3.59) BN(I)
+IF<TV(I) .NE. 3) THEN
+READ (3.·) CT(I)
+IF(CTCI) .EQ.I) READ(3.·) W(I).A1CI).A2(1).DW(()
+IF(CT(() .EQ.'2) RE~D(J .·) W(I).DIA(I).DW(I)
+ELSE IF(TV(!) .EQ .:\)THEN
+READ (3.·) NC{I)
+READ(3.*}(CTC(I.J) .J=I.NC{I»
+DO 17 J =I,NC{I}
+IF(CTC(I.J) .EQ. I} .
+READ(3,·)WCCI,J).A(I.J),ACI(I.J}.AC2(1.J),
++DWCCI.J)
+IF(CTC(I,J) .EQ. 2)
+READ(3.·)WC(I.J).A(I.J).DIAC(I,J).DWC(I,J)nCONTINUE .
+END IF
+7 CONTINUE
+CWRITE (1,404)
+WRITE (1.404)
+WRITE (1.69) 'Aboutlo read - press <ENTER> when ready...'
+WRITE (1 ,404)
+PAUSEC
+C INPUT DATA
+C.',; .( ~99 FOUNDATION pEal~N
+END If
+WRITE (1,404)
+WRITE 0,404)
+WRITE (1,404)
+WRITE(I,39) 'OUTPUT IS EXPECTED VIA PRINTEROR
+ALE'
+WRITE (I,49) 'Please Enter the letter - P - ifthe output is'.
++'via the Printer'
+WRITE (1.49) 'PleaseEnter the letter- F- if the output is'.
++'via External File'
+WRITE (I.403)
+READ (1.59) ANS2
+IF( (ANS2 .EQ. 'F').OR. (ANS2 .EQ.'f') )THEN..
+WRITE (1.79)'Enter the OUTPUT filename'
+READ (1.59) FNAME2)
+OPEN (4.ALE =FNAME2)
+NO=4
+ELSE
+NO=2I,CC
+'C GENERAL STATEMENTS
+OPEN (I.ALE ='CON,)
+WRITE (1.999)
+WRITE(1.404)
+WRITE 0.404)
+WRITE (1,9) WELCOME TO BASE ANALYSIS AND
+DESIGNTO BS8110'
+WRITE (1,19) 'PROGRAM DEVELOPED AND WRITTEN
+BY ASROS LTD.'
+WRITE (1.29) 'JANUARY 1991'
+OPEN (2.ALE ='LPTI')
+WRITE (1.403)
+829 FORMAT(5X,A341)
+WRITE (1.39) 'INPUT IS EXPECTED VIA SCREEN OR
+ALE'
+WRITE (1.49) 'Please Enter the letter-T - ifthe Input is',
++'via the Terminal'
+WRITE (1,49) 'Please Enter the letter -F - if theInput is',
++'via External File'
+WRITE(1.403)
+READ(1,59) ANSI
+IF( (ANSI .EQ. 'F').OR .{ANSI.EQ.'f))lllEN
+WRITE (1,79) 'Enter the INPUT filename'
+READ (1,59) FNAMEI
+OPEN (3, ALE =FNAMEI)
+NI=3
+ELSE
+NI
+...
+
+=========== PAGE 319 ===========
+---CC
+SUBROUTINE GAUSS(AG.V.NG.NDIM.SUMAX .X)
+DIMENSION
+AG(NDIM.NDIM).Y(NDIM),X(NDIM),SUMAX(NDIM)
+K=O
+SK = K+I
+DO 7 I = K+I,NG
+Z=AG(I.K)/AG(K,K)
+DO 17J= I.NG
+AG(IJ)=AG(I.J) -Z·AG(K.J)
+17 CONTINUE
+7 YO) =Y(I)- Y(K,·Z
+IF(K .LT. (NG-I)) GO TO 5
+X(NG)=Y(NG)/AG(NG.NG)
+DO 27 I=(NG-I),I,-I
+SUMAX(I)=0.00
+DO 37J=(I+l).NG
+37 SUMAX(l) =SUMAX(I) + X(J)·AG(IJ)
+27 X(I) =(V(I) -SUMAX(I))lAG(I,I)
+RETURN
+ENDSUBROUTINE
+PERMLB(VBLRDT,SPT,PI.D .FY,FCU.FBS.UBS)
+RN = IOOO.OISPT
+FBS= (VBL·IOOO .OO)l(RN·RDT·PI·D)
+IF(FY .LE. 250)TH!N
+IF(FCU .LE. 20.) UBS= 1.70
+IF«FCU.GT.20.) .AND. (FCU .LE.25.» UBS =2.0
+IF«FCU.GT. 25.).AND.(FCU .LE.30.» UBS =2.2
+IF(FCU.GT.30.) UBS = 2.7
+~E
+IF(FCU .LE. 20.) UBS =2.1
+IF«FCU.GT.20.) .AND. (FCU .LE. 25.»UBS= 2.5
+IF«FCU .GT. 25.).AND. (FCU .LE.30.» UBS= 2.8
+IF (FCU .GT. 30.) UBS =3.4
+END IF
+RETURN
+ENDCC
+SUBROUTINE PERMSHCV.RD .SV.PI.D.VS. vcivs=V·IOOOJ(IOOO .*D)
+AS=(PI-RD··2.)14.00
+AS=AS-(I000.lSV)
+AC=(AS·IOO.)I(lOOO.·D)
+IF(AC.GT.3.00) AC=3.00
+AC=AC··( 1.13.)
+OC=400JD
+IF(OC .LT. I) OC = 1.00
+OC = OC-*O.25
+VC = 0.632·AC·OC
+RETURN
+ENDIF(AS.GT.6430.) RD =40.0
+AR=(PI-RD*-2.0)l4 .00
+V = ASiAR
+V = IOOON
+N=INT(VI2S.)-25
+SV=FLOAT(N)
+RETURN
+END303 FOUNDATION DESIIJN
+C
+SUBROUTINE RODDIA(AS.PI,FY,T.RD.SV)
+CHARACTER-I T
+IF(FY.LE.250)T='R'
+IF(FY .GT.250)T ='Y'
+IF(AS.LE.90S.)RD=12.
+IF( (AS .GT. 90S.).AND.(AS .LE. 1610.)) RD =16.
+IF( (AS.GT. 1610.).AND. (AS .LE.2510.» RD =20.
+IF( (AS .GT.2510.) .AND. (AS .LE.3930.» RD =25.
+IF( (AS .GT. 3930.) .AND.(AS .LE.6430.) ) RD =32.STOP
+END
+C SUBROUTINES CAllED.
+C
+SUBROUTINE STEEl.(M.D,FCU.FY.HECK.AST)
+REALM.K.LA
+INTEGERHECK
+HECK=I
+H=D+25
+AST=0.00
+K=(M*I.E06)!(FCU*IOOO.*D--2.0)
+IF(K .GT. 0.156) HECK =0
+IF(HECK .EQ.0) GOTO 3S
+LA=0.5 + SQRT(O.25· KIO.9)
+IF(LA .GE.0.95) LA =0.9S
+AST=(M-1.0E06)/(0.9S*FY-LA-D)
+IF(FY .LE. 250)C =0.24
+IF(FY .GT. 2SO)C=0.13
+AM=(C-lOOO.-H)lIOO.O
+IF(AM .GT. AST)AST= AM
+3SRETURN
+END8 RlRMAT (23X,A34)
+18 RlRMAT (23X,A34111)
+28 RlRMAT (SX,A9,1X,A20,12X,A8,IX,A20)
+38 RlRMAT (ISX,A9,1X,A20,12X,A8,IX,AI6I)
+48RlRMAT
+(/SX,A9,IX,F6.0.1X,A2,IX,F6.0,1X.A2,13X,A8,1X.FS.O,IX,A2)
+S8RlRMAT (SX.A9,33X.A8.IX.F8.3,IX,A4,6(1)
+68 RlRMAT (I/ISX,A16.1X.F5.0,A2I1)
+78 RlRMAT (SX.A21 .IX.F8.3.IX.AS)
+88RlRMAT (lSX.A9.1X.A1.F3 .0.::!X.A 1.2X.F4.0.A14)
+98 RlRMAT (SX.IOX.AIS/)
+108 RlRMAT (/1SX.AI JIf)
+118 RlRMAT (SX.A26.1X.F4.2.1X.A8)
+128 RlRMAT (//SOC)!)
+138 RlRMAT (5X.A6.1X.F4.I.1X,A8,21X.A6.1X,FS.I.1X.A8/)
+IS8 RlRMAT (3(/»
+168 RlRMAT (SX.A9.33X.A23.1X.l2.8(1))
+178 RlRMAT (SX,A31)
+188 RlRMAT (SX.A311)
+198 fORMAT (5X.A4.4X.A6.4X ,A6.6X,AS,IIX,A7)
+208 FORMAT (6X.A3.3X.A8.3X.A6,4X.A8.8X.A 12)
+218 FORMAT
+(/6X.12.SX.F6.0.::!X.I:ILUX.F8.2.3X.A1.F3.0,4X,AI .zx,
++ F4.0.IX.A6)
+228 FORMAT (IISX.A23)
+238 FORMAT(SX.A231)
+248RlRMAT (SX.A4,4X.A6 .4X,A6,6X,AS,I2X,A 7)
+258 RlRMAT (6X,A3,6X.A3,SX,A6,4X,A8,10X.A9)
+268RlRMAT
+(l6X,12,4X,F6.3,3X.F8.3.3X,F8.2.SX.A1,F3.0.2X.A1,2X.
++ F4.0.IX.A6)
+278 FORMAT (IISX.A29)
+288 FORMAT(SX.A291)
+298 RlRMAT (SX.A22.IX,F7.3.I X.AS)
+308 FORMAT (ISX.A22. IX.F7.2.I X,A6)
+318 FORMAT (/SX.A7.ISX.1X.AI.F3.0.2X.
+...

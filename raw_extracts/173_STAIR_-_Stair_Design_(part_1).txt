@@ -1,0 +1,70 @@
+=== PAGE 173: STAIR - Stair Design (part 1) ===
+
+REALMST(lO). MHT(10). MQT(10).
+MSB(lO) ,MCS(lO), MSP(lO),
++LST(lO), LHT(10). LQT(lO). LSB(10).
+LCS(10), LSP(lO), LLD(lO).
++M
+DIMENSION TR(lO). RS(lO). UDL(lO) ,
+WAIST(lO). SLF(lO),ASST(lO).
++SPLD(10), WLD( 10)
+CHARACTER COY*65, ANS*I,
+TYPE(10)*25, r-i,INP"'l, OTP"'I.
++ANSL(lO)*lPROGRAM STAIR
+This Program design Straight flight stair
+I{S 8110: 1997.
+INTEGER HECK. NTYPE(IO). 0,IN,,.CHARACTER*30 FNAME1. FNAME2,
+JOB. ENGR. DATE
+OPEN (1. FILE='CON')
+403 FORMAT (3(1)
+WRITE (1,404)
+404 FORMAT (7(1)
+WRITE (1, 9) 'WELCOME TO STAIR
+ANALYSIS AND DESIGN TO BS 8110'
+WRITE (1.19) 'PROGRAM
+DEVELOPED AND WRITTEN BY VO
+OYENUGA.'
+WRITE (1, 29) 'APRll., 2000'
+OPEN (2. FILE='LPTI')
+WRITE (1,403)
+C829 FORMAT (5 .X.A341)
+WRITE (1. 39) 'INPUT IS EXPECTED
+VIA SCREEN OR FILE'Since Stair Design do not involve any rigorous analysis, itmay be faster to implement such design using
+theM.S.Excel software rather than us inga highlevel language p rogram approach .However, a
+comprehensive hig h levellanguage program can be developed for allthevarious stair typesusing
+various sub-routines .The user will be directed via coding to choose which stair type is de sired. The
+reader should attempt to do this using FORTRAN s tatement for thevarious stair typesdiscussed in this
+chapter. Aprogram to implement Straight Flight is enclosedas Program STAIR with aresult.132.3
+88.2
+47.683
+147
+0.088
+0.89
+130.83
+935.72692.13
+15.45
+24.7220.50032
+0.053331
+0.936742
+116.156
+453.1182157 STAIRDEsnlN
+Total load
+Load per m. run
+Moment. M.=0.125w12
+New Effective Depth (175 -20-8)
+K-value
+Lever arm factor
+Lever arm
+Reinforcement, As
+Provide @ mmc/e.B
+End of Design.Design of Flight 2
+Own load
+Flight1load
+Flight3loadNote that no separate landing is designed for and
+Flight 2 would support loads from flight 1and 3. hence, the
+last tobedesignedMoment. M=0.lOw12
+K- value
+Lever arm factor. la
+Lever arm
+Reinforcement, As.
+Provide @ mmclcB.Reinforced Concrete Design
