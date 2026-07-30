@@ -1,9 +1,11 @@
 """Slab design form page."""
 
 import os
+import logging
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFileDialog, QScrollArea,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt
 
@@ -38,9 +40,19 @@ class SlabPage(QWidget):
         layout.addWidget(c1)
 
         c2 = Card("Panel Geometry & Loading")
+        # AUDIT: depth 100–500 mm is fine. But for two-way slabs, ly must be
+        # >= span for the coefficient tables to be valid. The page allows
+        # ly=0 which would cause a division-by-zero in _design_twoway.
         self.s_depth = spinbox(100, 500, 10, 150, 0)
+        # AUDIT: span 0.5–20 m is reasonable. For two-way, lx must be the
+        # short span — the engine takes min(span, ly) but the user might
+        # enter them backwards with no warning.
         self.s_span = spinbox(0.5, 20, 0.5, 4, 2, " m")
+        # AUDIT: ly 0–20 m — ly=0 with two-way selected causes division by
+        # zero (k = ly/lx). Should enforce ly >= span for two-way.
         self.s_ly = spinbox(0, 20, 0.5, 5, 2, " m")
+        # AUDIT: case 1–9 is valid for two-way only. For other slab types,
+        # case is ignored — no harm but potentially confusing.
         self.s_case = spin_int(1, 9, 1)
 
         load_w, self.gk, self.qk, self.load_result = load_combo_group()
@@ -143,7 +155,16 @@ class SlabPage(QWidget):
             span_udls=[w[1].value() for w in self._cont_span_widgets],
         )
         designer = SlabDesigner(fcu=fcu, fy=fy)
-        self._last_result = designer.design([self._last_input])[0]
+        try:
+            self._last_result = designer.design([self._last_input])[0]
+        except Exception as exc:
+            logging.error("Slab design failed", exc_info=True)
+            QMessageBox.warning(
+                self, "Design Error",
+                f"Could not complete the design — check your inputs: {exc}",
+            )
+            return
+
         r = self._last_result
 
         rows = [

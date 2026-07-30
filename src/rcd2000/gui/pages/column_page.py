@@ -1,8 +1,11 @@
 """Column design form page."""
 
 import os
+import logging
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox,
+)
 
 from rcd2000.column import ColumnDesigner, ColumnInput
 from rcd2000.report import format_column
@@ -31,10 +34,18 @@ class ColumnPage(QWidget):
         layout.addWidget(c1)
 
         c2 = Card("Loads & Geometry")
+        # AUDIT: load range 0–50000 kN may exceed what a rectangular column
+        # of the given dimensions can carry — the engine will return heck=1,
+        # but the user gets no early guidance. Consider adding a pre-check.
         self.load = spinbox(0, 50000, 100, 1000)
+        # AUDIT: bx/by range 100–2000 mm is fine, but for circular columns
+        # these are ignored — dia is used instead. No conflict.
         self.bx = spinbox(100, 2000, 25, 300, 0)
         self.by = spinbox(100, 2000, 25, 300, 0)
+        # AUDIT: dia 100–2000 mm is physically large but not invalid.
         self.dia = spinbox(100, 2000, 25, 300, 0)
+        # AUDIT: depth 100–2000 mm — for circular columns, depth must equal
+        # dia for the engine to work correctly. The page doesn't enforce this.
         self.depth = spinbox(100, 2000, 25, 300, 0)
         c2.add_row("Axial Load (kN):", self.load)
         c2.add_row("b/h width - x (mm):", self.bx)
@@ -73,20 +84,43 @@ class ColumnPage(QWidget):
 
     def _calculate(self):
         self._clear_results()
-        self._last_input = ColumnInput(
-            column_id="C1",
-            col_type=self.col_type.currentIndex() + 1,
-            shape=1 if self.shape.currentIndex() == 0 else 2,
-            load=self.load.value(),
-            bx=self.bx.value(), by=self.by.value(),
-            dia=self.dia.value(), depth=self.depth.value(),
-            moment_x=self.moment_x.value(),
-            moment_y=self.moment_y.value(),
-            moment=self.moment.value() or self.moment_x.value(),
-        )
-        designer = ColumnDesigner()
-        self._last_result = designer.design([self._last_input])[0]
-        result = self._last_result
+        try:
+            col_type = self.col_type.currentIndex() + 1
+            # For axial columns (col_type=1), moment is not applicable.
+            # For uniaxial (col_type=2), use the dedicated moment field.
+            # For biaxial (col_type=3), use moment_x / moment_y.
+            # Only fall back to moment_x when the uniaxial moment field is
+            # genuinely not provided (i.e., col_type != 2), so that a
+            # legitimate 0.0 input is respected.
+            if col_type == 2:
+                moment = self.moment.value()
+            elif col_type == 3:
+                moment = self.moment_x.value()
+            else:
+                moment = 0.0
+
+            self._last_input = ColumnInput(
+                column_id="C1",
+                col_type=col_type,
+                shape=1 if self.shape.currentIndex() == 0 else 2,
+                load=self.load.value(),
+                bx=self.bx.value(), by=self.by.value(),
+                dia=self.dia.value(), depth=self.depth.value(),
+                moment_x=self.moment_x.value(),
+                moment_y=self.moment_y.value(),
+                moment=moment,
+            )
+            designer = ColumnDesigner()
+            self._last_result = designer.design([self._last_input])[0]
+        except Exception as exc:
+            logging.error("Column design failed", exc_info=True)
+            QMessageBox.warning(
+                self, "Design Error",
+                f"Could not complete the design — check your inputs: {exc}",
+            )
+            return
+
+        r = self._last_result
         ci = self._last_input
 
         rows = [

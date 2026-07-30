@@ -1,8 +1,11 @@
 """Stair design form page."""
 
 import os
+import logging
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox,
+)
 
 from rcd2000.stair import StairDesigner, StairInput
 from rcd2000.report import format_stair
@@ -24,13 +27,20 @@ class StairPage(QWidget):
         layout.addWidget(header_label("Stair Design - BS 8110"))
 
         c = Card("Stair Geometry & Loading")
+        # AUDIT: span 1–12 m is fine. The engine assumes waist = span/20,
+        # so very short spans produce very thin slabs (<100mm min enforced).
         self.s_span = spinbox(1, 12, 0.5, 4, 2, " m")
+        # AUDIT: tread 150–400 mm and rise 100–250 mm — rise/tread ratio
+        # not enforced. BS 8110 doesn't strictly govern this, but
+        # comfort guidelines suggest rise/tread <= 0.75.
         self.s_tread = spinbox(150, 400, 5, 250, 0)
         self.s_rise = spinbox(100, 250, 5, 175, 0)
         c.add_row("Span (m):", self.s_span)
         c.add_row("Tread (mm):", self.s_tread)
         c.add_row("Rise (mm):", self.s_rise)
 
+        # AUDIT: imposed_load 0–20 kN/m² and spl 0–10 kN/m² are fine.
+        # wld 0–50 kN/m³ — default 0 means self-weight is the only DL.
         self.s_imp = spinbox(0, 20, 0.5, 1.5, 2, " kN/m²")
         self.s_spl = spinbox(0, 10, 0.5, 0, 2, " kN/m²")
         self.s_wld = spinbox(0, 50, 1, 0, 1, " kN/m³")
@@ -74,7 +84,16 @@ class StairPage(QWidget):
             wld=self.s_wld.value(),
         )
         designer = StairDesigner()
-        self._last_result = designer.design([self._last_input])[0]
+        try:
+            self._last_result = designer.design([self._last_input])[0]
+        except Exception as exc:
+            logging.error("Stair design failed", exc_info=True)
+            QMessageBox.warning(
+                self, "Design Error",
+                f"Could not complete the design — check your inputs: {exc}",
+            )
+            return
+
         r = self._last_result
 
         rows = [

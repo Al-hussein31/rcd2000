@@ -1,8 +1,11 @@
 """Foundation design form page."""
 
 import os
+import logging
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox,
+)
 
 from rcd2000.base import BaseDesigner, BaseInput
 from rcd2000.report import format_base
@@ -37,13 +40,27 @@ class BasePage(QWidget):
         layout.addWidget(c1)
 
         c2 = Card("Loads & Dimensions")
+        # AUDIT: load 0–50000 kN is large but not invalid. However, load=0
+        # would produce a zero-area footing (sqrt(0)) — the engine handles
+        # this but the result is meaningless.
         self.base_load = spinbox(0, 50000, 100, 1000)
+        # AUDIT: column dims 100–2000 mm — for a 100mm column, the base
+        # projection could be negative (base smaller than column). The
+        # engine doesn't guard against this.
         self.base_a1 = spinbox(100, 2000, 25, 300, 0)
         self.base_a2 = spinbox(100, 2000, 25, 300, 0)
+        # AUDIT: dia 100–2000 mm is fine for circular columns.
         self.base_dia = spinbox(100, 2000, 25, 300, 0)
+        # AUDIT: base thickness h 100–2000 mm — minimum 100mm is too low
+        # for any real footing (crushing/bond checks will fail, but engine
+        # iterates h up by 50mm until OK, so it self-corrects).
         self.base_h = spinbox(100, 2000, 25, 300, 0)
+        # AUDIT: L1/L2 0–20 m — for isolated footings, L1/L2=0 means
+        # auto-calculate from area. For combined footings, L2=0 defaults
+        # to 2.0m in the engine. No critical issue.
         self.base_l1 = spinbox(0, 20, 0.5, 0, 2, " m")
         self.base_l2 = spinbox(0, 20, 0.5, 0, 2, " m")
+        # AUDIT: dowel_dia 8–40 mm is fine.
         self.base_dowel = spinbox(8, 40, 2, 12, 0)
         c2.add_row("Axial Load (kN):", self.base_load)
         c2.add_row("Col Dim a1 (mm):", self.base_a1)
@@ -98,7 +115,16 @@ class BasePage(QWidget):
         designer = BaseDesigner(
             pb=self.base_pb.value(), fcu=fcu, fy=fy,
         )
-        self._last_result = designer.design([self._last_input])[0]
+        try:
+            self._last_result = designer.design([self._last_input])[0]
+        except Exception as exc:
+            logging.error("Base design failed", exc_info=True)
+            QMessageBox.warning(
+                self, "Design Error",
+                f"Could not complete the design — check your inputs: {exc}",
+            )
+            return
+
         r = self._last_result
 
         rows = [

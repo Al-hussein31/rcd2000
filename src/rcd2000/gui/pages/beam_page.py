@@ -1,9 +1,11 @@
 """Beam design form page."""
 
 import os
+import logging
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, QLabel, QFileDialog,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt
 
@@ -37,8 +39,13 @@ class BeamPage(QWidget):
         layout.addWidget(c1)
 
         c2 = Card("Section Geometry")
+        # AUDIT: bf (flange width) range 100–2000 mm allows bf < b (web width),
+        # which is physically invalid for BS 8110 — the engine doesn't guard
+        # against this. Consider enforcing bf >= b at design time.
         self.b_b = spinbox(100, 2000, 25, 225, 0)
         self.b_bf = spinbox(100, 2000, 25, 225, 0)
+        # AUDIT: h range 100–2000 mm allows h < b+100 (minimum effective depth),
+        # which would cause steel_beam to fail or produce nonsensical results.
         self.b_h = spinbox(100, 2000, 25, 450, 0)
         self.b_hf = spinbox(0, 500, 10, 0, 0)
         c2.add_row("b (mm):", self.b_b)
@@ -130,28 +137,37 @@ class BeamPage(QWidget):
 
     def _calculate(self):
         self._clear_results()
-        nm = self.n_members.value()
-        fcu = int(self.beam_fcu.currentText())
-        fy = int(self.beam_fy.currentText())
-        fyv = int(self.beam_fyv.currentText())
+        try:
+            nm = self.n_members.value()
+            fcu = int(self.beam_fcu.currentText())
+            fy = int(self.beam_fy.currentText())
+            fyv = int(self.beam_fyv.currentText())
 
-        self._last_input = BeamInput(
-            beam_id="B1",
-            n_supports=self.n_supports.value(),
-            n_members=nm,
-            b=self.b_b.value(), bf=self.b_bf.value(),
-            h=self.b_h.value(), hf=self.b_hf.value(),
-            fcu=fcu, fy=fy, fyv=fyv,
-            member_lengths=[w[1].value() for w in self._member_widgets],
-            member_udl=[w[2].value() for w in self._member_widgets],
-            member_wt=[w[3].value() for w in self._member_widgets],
-            member_wb=[w[4].value() for w in self._member_widgets],
-            member_ab=[w[5].value() for w in self._member_widgets],
-            ty1=self.ty1.currentIndex(),
-            ty2=self.ty2.currentIndex(),
-        )
-        designer = BeamDesigner(fcu=fcu, fy=fy, fyv=fyv)
-        self._last_result = designer.design([self._last_input])[0]
+            self._last_input = BeamInput(
+                beam_id="B1",
+                n_supports=self.n_supports.value(),
+                n_members=nm,
+                b=self.b_b.value(), bf=self.b_bf.value(),
+                h=self.b_h.value(), hf=self.b_hf.value(),
+                fcu=fcu, fy=fy, fyv=fyv,
+                member_lengths=[w[1].value() for w in self._member_widgets],
+                member_udl=[w[2].value() for w in self._member_widgets],
+                member_wt=[w[3].value() for w in self._member_widgets],
+                member_wb=[w[4].value() for w in self._member_widgets],
+                member_ab=[w[5].value() for w in self._member_widgets],
+                ty1=self.ty1.currentIndex(),
+                ty2=self.ty2.currentIndex(),
+            )
+            designer = BeamDesigner(fcu=fcu, fy=fy, fyv=fyv)
+            self._last_result = designer.design([self._last_input])[0]
+        except Exception as exc:
+            logging.error("Beam design failed", exc_info=True)
+            QMessageBox.warning(
+                self, "Design Error",
+                f"Could not complete the design — check your inputs: {exc}",
+            )
+            return
+
         result = self._last_result
 
         if result.spans:

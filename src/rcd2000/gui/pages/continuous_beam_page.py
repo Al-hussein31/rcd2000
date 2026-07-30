@@ -1,9 +1,11 @@
 """Continuous beam analysis form page."""
 
 import os
+import logging
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFileDialog,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt
 
@@ -78,12 +80,20 @@ class ContinuousBeamPage(QWidget):
             row = len(self._cb_member_widgets) + 1
             lbl = QLabel(f"M{row}")
             lbl.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; background: transparent;")
+            # AUDIT: length 1–50 m is fine. inertia 0.0001–10 m⁴ is
+            # very small but the engine uses it directly in the stiffness
+            # matrix — zero would cause division-by-zero, but the min
+            # prevents that.
             length = spinbox(1, 50, 0.5, 5, 2, " m")
             inertia = spinbox(0.0001, 10, 0.001, 0.001, 4)
+            # AUDIT: e_mod 0.1–10 — relative modulus, fine as-is.
             e_mod = spinbox(0.1, 10, 0.1, 1, 1)
             udl = spinbox(0, 500, 5, 0, 1, " kN/m")
             wt = spinbox(0, 200, 5, 0, 1)
             wb = spinbox(0, 200, 5, 0, 1)
+            # AUDIT: ab 0–10 m — trapezoidal load position. If ab > length,
+            # the load is outside the member. The engine clamps alpha =
+            # ab/l which could exceed 1.0, producing invalid results.
             ab = spinbox(0, 10, 0.5, 0, 2)
             self.member_grid.addWidget(lbl, row, 0)
             self.member_grid.addWidget(length, row, 1)
@@ -132,7 +142,16 @@ class ContinuousBeamPage(QWidget):
             end2_type=self.cb_end2.currentIndex(),
         )
         analyzer = ContinuousBeamAnalyzer()
-        self._last_result = analyzer.analyze(self._last_input)
+        try:
+            self._last_result = analyzer.analyze(self._last_input)
+        except Exception as exc:
+            logging.error("Continuous beam analysis failed", exc_info=True)
+            QMessageBox.warning(
+                self, "Analysis Error",
+                f"Could not complete the analysis — check your inputs: {exc}",
+            )
+            return
+
         r = self._last_result
 
         if r.support_moments:
