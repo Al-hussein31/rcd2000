@@ -13,7 +13,6 @@ Usage:
 import sys
 import json
 import argparse
-from typing import List
 
 from rcd2000 import __version__
 from rcd2000.beam import BeamDesigner, BeamInput
@@ -25,6 +24,15 @@ from rcd2000.continuous_beam import (
     ContinuousBeamAnalyzer, ContinuousBeamInput, ContinuousBeamMember
 )
 from rcd2000.models import result_to_dict
+from rcd2000.report import (
+    format_slab, format_column, format_beam,
+    format_stair, format_base, format_continuous_beam,
+)
+
+
+JOB = ""
+DATE = ""
+ENGR = ""
 
 
 def read_json(path: str) -> dict:
@@ -32,13 +40,22 @@ def read_json(path: str) -> dict:
         return json.load(f)
 
 
-def write_output(data: dict, output: str):
+def write_report(text: str, output: str):
     if output:
         with open(output, "w") as f:
-            json.dump(data, f, indent=2, default=str)
-        print(f"Results written to {output}")
+            f.write(text)
     else:
-        print(json.dumps(data, indent=2, default=str))
+        sys.stdout.write(text)
+
+
+def write_json(data, output: str):
+    text = json.dumps(data, indent=2, default=str)
+    if output:
+        output = output.replace(".txt", ".json") if output.endswith(".txt") else output
+        with open(output, "w") as f:
+            f.write(text)
+    else:
+        print(text)
 
 
 def cmd_beam(args):
@@ -46,22 +63,19 @@ def cmd_beam(args):
     fcu = data.get("fcu", 25.0)
     fy = data.get("fy", 460.0)
     fyv = data.get("fyv", 250.0)
+    job = data.get("job_ref", JOB)
+    date = data.get("date", DATE)
+    engr = data.get("designer", ENGR)
     designer = BeamDesigner(fcu=fcu, fy=fy, fyv=fyv)
 
     beams = []
     for b in data.get("beams", [data]):
-        member_pl = []
-        for pl_list in b.get("member_pl", []):
-            member_pl.append([(p["load"], p["dist"]) for p in pl_list])
-
         beams.append(BeamInput(
             beam_id=b.get("beam_id", "B1"),
             n_supports=b.get("n_supports", 2),
             n_members=b.get("n_members", 1),
-            b=b.get("b", 225),
-            bf=b.get("bf", 225),
-            h=b.get("h", 450),
-            hf=b.get("hf", 0),
+            b=b.get("b", 225), bf=b.get("bf", 225),
+            h=b.get("h", 450), hf=b.get("hf", 0),
             fcu=fcu, fy=fy, fyv=fyv,
             member_lengths=b.get("member_lengths", []),
             member_udl=b.get("member_udl", []),
@@ -69,19 +83,29 @@ def cmd_beam(args):
             member_wb=b.get("member_wb", []),
             member_ab=b.get("member_ab", []),
             member_npl=b.get("member_npl", []),
-            member_pl=member_pl,
-            ty1=b.get("ty1", 0),
-            ty2=b.get("ty2", 0),
+            member_pl=[[(p["load"], p["dist"]) for p in pl_list]
+                       for pl_list in b.get("member_pl", [])],
+            ty1=b.get("ty1", 0), ty2=b.get("ty2", 0),
         ))
 
     results = designer.design(beams)
-    write_output({"results": [result_to_dict(r) for r in results]}, args.output)
+    if args.json:
+        write_json({"results": [result_to_dict(r) for r in results]}, args.output)
+    else:
+        text = ""
+        for bi, r in zip(beams, results):
+            text += format_beam(bi, r, job, date, engr)
+            text += "\n\n"
+        write_report(text.strip() + "\n", args.output)
 
 
 def cmd_column(args):
     data = read_json(args.input)
     fcu = data.get("fcu", 25.0)
     fy = data.get("fy", 460.0)
+    job = data.get("job_ref", JOB)
+    date = data.get("date", DATE)
+    engr = data.get("designer", ENGR)
     designer = ColumnDesigner(fcu=fcu, fy=fy)
 
     columns = []
@@ -91,23 +115,31 @@ def cmd_column(args):
             col_type=c.get("col_type", 1),
             shape=c.get("shape", 1),
             load=c.get("load", 0),
-            bx=c.get("bx", 0),
-            by=c.get("by", 0),
-            dia=c.get("dia", 0),
-            depth=c.get("depth", 0),
+            bx=c.get("bx", 0), by=c.get("by", 0),
+            dia=c.get("dia", 0), depth=c.get("depth", 0),
             moment_x=c.get("moment_x", 0),
             moment_y=c.get("moment_y", 0),
             moment=c.get("moment", 0),
         ))
 
     results = designer.design(columns)
-    write_output({"results": [result_to_dict(r) for r in results]}, args.output)
+    if args.json:
+        write_json({"results": [result_to_dict(r) for r in results]}, args.output)
+    else:
+        text = ""
+        for ci, r in zip(columns, results):
+            text += format_column(ci, r, job, date, engr, fcu, fy)
+            text += "\n\n"
+        write_report(text.strip() + "\n", args.output)
 
 
 def cmd_slab(args):
     data = read_json(args.input)
     fcu = data.get("fcu", 25.0)
     fy = data.get("fy", 460.0)
+    job = data.get("job_ref", JOB)
+    date = data.get("date", DATE)
+    engr = data.get("designer", ENGR)
     designer = SlabDesigner(fcu=fcu, fy=fy)
 
     panels = []
@@ -129,13 +161,23 @@ def cmd_slab(args):
         ))
 
     results = designer.design(panels)
-    write_output({"results": [result_to_dict(r) for r in results]}, args.output)
+    if args.json:
+        write_json({"results": [result_to_dict(r) for r in results]}, args.output)
+    else:
+        text = ""
+        for p, r in zip(panels, results):
+            text += format_slab(p, r, job, date, engr)
+            text += "\n\n"
+        write_report(text.strip() + "\n", args.output)
 
 
 def cmd_stair(args):
     data = read_json(args.input)
     fcu = data.get("fcu", 25.0)
     fy = data.get("fy", 460.0)
+    job = data.get("job_ref", JOB)
+    date = data.get("date", DATE)
+    engr = data.get("designer", ENGR)
     designer = StairDesigner(fcu=fcu, fy=fy)
 
     stairs = []
@@ -151,7 +193,14 @@ def cmd_stair(args):
         ))
 
     results = designer.design(stairs)
-    write_output({"results": [result_to_dict(r) for r in results]}, args.output)
+    if args.json:
+        write_json({"results": [result_to_dict(r) for r in results]}, args.output)
+    else:
+        text = ""
+        for si, r in zip(stairs, results):
+            text += format_stair(si, r, job, date, engr)
+            text += "\n\n"
+        write_report(text.strip() + "\n", args.output)
 
 
 def cmd_base(args):
@@ -159,6 +208,9 @@ def cmd_base(args):
     fcu = data.get("fcu", 25.0)
     fy = data.get("fy", 460.0)
     pb = data.get("pb", 150.0)
+    job = data.get("job_ref", JOB)
+    date = data.get("date", DATE)
+    engr = data.get("designer", ENGR)
     designer = BaseDesigner(pb=pb, fcu=fcu, fy=fy)
 
     bases = []
@@ -169,21 +221,28 @@ def cmd_base(args):
             col_type=b.get("col_type", 1),
             load=b.get("load", 0),
             pb=pb, fcu=fcu, fy=fy,
-            a1=b.get("a1", 300),
-            a2=b.get("a2", 300),
-            dia=b.get("dia", 0),
-            dowel_dia=b.get("dowel_dia", 12),
+            a1=b.get("a1", 300), a2=b.get("a2", 300),
+            dia=b.get("dia", 0), dowel_dia=b.get("dowel_dia", 12),
             h=b.get("h", 200),
-            l1=b.get("l1", 0),
-            l2=b.get("l2", 0),
+            l1=b.get("l1", 0), l2=b.get("l2", 0),
         ))
 
     results = designer.design(bases)
-    write_output({"results": [result_to_dict(r) for r in results]}, args.output)
+    if args.json:
+        write_json({"results": [result_to_dict(r) for r in results]}, args.output)
+    else:
+        text = ""
+        for bi, r in zip(bases, results):
+            text += format_base(bi, r, job, date, engr)
+            text += "\n\n"
+        write_report(text.strip() + "\n", args.output)
 
 
 def cmd_continuous(args):
     data = read_json(args.input)
+    job = data.get("job_ref", JOB)
+    date = data.get("date", DATE)
+    engr = data.get("designer", ENGR)
     analyzer = ContinuousBeamAnalyzer()
 
     members = []
@@ -194,8 +253,7 @@ def cmd_continuous(args):
             inertia=m.get("inertia", 0.001),
             e_mod=m.get("e_mod", 1.0),
             udl=m.get("udl", 0),
-            wt=m.get("wt", 0),
-            wb=m.get("wb", 0),
+            wt=m.get("wt", 0), wb=m.get("wb", 0),
             ab=m.get("ab", 0),
             npl=m.get("npl", 0),
             point_loads=[(pl["load"], pl["dist"]) for pl in m.get("point_loads", [])],
@@ -210,7 +268,11 @@ def cmd_continuous(args):
     )
 
     result = analyzer.analyze(beam)
-    write_output(result_to_dict(result), args.output)
+    if args.json:
+        write_json(result_to_dict(result), args.output)
+    else:
+        text = format_continuous_beam(beam, result, job, date, engr)
+        write_report(text.strip() + "\n", args.output)
 
 
 def cmd_info(args):
@@ -239,7 +301,9 @@ def main():
         p = sub.add_parser(cmd_name, help=help_text)
         if cmd_name != "info":
             p.add_argument("input", help="JSON input file")
-            p.add_argument("-o", "--output", help="Output file (default: stdout)")
+            p.add_argument("-o", "--output", help="Output text file")
+            p.add_argument("--json", action="store_true",
+                           help="Output raw JSON instead of formatted report")
         p.set_defaults(func=func)
 
     args = parser.parse_args()

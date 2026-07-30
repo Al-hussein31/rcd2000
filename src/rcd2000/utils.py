@@ -115,6 +115,9 @@ def steel_area(m: float, d: float, fcu: float, fy: float) -> Tuple[float, int]:
 def rodia_slab(ast: float, fy: float) -> Tuple[str, float, float]:
     """Select bar diameter and spacing for slab.
     Returns (bar_type, bar_dia_mm, spacing_mm).
+
+    Picks the smallest bar that gives spacing in [100, 200] mm.
+    For small As, picks smallest bar with spacing capped at 200 mm.
     """
     bar_type = "Y"
     bd = [8.0, 10.0, 12.0, 16.0, 20.0, 25.0, 32.0]
@@ -123,20 +126,14 @@ def rodia_slab(ast: float, fy: float) -> Tuple[str, float, float]:
     if ast <= 0.0:
         return bar_type, 10.0, 200.0
 
-    best_rd = bd[-1]
-    best_sv = 200.0
     for rd in bd:
         sv = 1000.0 * pi * rd ** 2.0 / (4.0 * ast)
-        if 100.0 <= sv <= 200.0:
+        if sv >= 100.0:
+            if sv > 200.0:
+                sv = 200.0
             return bar_type, rd, sv
-        best_rd = rd
-        best_sv = sv
 
-    if best_sv > 200.0:
-        best_sv = 200.0
-    if best_sv < 75.0:
-        best_sv = 75.0
-    return bar_type, best_rd, best_sv
+    return bar_type, bd[-1], 75.0
 
 
 def rodia_beam(ast: float, pi: float, fy: float) -> Tuple[str, float, float]:
