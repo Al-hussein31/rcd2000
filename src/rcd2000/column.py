@@ -97,8 +97,7 @@ class ColumnDesigner:
         elif c.col_type == 3:
             self._biaxial(c, ag, r)
 
-        if r.heck == 1:
-            r.steel_percent = r.steel_required * 100.0 / ag if ag > 0 else 0.0
+        r.steel_percent = r.steel_required * 100.0 / ag if ag > 0 else 0.0
 
         return r
 
@@ -135,9 +134,9 @@ class ColumnDesigner:
         mu_table = []
         as_table = []
 
-        at = 0.003
+        at = 0.0
         for i in range(9):
-            xh = 0.2 + (i + 1) * 0.1  # 0.3 to 1.0
+            xh = 0.2 + i * 0.1  # 0.2 to 1.0
             for j in range(nn):
                 at += 0.001
                 hx = 1.0 / xh
