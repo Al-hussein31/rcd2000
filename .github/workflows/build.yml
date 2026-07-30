@@ -16,25 +16,22 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            display: Linux
             pyinstaller_flags: --onefile
             icon_flag: ""
             sep: ":"
-            asset_pattern: dist/RCD2000
+            uploaded_asset: dist/RCD2000-linux
 
           - os: macos-latest
-            display: macOS
             pyinstaller_flags: --windowed
             icon_flag: --icon src/rcd2000/gui/icons/logo.icns
             sep: ":"
-            asset_pattern: dist/RCD2000.app
+            uploaded_asset: dist/RCD2000-macos.zip
 
           - os: windows-latest
-            display: Windows
             pyinstaller_flags: --onefile --windowed
             icon_flag: --icon src/rcd2000/gui/icons/logo.ico
             sep: ";"
-            asset_pattern: dist/RCD2000.exe
+            uploaded_asset: dist/RCD2000-windows.exe
 
     runs-on: ${{ matrix.os }}
 
@@ -74,15 +71,22 @@ jobs:
             --hidden-import PySide6.QtXml \
             run_gui.py
 
-      - name: Package .app for upload (macOS)
+      - name: Package .app into zip (macOS)
         if: runner.os == 'macOS'
         run: |
           ditto -c -k --sequesterRsrc dist/RCD2000.app dist/RCD2000-macos.zip
-          echo "macOS zip ready"
+          ls -lh dist/RCD2000-macos.zip
+
+      - name: Rename executable (Linux)
+        if: runner.os == 'Linux'
+        run: mv dist/RCD2000 dist/RCD2000-linux
+
+      - name: Rename executable (Windows)
+        if: runner.os == 'Windows'
+        run: mv dist/RCD2000.exe dist/RCD2000-windows.exe
 
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            ${{ matrix.asset_pattern }}
+          files: ${{ matrix.uploaded_asset }}
