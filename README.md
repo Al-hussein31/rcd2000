@@ -1,12 +1,20 @@
-# RCD2000
+<p align="center">
+  <img src="logo.svg" width="280" alt="RCD2000">
+</p>
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-44%2F44-passing-brightgreen)]()
-[![Code size](https://img.shields.io/github/languages/code-size/Al-hussein31/rcd2000)]()
-[![BS 8110](https://img.shields.io/badge/code-BS%208110%3A1997-orange)]()
+<p align="center">
+  <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
+  <a href=""><img src="https://img.shields.io/badge/tests-44%2F44-passing-brightgreen" alt="Tests"></a>
+  <a href=""><img src="https://img.shields.io/github/languages/code-size/Al-hussein31/rcd2000" alt="Code size"></a>
+  <a href=""><img src="https://img.shields.io/badge/code-BS%208110%3A1997-orange" alt="BS 8110"></a>
+</p>
 
-Reinforced concrete design to BS 8110:1997. Python port of Oyenuga's RCD2000 FORTRAN programs.
+<p align="center">
+  <strong>Reinforced concrete design to BS 8110:1997.</strong> Python port of Oyenuga's RCD2000 FORTRAN programs.
+</p>
+
+RCD2000 is a structural engineering tool that designs beams, columns, slabs, stairs, and foundations in accordance with British Standard BS 8110. It uses the Clapeyron three-moment equation for continuous analysis and strain compatibility for column interaction curves.
 
 RCD2000 is a structural engineering tool that designs beams, columns, slabs, stairs, and foundations in accordance with British Standard BS 8110. It uses the Clapeyron three-moment equation for continuous analysis and strain compatibility for column interaction curves.
 

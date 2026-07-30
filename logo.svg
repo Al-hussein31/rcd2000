@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <linearGradient id="concrete" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#4a4a4a"/>
+      <stop offset="100%" stop-color="#2d2d2d"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e8a030"/>
+      <stop offset="100%" stop-color="#cc7a1f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Concrete section outline -->
+  <rect x="60" y="60" width="280" height="280" rx="12" ry="12"
+        fill="none" stroke="url(#concrete)" stroke-width="12"/>
+
+  <!-- Concrete fill (subtle) -->
+  <rect x="60" y="60" width="280" height="280" rx="12" ry="12"
+        fill="#3a3a3a" opacity="0.08"/>
+
+  <!-- Shear link / stirrup (dashed inner square) -->
+  <rect x="110" y="110" width="180" height="180" rx="6" ry="6"
+        fill="none" stroke="url(#steel)" stroke-width="6"
+        stroke-dasharray="14,8" opacity="0.7"/>
+
+  <!-- Corner reinforcement bars -->
+  <circle cx="110" cy="110" r="18" fill="url(#steel)"/>
+  <circle cx="290" cy="110" r="18" fill="url(#steel)"/>
+  <circle cx="110" cy="290" r="18" fill="url(#steel)"/>
+  <circle cx="290" cy="290" r="18" fill="url(#steel)"/>
+
+  <!-- Bar highlights -->
+  <circle cx="105" cy="105" r="5" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="285" cy="105" r="5" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="105" cy="285" r="5" fill="rgba(255,255,255,0.3)"/>
+  <circle cx="285" cy="285" r="5" fill="rgba(255,255,255,0.3)"/>
+
+  <!-- RCD text below -->
+  <text x="200" y="370" text-anchor="middle"
+        font-family="'SF Mono','Menlo','Consolas',monospace"
+        font-size="32" font-weight="700" fill="#4a4a4a"
+        letter-spacing="6">RCD2000</text>
+</svg>
