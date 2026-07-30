@@ -192,3 +192,181 @@ C
   228 FORMAT(5X,A6,1X,F8.3,1X,A6)
   238 FORMAT(/80('-')/)
 C
+C----------------------------------------------------------------------
+C
+C     FORMAT STATEMENTS AND SHEAR LINK CALCULATIONS
+C     (FROM PAGE 213)
+C
+  129 FORMAT(15X,A42)
+    8 FORMAT(1X,23X,A34)
+   18 FORMAT(23X,A34)
+   28 FORMAT(5X,A9,1X,A20,12X,A8,1X,A20)
+   38 FORMAT(/5X,A9,1X,A25,7X,A5,1X,F5.0,1X,A2,1X,F5.0,1X,A2)
+   48 FORMAT(5X,A7,6(1X))
+C
+      WRITE(NO,188) 'NOTE: Spacing Based on 2 Legs 10mm Dia. Bar',
+     +              'with FY = ', FYV, 'N/Sq.mm'
+      WRITE(NO,238)
+      WRITE(NO,218) 'SUPT', NDD(NS), CLD2, SVC2
+C
+      IF (NPL(I) .NE. 0) THEN
+        WRITE(NO,278) (P(I,J), J = 1, NPL(I)),
+     +                (AP(I,J), J = 1, NPL(I))
+      END IF
+ 7007 CONTINUE
+C
+  285 FORMAT(5X,1X,A4,6X,A3,5X,A7,3X,A7,3X,A5,4X,A3,4X,A8)
+  255 FORMAT(5X,A12)
+  268 FORMAT(5X,A2,A4,A2,2X,F6.2,4X,F6.2,4X,F6.2,4X,F5.3,6X,I2)
+  278 FORMAT(15X,12(F6.2,1X))
+C
+      WRITE(NO,658) 'A. MOMENTS'
+      WRITE(NO,68) 'AAAAAAAAAAAAAAAA'
+      WRITE(NO,78) 'SPAN REINFORCEMENTS'
+      WRITE(NO,88) 'Span', 'Length', 'Moment', 'Steel (Sq. mm)',
+     +             'Provide'
+      WRITE(NO,98) 'S/N', '(m)', '(kN.m)', 'Bottom', 'Top'
+C
+      DO 907 I = 1, NM
+  907   WRITE(NO,108) NX(I), '-', NY(I), L(I), SPMT(I), AS(I),
+     +                ASC(I), 'T'
+C
+      WRITE(NO,118) 'SUPPORT REINFORCEMENTS'
+      WRITE(NO,128) 'Supt', 'Reaction', 'Moment', 'Steel (Sq. mm)',
+     +              'Provide'
+      WRITE(NO,138) 'S/N', '(kN)', '(kN.m)', 'Top', 'Bottom'
+C
+      DO 917 I = 1, NS
+  917   WRITE(NO,148) NDD(I), REACTN(I), MT(I), AT(I), ATC(I),
+     +                'T'
+C
+      WRITE(NO,208)
+      WRITE(NO,68) 'B. SHEAR'
+      WRITE(NO,68) 'AAAAAAAAAAAAAAAA'
+      WRITE(NO,158) 'SPAN', 'LEFT SUPPORT', 'RIGHT SUPPORT'
+      WRITE(NO,168) 'S/N', 'Shear', 'Spacing', 'Provide', 'Shear',
+     +              'Spacing', 'Provide'
+C
+      IF (CMT1 .NE. 0.00) THEN
+        WRITE(NO,218) 'SUPT', NDD(1), CLD1, SVC1
+      END IF
+C
+      DO 927 I = 1, NM
+  927   WRITE(NO,178) NX(I), '-', NY(I), SFN1(I), SV1(I),
+     +                SFN2(I), SV2(I)
+C
+      IF (CMT2 .NE. 0.00) THEN
+        WRITE(NO,28) 'JOB REF: ', JOB, 'DATE: ', DATE
+        WRITE(NO,402)
+  402   FORMAT(1X)
+        WRITE(NO,28) 'DESIGNED: ', ENGR, 'CHECKED: '
+      END IF
+C
+      IF (IQ .NE. 1) THEN
+        WRITE(NO,248) 'PAGE ', IQ, 'OF', NB
+  248   FORMAT(56X,A4,1X,I2,1X,A2,1X,I2)
+      END IF
+C
+      WRITE(NO,38) 'BEAM ID: ', BN, 'SIZE: ', H, 'BY', B, 'mm'
+      WRITE(NO,48) 'SKETCH:'
+      WRITE(NO,58) 'FCU = ', FCU, 'N/Sq.mm', 'FY = ', FY,
+     +             'N/Sq.mm'
+C
+      MU = (0.156 * FCU * B * D**2.0) / 1.0E06
+      WRITE(NO,228) 'Mu = ', MU, 'kN.m'
+      WRITE(NO,258) 'Beam Loading'
+      WRITE(NO,288) 'SPAN', 'UDL', 'TRIANG.', 'TRAPEZ.',
+     +              'TR.DIST.', 'NPL', 'LOADS'
+C
+      DO 7007 I = 1, NM
+        WRITE(NO,268) NX(I), '-', NY(I), UD(I), WT(I), WB(I),
+     +                AB(I), NPL(I)
+ 7007 CONTINUE
+C
+      IF (IQ .EQ. 1) THEN
+        WRITE(NO,8) 'BEAM ANALYSIS AND DESIGN BS 8110'
+        WRITE(NO,18)
+      END IF
+C
+C RESULTS OUTPUT
+C
+      WRITE(6,404)
+      WRITE(6,404)
+      WRITE(6,129) 'About to write - press <ENTER> when ready'
+      WRITE(6,449) 'Beam Id. No. ', BN
+  449 FORMAT(10X,A14,A30)
+      WRITE(6,404)
+      PAUSE
+C
+      AV2 = AT(I + 1)
+      CALL SHEAR(V2, AV2, FYV, FCU, B, D, SV, HECK)
+      IF (HECK .EQ. 0) H = H + 150
+      IF (HECK .EQ. 0) GO TO 5
+      SV2(I) = SV
+C
+C NOW FOR THE CANTILEVER ENDS
+C
+      IF (CMT1 .NE. 0.00) THEN
+        VC = CLD1
+        AVC = AT(1)
+        CALL SHEAR(VC, AVC, FYV, FCU, B, D, SV, HECK)
+        SVC1 = SV
+        IF (HECK .EQ. 0) H = H + 150
+        IF (HECK .EQ. 0) GO TO 5
+      END IF
+C
+      IF (CMT2 .NE. 0.00) THEN
+        VC = CLD2
+        AVC = AT(NS)
+        CALL SHEAR(VC, AVC, FYV, FCU, B, D, SV, HECK)
+        SVC2 = SV
+        IF (HECK .EQ. 0) H = H + 150
+        IF (HECK .EQ. 0) GO TO 5
+      END IF
+C
+C----------------------------------------------------------------------
+C
+C     SHEAR STRESS CHECK SUBROUTINE
+C     (FROM PAGE 215)
+C
+      SUBROUTINE SHEAR(V, A, FY, FCU, B, D, SV, HECK)
+      INTEGER HECK
+C
+      V = ABS(V)
+      HECK = 1
+C
+      VV = (V * 1000.0) / (B * D)
+      VM = 0.8 * SQRT(FCU)
+      IF (VM .GT. 5.0) VM = 5.0
+C
+      IF (VV .GT. VM) THEN
+        WRITE(1,9) 'PERMISSIBLE SHEAR STRESS EXCEEDED'
+        WRITE(1,9) 'BEAM DEPTH INCREASED BY 50mm'
+        HECK = 0
+        GO TO 35
+      END IF
+C
+      AC = (100.0 * A) / (B * D)
+      IF (AC .GT. 3.00) AC = 3.00
+      AC = AC**(1.0 / 3.0)
+      DC = 400.0 / D
+      IF (DC .LT. 1.0) DC = 1.0
+      DC = DC**(1.0 / 4.0)
+      VC = 0.63 * AC * DC
+      HVC = 0.5 * VC
+      PVC = VC + 0.40
+C
+      IF (VV .LT. HVC) SV = 0.75 * D
+      IF ((HVC .LE. VV) .AND. (VV .LT. PVC)) THEN
+        SV = (0.95 * FY * 157.0) / (0.4 * B)
+      ELSE IF ((PVC .LE. VV) .AND. (VV .LE. VM)) THEN
+        SV = (157.0 * 0.95 * FY) / (B * (VV - VC))
+      END IF
+C
+      SP = 0.75 * D
+      IF (SV .GT. SP) SV = SP
+C
+    9 FORMAT(/5X,A34/)
+   35 RETURN
+      END
+C

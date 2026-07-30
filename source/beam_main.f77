@@ -202,5 +202,56 @@ C
 C
    27 CONTINUE
 C
+C
+C MODULE 2: ANALYSIS CALCULATIONS
+C
+      AL = AB(I) / L(I)
+      SRNI(I) = SRNI(I) + 0.5 * WB(I) * L(I) * (1.0 - AL)
+      SP = (3.0 - 4.0 * AL**2.0) / 24.0
+      SP = SP * WB(I) * L(I)**2.0
+      FREEMT(I) = FREEMT(I) + SP
+      SRN2(I) = SRNI(I)
+C
+C CONVERT TRIANGULAR AND TRAPEZOIDAL LOADS TO UDL
+C
+      U(I) = UD(I) + WT(I) / 3.0
+      AL = AB(I) / L(I)
+      U(I) = U(I) + WB(I) * (1.0 - (2.0 / 3.0) * AL) * 0.5
+C
+C CALCULATE SAME FOR THE SYSTEM OF POINT LOADS
+C
+      IF (NPL(I) .NE. 0) THEN
+        DO 87 J = 1, NPL(I)
+          AL = AP(I,J) / L(I)
+          AR = 1.0 - AL
+          SRNI(I) = SRNI(I) + P(I,J) * AR
+          SRN2(I) = SRN2(I) + P(I,J) * AL
+   87   CONTINUE
+      END IF
+C
+      SRNI(I) = SRNI(I) + 0.25 * WT(I) * L(I)
+      FREEMT(I) = FREEMT(I) + (1.0 / 12.0) * WT(I) * L(I)**2.0
+C
+      DO 671 I = 1, NM
+        SRNI(I) = UD(I) * L(I) * 0.5
+        FREEMT(I) = (UD(I) * L(I)**2.0) / 8.0
+  671 CONTINUE
+C
+C CALCULATE SECTION PROPERTIES
+C
+      DO 205 I = 1, NM
+        NX(I) = NOD(I)
+        NY(I) = NOD(I + 1)
+        E(I) = 1.0
+        D = H - 50.0
+        IV(I) = (B * D**3.0) / 12.0
+        IV(I) = IV(I) / 1.0E12
+  205 CONTINUE
+C
+C FREE SPAN MOMENTS AND STATIC SHEAR
+C
+      IF (NO .EQ. 4) OPEN(4, FILE=FNAME2)
+      IF (NO .EQ. 2) OPEN(2, FILE='CON')
+C
       STOP
       END

@@ -1,0 +1,12 @@
+numpy>=1.24
+
+[cli]
+rich>=13.0
+typer>=0.9
+
+[dev]
+pytest>=7.0
+pytest-cov>=4.0
+
+[web]
+streamlit>=1.28

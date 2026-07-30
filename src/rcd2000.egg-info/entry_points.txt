@@ -1,0 +1,2 @@
+[console_scripts]
+rcd2000 = rcd2000.cli:app

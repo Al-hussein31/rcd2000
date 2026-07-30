@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rcd2000"
+version = "1.0.0"
+description = "Reinforced Concrete Design to BS 8110 - Modern port of Oyenuga's RCD2000"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "RCD2000 Contributors", email = "info@rcd2000.dev"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Engineering",
+    "Topic :: Scientific/Engineering",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+cli = [
+    "rich>=13.0",
+    "typer>=0.9",
+]
+web = [
+    "streamlit>=1.28",
+]
+
+[project.scripts]
+rcd2000 = "rcd2000.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.mypy]
+strict = false
+python_version = "3.11"
