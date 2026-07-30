@@ -29,6 +29,9 @@ class SlabPage(DesignFormPage):
         c1.add_row("fcu (N/mm²):", self.slab_fcu)
         c1.add_row("fy (N/mm²):", self.slab_fy)
         layout.addWidget(c1)
+        self._auto_clear_invalid(self.slab_type)
+        self._auto_clear_invalid(self.slab_fcu)
+        self._auto_clear_invalid(self.slab_fy)
 
         c2 = Card("Panel Geometry & Loading")
         # AUDIT: depth 100–500 mm is fine. But for two-way slabs, ly must be
@@ -57,6 +60,12 @@ class SlabPage(DesignFormPage):
         c2.add_widget(load_w)
         c2.add_widget(self.udl_label)
         layout.addWidget(c2)
+        self._auto_clear_invalid(self.s_depth)
+        self._auto_clear_invalid(self.s_span)
+        self._auto_clear_invalid(self.s_ly)
+        self._auto_clear_invalid(self.s_case)
+        self._auto_clear_invalid(self.gk)
+        self._auto_clear_invalid(self.qk)
 
         c3 = Card("Continuous Slab Spans")
         self.cont_nspan = spin_int(1, 8, 3)
@@ -84,6 +93,8 @@ class SlabPage(DesignFormPage):
             h.addWidget(label(f"S{i+1}:", secondary=True, size=12))
             le = spinbox(1, 20, 0.5, 4, 2, " m")
             ud = spinbox(0, 100, 5, 10, 1, " kN/m")
+            self._auto_clear_invalid(le)
+            self._auto_clear_invalid(ud)
             h.addWidget(le)
             h.addWidget(ud)
             self.cont_span_layout.addLayout(h)
@@ -128,6 +139,37 @@ class SlabPage(DesignFormPage):
         designer = SlabDesigner(fcu=fcu, fy=fy)
         result = designer.design([inp])[0]
         return inp, result
+
+    def validate(self) -> list[str]:
+        errors = []
+        ptype = self.slab_type.currentIndex()
+        if ptype == 3:
+            if self.s_ly.value() < self.s_span.value():
+                errors.append("For two-way slabs, long span (Ly) must be ≥ short span")
+                self._mark_invalid(self.s_ly)
+                self._mark_invalid(self.s_span)
+            if self.s_ly.value() <= 0:
+                errors.append("Ly (long span) must be > 0 for two-way slabs")
+                self._mark_invalid(self.s_ly)
+            if self.s_case.value() < 1 or self.s_case.value() > 9:
+                errors.append("Case must be 1–9 for two-way slabs")
+                self._mark_invalid(self.s_case)
+        if ptype == 2:
+            for i, w in enumerate(self._cont_span_widgets):
+                if w[0].value() <= 0:
+                    errors.append(f"Span {i+1} length must be > 0")
+                    self._mark_invalid(w[0])
+        return errors
+
+    def summarize(self, inp) -> str:
+        names = ["Cantilever", "Simply Supported", "Continuous", "Two-Way"]
+        try:
+            ptype = inp.panel_type if hasattr(inp, "panel_type") else inp.get("panel_type", 1)
+            span = inp.span if hasattr(inp, "span") else inp.get("span", 0)
+            name = names[ptype - 1] if 1 <= ptype <= 4 else f"Type {ptype}"
+            return f"{name}, span {span:.1f}m"
+        except Exception:
+            return f"{names[self.slab_type.currentIndex()]}"
 
     def format_report(self, inp, result):
         return format_slab(inp, result)

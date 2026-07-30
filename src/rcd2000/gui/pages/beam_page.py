@@ -31,6 +31,9 @@ class BeamPage(DesignFormPage):
         c1.add_row("fy (N/mm²):", self.beam_fy)
         c1.add_row("fyv (N/mm²):", self.beam_fyv)
         layout.addWidget(c1)
+        self._auto_clear_invalid(self.beam_fcu)
+        self._auto_clear_invalid(self.beam_fy)
+        self._auto_clear_invalid(self.beam_fyv)
 
         c2 = Card("Section Geometry")
         # AUDIT: bf (flange width) range 100–2000 mm allows bf < b (web width),
@@ -47,6 +50,10 @@ class BeamPage(DesignFormPage):
         c2.add_row("h - overall depth (mm):", self.b_h)
         c2.add_row("hf - flange depth (mm):", self.b_hf)
         layout.addWidget(c2)
+        self._auto_clear_invalid(self.b_b)
+        self._auto_clear_invalid(self.b_bf)
+        self._auto_clear_invalid(self.b_h)
+        self._auto_clear_invalid(self.b_hf)
 
         c3 = Card("Supports & Members")
         self.n_supports = spin_int(2, 10, 2)
@@ -59,6 +66,10 @@ class BeamPage(DesignFormPage):
         c3.add_row("Left End:", self.ty1)
         c3.add_row("Right End:", self.ty2)
         layout.addWidget(c3)
+        self._auto_clear_invalid(self.n_supports)
+        self._auto_clear_invalid(self.n_members)
+        self._auto_clear_invalid(self.ty1)
+        self._auto_clear_invalid(self.ty2)
 
         self.diagram = SpanDiagram()
         self.diagram.setVisible(False)
@@ -69,6 +80,8 @@ class BeamPage(DesignFormPage):
         load_w, self.gk, self.qk, self.load_result = load_combo_group()
         c4.add_widget(load_w)
         layout.addWidget(c4)
+        self._auto_clear_invalid(self.gk)
+        self._auto_clear_invalid(self.qk)
 
         c5 = Card("Member Data")
         self.member_grid = QGridLayout()
@@ -92,6 +105,11 @@ class BeamPage(DesignFormPage):
             wt = spinbox(0, 200, 5, 0, 1)
             wb = spinbox(0, 200, 5, 0, 1)
             ab = spinbox(0, 10, 0.5, 0, 2)
+            self._auto_clear_invalid(length)
+            self._auto_clear_invalid(udl)
+            self._auto_clear_invalid(wt)
+            self._auto_clear_invalid(wb)
+            self._auto_clear_invalid(ab)
             self.member_grid.addWidget(lbl, row, 0)
             self.member_grid.addWidget(length, row, 1)
             self.member_grid.addWidget(udl, row, 2)
@@ -140,6 +158,30 @@ class BeamPage(DesignFormPage):
         designer = BeamDesigner(fcu=fcu, fy=fy, fyv=fyv)
         result = designer.design([inp])[0]
         return inp, result
+
+    def validate(self) -> list[str]:
+        errors = []
+        if self.b_bf.value() < self.b_b.value():
+            errors.append("Flange width (bf) must be ≥ web width (b)")
+            self._mark_invalid(self.b_bf)
+            self._mark_invalid(self.b_b)
+        if self.b_h.value() < self.b_b.value() + 100:
+            errors.append("Overall depth (h) should be at least b + 100 mm for effective depth")
+            self._mark_invalid(self.b_h)
+        for i, w in enumerate(self._member_widgets):
+            if w[1].value() <= 0:
+                errors.append(f"Member {i+1} length must be > 0")
+                self._mark_invalid(w[1])
+        return errors
+
+    def summarize(self, inp) -> str:
+        try:
+            b = inp.b if hasattr(inp, "b") else inp.get("b", 0)
+            h = inp.h if hasattr(inp, "h") else inp.get("h", 0)
+            nm = inp.n_members if hasattr(inp, "n_members") else inp.get("n_members", 0)
+            return f"{nm} spans, {b}×{h}mm"
+        except Exception:
+            return f"{self.n_members.value()} spans"
 
     def format_report(self, inp, result):
         return format_beam(inp, result)

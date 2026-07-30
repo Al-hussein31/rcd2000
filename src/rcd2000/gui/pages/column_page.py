@@ -21,6 +21,8 @@ class ColumnPage(DesignFormPage):
         c1.add_row("Type:", self.col_type)
         c1.add_row("Shape:", self.shape)
         layout.addWidget(c1)
+        self._auto_clear_invalid(self.col_type)
+        self._auto_clear_invalid(self.shape)
 
         c2 = Card("Loads & Geometry")
         # AUDIT: load range 0–50000 kN may exceed what a rectangular column
@@ -42,6 +44,11 @@ class ColumnPage(DesignFormPage):
         c2.add_row("Diameter (mm):", self.dia)
         c2.add_row("Overall depth (mm):", self.depth)
         layout.addWidget(c2)
+        self._auto_clear_invalid(self.load)
+        self._auto_clear_invalid(self.bx)
+        self._auto_clear_invalid(self.by)
+        self._auto_clear_invalid(self.dia)
+        self._auto_clear_invalid(self.depth)
 
         c3 = Card("Materials")
         from rcd2000.gui.widgets import fcu_combo, fy_combo
@@ -50,6 +57,8 @@ class ColumnPage(DesignFormPage):
         c3.add_row("fcu (N/mm²):", self.col_fcu)
         c3.add_row("fy (N/mm²):", self.col_fy)
         layout.addWidget(c3)
+        self._auto_clear_invalid(self.col_fcu)
+        self._auto_clear_invalid(self.col_fy)
 
         c4 = Card("Moments")
         self.moment_x = spinbox(0, 5000, 10, 0)
@@ -59,6 +68,9 @@ class ColumnPage(DesignFormPage):
         c4.add_row("My (kN·m):", self.moment_y)
         c4.add_row("M (uniaxial, kN·m):", self.moment)
         layout.addWidget(c4)
+        self._auto_clear_invalid(self.moment_x)
+        self._auto_clear_invalid(self.moment_y)
+        self._auto_clear_invalid(self.moment)
 
     def calculate(self):
         col_type = self.col_type.currentIndex() + 1
@@ -92,6 +104,50 @@ class ColumnPage(DesignFormPage):
         designer = ColumnDesigner(fcu=fcu, fy=fy)
         result = designer.design([inp])[0]
         return inp, result
+
+    def validate(self) -> list[str]:
+        errors = []
+        shape = self.shape.currentIndex()
+        col_type = self.col_type.currentIndex() + 1
+        if shape == 0:
+            if self.bx.value() < 100 or self.by.value() < 100:
+                errors.append("Rectangular column requires both b/x and b/y dimensions")
+                if self.bx.value() < 100:
+                    self._mark_invalid(self.bx)
+                if self.by.value() < 100:
+                    self._mark_invalid(self.by)
+        else:
+            if self.dia.value() < 100:
+                errors.append("Circular column diameter must be at least 100 mm")
+                self._mark_invalid(self.dia)
+            if abs(self.depth.value() - self.dia.value()) > 1:
+                errors.append("Overall depth should equal diameter for circular columns")
+                self._mark_invalid(self.depth)
+        if col_type == 1 and self.load.value() <= 0:
+            errors.append("Axial load must be greater than zero")
+            self._mark_invalid(self.load)
+        if col_type == 2 and self.moment.value() <= 0:
+            errors.append("Uniaxial moment must be greater than zero for uniaxial design")
+            self._mark_invalid(self.moment)
+        if col_type == 3 and self.moment_x.value() <= 0 and self.moment_y.value() <= 0:
+            errors.append("At least one moment (Mx or My) must be > 0 for biaxial design")
+            self._mark_invalid(self.moment_x)
+            self._mark_invalid(self.moment_y)
+        return errors
+
+    def summarize(self, inp) -> str:
+        try:
+            load = inp.load if hasattr(inp, "load") else inp.get("load", 0)
+            shape = inp.shape if hasattr(inp, "shape") else inp.get("shape", 1)
+            if shape == 1:
+                bx = inp.bx if hasattr(inp, "bx") else inp.get("bx", 0)
+                by = inp.by if hasattr(inp, "by") else inp.get("by", 0)
+                return f"Rect {bx}×{by}mm, {load:.0f}kN"
+            else:
+                dia = inp.dia if hasattr(inp, "dia") else inp.get("dia", 0)
+                return f"Circ Ø{dia}mm, {load:.0f}kN"
+        except Exception:
+            return f"Load {self.load.value():.0f}kN"
 
     def format_report(self, inp, result):
         from rcd2000.gui.theme import fmt as _fmt  # noqa: F811

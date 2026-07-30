@@ -484,10 +484,24 @@ class MainWindow(QMainWindow):
         for rec in data:
             module_name = rec.get("module", "Unknown")
             ts = rec.get("timestamp", "??")
-            display = f"{module_name}  ·  {ts}"
             state_dict = rec.get("state")
-            # Store the dicts as-is; _history_clicked will use module_name
-            self._history.append((module_name, rec.get("input"), rec.get("result"), state_dict))
+            inp_dict = rec.get("input")
+            result_dict = rec.get("result")
+            # Try to use summarize() for a descriptive label
+            summary = ""
+            inp_for_summary = result_dict or inp_dict or {}
+            for i, mod in enumerate(MODULES):
+                if mod[0] == module_name:
+                    try:
+                        summary = self.pages[i].summarize(inp_for_summary)
+                    except Exception:
+                        summary = ""
+                    break
+            if summary:
+                display = f"{module_name} · {summary} · {ts}"
+            else:
+                display = f"{module_name}  ·  {ts}"
+            self._history.append((module_name, inp_dict, result_dict, state_dict))
             self.history_list.insertItem(0, display)
             while self.history_list.count() > 20:
                 self.history_list.takeItem(self.history_list.count() - 1)
@@ -588,10 +602,19 @@ class MainWindow(QMainWindow):
                 except Exception:
                     pass
                 break
-        ts = datetime.now().strftime("%H:%M:%S")
-        display = f"{display_name}  ·  {ts}"
+        ts = datetime.now().strftime("%H:%M")
+        # Build one-line summary via the page's summarize() method
+        summary = ""
+        for i, mod in enumerate(MODULES):
+            if mod[0] == display_name:
+                try:
+                    summary = self.pages[i].summarize(inp)
+                except Exception:
+                    summary = ""
+                break
+        label = f"{display_name} · {summary} · {ts}" if summary else f"{display_name}  ·  {ts}"
         self._history.append((display_name, inp, result, state_dict))
-        self.history_list.insertItem(0, display)
+        self.history_list.insertItem(0, label)
         while self.history_list.count() > 20:
             self.history_list.takeItem(self.history_list.count() - 1)
         self.status.showMessage(f"{display_name} designed - {ts}")

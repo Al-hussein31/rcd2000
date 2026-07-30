@@ -39,6 +39,14 @@ class StairPage(DesignFormPage):
         c.add_widget(label("Load Combination (for reference)", secondary=True, size=12))
         c.add_widget(load_w)
         layout.addWidget(c)
+        self._auto_clear_invalid(self.s_span)
+        self._auto_clear_invalid(self.s_tread)
+        self._auto_clear_invalid(self.s_rise)
+        self._auto_clear_invalid(self.s_imp)
+        self._auto_clear_invalid(self.s_spl)
+        self._auto_clear_invalid(self.s_wld)
+        self._auto_clear_invalid(self.gk)
+        self._auto_clear_invalid(self.qk)
 
     def calculate(self):
         inp = StairInput(
@@ -53,6 +61,23 @@ class StairPage(DesignFormPage):
         designer = StairDesigner()
         result = designer.design([inp])[0]
         return inp, result
+
+    def validate(self) -> list[str]:
+        errors = []
+        ratio = self.s_rise.value() / max(self.s_tread.value(), 1)
+        if ratio > 0.75:
+            errors.append(f"Rise/tread ratio ({ratio:.2f}) exceeds comfort guideline of 0.75")
+            self._mark_invalid(self.s_rise)
+            self._mark_invalid(self.s_tread)
+        return errors
+
+    def summarize(self, inp) -> str:
+        try:
+            span = inp.span if hasattr(inp, "span") else inp.get("span", 0)
+            tread = inp.tread if hasattr(inp, "tread") else inp.get("tread", 0)
+            return f"Span {span:.1f}m, tread {tread}mm"
+        except Exception:
+            return f"Span {self.s_span.value():.1f}m"
 
     def format_report(self, inp, result):
         return format_stair(inp, result)

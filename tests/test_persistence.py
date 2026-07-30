@@ -70,6 +70,7 @@ class TestDiskPersistence:
         page = window.pages[0]
         page.col_type.setCurrentIndex(2)
         page.load.setValue(2500)
+        page.moment_x.setValue(150)  # biaxial needs at least one moment
         page._on_calculate()
 
         window._write_state()

@@ -38,6 +38,10 @@ class ContinuousBeamPage(DesignFormPage):
         c1.add_row("Left End:", self.cb_end1)
         c1.add_row("Right End:", self.cb_end2)
         layout.addWidget(c1)
+        self._auto_clear_invalid(self.cb_ns)
+        self._auto_clear_invalid(self.cb_nm)
+        self._auto_clear_invalid(self.cb_end1)
+        self._auto_clear_invalid(self.cb_end2)
 
         self.diagram = SpanDiagram()
         self.diagram.setVisible(False)
@@ -75,6 +79,13 @@ class ContinuousBeamPage(DesignFormPage):
             # the load is outside the member. The engine clamps alpha =
             # ab/l which could exceed 1.0, producing invalid results.
             ab = spinbox(0, 10, 0.5, 0, 2)
+            self._auto_clear_invalid(length)
+            self._auto_clear_invalid(inertia)
+            self._auto_clear_invalid(e_mod)
+            self._auto_clear_invalid(udl)
+            self._auto_clear_invalid(wt)
+            self._auto_clear_invalid(wb)
+            self._auto_clear_invalid(ab)
             self.member_grid.addWidget(lbl, row, 0)
             self.member_grid.addWidget(length, row, 1)
             self.member_grid.addWidget(inertia, row, 2)
@@ -125,6 +136,29 @@ class ContinuousBeamPage(DesignFormPage):
         analyzer = ContinuousBeamAnalyzer()
         result = analyzer.analyze(inp)
         return inp, result
+
+    def validate(self) -> list[str]:
+        errors = []
+        if self.cb_nm.value() < 1:
+            errors.append("At least one member is required")
+            self._mark_invalid(self.cb_nm)
+        for i, w in enumerate(self._cb_member_widgets):
+            if w[1].value() <= 0:
+                errors.append(f"Member {i+1} length must be > 0")
+                self._mark_invalid(w[1])
+            if w[7].value() > w[1].value():
+                errors.append(f"Member {i+1}: distance (ab) exceeds member length")
+                self._mark_invalid(w[7])
+                self._mark_invalid(w[1])
+        return errors
+
+    def summarize(self, inp) -> str:
+        try:
+            nm = inp.n_members if hasattr(inp, "n_members") else inp.get("n_members", 0)
+            ns = inp.n_supports if hasattr(inp, "n_supports") else inp.get("n_supports", 0)
+            return f"{nm} spans, {ns} supports"
+        except Exception:
+            return f"{self.cb_nm.value()} spans"
 
     def format_report(self, inp, result):
         return format_continuous_beam(inp, result)

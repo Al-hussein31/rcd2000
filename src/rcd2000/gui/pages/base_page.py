@@ -25,6 +25,11 @@ class BasePage(DesignFormPage):
         c1.add_row("fy (N/mm²):", self.base_fy)
         c1.add_row("Allowable Bearing (kN/m²):", self.base_pb)
         layout.addWidget(c1)
+        self._auto_clear_invalid(self.base_type)
+        self._auto_clear_invalid(self.col_shape)
+        self._auto_clear_invalid(self.base_fcu)
+        self._auto_clear_invalid(self.base_fy)
+        self._auto_clear_invalid(self.base_pb)
 
         c2 = Card("Loads & Dimensions")
         # AUDIT: load 0–50000 kN is large but not invalid. However, load=0
@@ -62,6 +67,16 @@ class BasePage(DesignFormPage):
         c2.add_widget(label("Loads"))
         c2.add_widget(load_w)
         layout.addWidget(c2)
+        self._auto_clear_invalid(self.base_load)
+        self._auto_clear_invalid(self.base_a1)
+        self._auto_clear_invalid(self.base_a2)
+        self._auto_clear_invalid(self.base_dia)
+        self._auto_clear_invalid(self.base_h)
+        self._auto_clear_invalid(self.base_l1)
+        self._auto_clear_invalid(self.base_l2)
+        self._auto_clear_invalid(self.base_dowel)
+        self._auto_clear_invalid(self.gk)
+        self._auto_clear_invalid(self.qk)
 
     def calculate(self):
         btype = self.base_type.currentIndex() + 1
@@ -84,6 +99,46 @@ class BasePage(DesignFormPage):
         )
         result = designer.design([inp])[0]
         return inp, result
+
+    def validate(self) -> list[str]:
+        errors = []
+        if self.base_load.value() <= 0:
+            errors.append("Axial load must be > 0")
+            self._mark_invalid(self.base_load)
+        col_shape = self.col_shape.currentIndex()
+        btype = self.base_type.currentIndex()
+        if col_shape == 0:
+            if self.base_a1.value() < 100 or self.base_a2.value() < 100:
+                errors.append("Column dimensions a1 and a2 must be at least 100 mm each")
+                if self.base_a1.value() < 100:
+                    self._mark_invalid(self.base_a1)
+                if self.base_a2.value() < 100:
+                    self._mark_invalid(self.base_a2)
+        else:
+            if self.base_dia.value() < 100:
+                errors.append("Column diameter must be at least 100 mm")
+                self._mark_invalid(self.base_dia)
+        if self.base_l1.value() > 0:
+            if self.base_l1.value() * 1000 < self.base_a1.value():
+                errors.append("Base length (L1) must be ≥ column dimension (a1)")
+                self._mark_invalid(self.base_l1)
+                self._mark_invalid(self.base_a1)
+        if self.base_l2.value() > 0:
+            col_dim = self.base_a2.value() if col_shape == 0 else self.base_dia.value()
+            if self.base_l2.value() * 1000 < col_dim:
+                errors.append("Base width (L2) must be ≥ column dimension")
+                self._mark_invalid(self.base_l2)
+        return errors
+
+    def summarize(self, inp) -> str:
+        names = ["Square", "Rectangular", "Combined"]
+        try:
+            btype = inp.base_type if hasattr(inp, "base_type") else inp.get("base_type", 1)
+            load = inp.load if hasattr(inp, "load") else inp.get("load", 0)
+            name = names[btype - 1] if 1 <= btype <= 3 else f"Type {btype}"
+            return f"{name}, {load:.0f}kN"
+        except Exception:
+            return f"{names[self.base_type.currentIndex()]}, {self.base_load.value():.0f}kN"
 
     def format_report(self, inp, result):
         return format_base(inp, result)

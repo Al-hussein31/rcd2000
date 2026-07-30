@@ -16,11 +16,11 @@ import os
 import logging
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog, QMessageBox,
 )
 from PySide6.QtCore import QStandardPaths
 
-from rcd2000.gui.widgets import button, header_label
+from rcd2000.gui.widgets import button, header_label, mark_invalid
 
 
 class DesignFormPage(QWidget):
@@ -43,6 +43,7 @@ class DesignFormPage(QWidget):
         self._status_cb = None
         self._last_save_dir = None
         self._history_viewed = False
+        self._error_widgets: list = []
         self._build_ui()
 
     # ── UI construction ──────────────────────────────────────────────
@@ -55,6 +56,16 @@ class DesignFormPage(QWidget):
 
         # --- page-specific input cards ---
         self.build_inputs(layout)
+
+        # --- validation error banner ---
+        self._validation_banner = QLabel()
+        self._validation_banner.setWordWrap(True)
+        self._validation_banner.setVisible(False)
+        self._validation_banner.setStyleSheet(
+            "background: #5c1a1a; color: #ff6b6b; font-size: 12px;"
+            " font-weight: 600; padding: 10px 14px; border-radius: 6px;"
+        )
+        layout.addWidget(self._validation_banner)
 
         # --- calculate button ---
         self.calc_btn = button(self._calc_button_text())
@@ -140,11 +151,68 @@ class DesignFormPage(QWidget):
             except (ValueError, TypeError):
                 pass
 
+    # ── Validation ──────────────────────────────────────────────────
+
+    def validate(self) -> list[str]:
+        """Return a list of human-readable error messages.
+
+        Override in subclass to perform sanity checks before calculation
+        runs.  Return an empty list when inputs are valid.
+        """
+        return []
+
+    def _clear_validation(self):
+        """Clear the validation error banner and red borders."""
+        self._validation_banner.setVisible(False)
+        for w in self._error_widgets:
+            try:
+                mark_invalid(w, False)
+            except Exception:
+                pass
+        self._error_widgets.clear()
+
+    def _mark_invalid(self, widget):
+        """Mark a widget as invalid and track it for later clearing."""
+        self._error_widgets.append(widget)
+        try:
+            mark_invalid(widget, True)
+        except Exception:
+            pass
+
+    def _auto_clear_invalid(self, widget):
+        """Connect a widget's change signal to clear its own invalid flag.
+
+        Call this for every input widget so red borders disappear as
+        soon as the user edits the field.
+        """
+        if hasattr(widget, "valueChanged"):
+            widget.valueChanged.connect(lambda v=None, w=widget: mark_invalid(w, False))
+        elif hasattr(widget, "currentIndexChanged"):
+            widget.currentIndexChanged.connect(lambda i=None, w=widget: mark_invalid(w, False))
+
+    # ── History summarizer ──────────────────────────────────────────
+
+    def summarize(self, inp) -> str:
+        """Return a short one-line summary of key inputs for history.
+
+        Override in subclass.  *inp* is the input dataclass (or a plain
+        dict when loaded from disk).  Default returns the module name.
+        """
+        return self.module_name
+
     # ── Event handlers ───────────────────────────────────────────────
 
     def _on_calculate(self):
         self._clear_results()
+        self._clear_validation()
         self._history_viewed = False
+
+        errors = self.validate()
+        if errors:
+            self._validation_banner.setText("\n".join(f"• {e}" for e in errors))
+            self._validation_banner.setVisible(True)
+            return
+
         try:
             self._last_input, self._last_result = self.calculate()
         except Exception as exc:
