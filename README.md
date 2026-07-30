@@ -4,6 +4,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/rcd2000/"><img src="https://img.shields.io/pypi/v/rcd2000?color=d48c28&label=PyPI" alt="PyPI"></a>
+  <a href="https://github.com/Al-hussein31/rcd2000/releases/latest"><img src="https://img.shields.io/github/v/release/Al-hussein31/rcd2000?color=2ea44f&label=Download&logo=github" alt="Download"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
   <a href="https://github.com/Al-hussein31/rcd2000/actions"><img src="https://img.shields.io/github/actions/workflow/status/Al-hussein31/rcd2000/test.yml?branch=main&label=tests" alt="Tests"></a>
@@ -37,6 +38,10 @@ RCD2000 is a structural engineering tool that designs beams, columns, slabs, sta
 ---
 
 ## Installation
+
+### Standalone executable (no Python required)
+
+<a href="https://github.com/Al-hussein31/rcd2000/releases/latest">Download the latest release</a> for your platform (Windows, macOS, or Linux). No Python installation needed — just download and run.
 
 ### Quick install (CLI only)
 
