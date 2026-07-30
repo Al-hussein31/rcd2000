@@ -212,10 +212,14 @@ class Report:
 
     # ── Footer ───────────────────────────────────────────────────
 
-    def footer(self, contact: str = "0803-323-1985"):
+    REPO = "https://github.com/Al-hussein31/rcd2000"
+
+    def footer(self, module_name: str = ""):
         self.separator()
         self.blank(1)
-        self.lines.append(f"{' ' * 5}Thank you for using RCD2000 - Pls Contact {contact} for Details")
+        job = module_name or "structural element"
+        self.lines.append(f"{' ' * 5}Well done! You've designed a {job} to BS 8110.")
+        self.lines.append(f"{' ' * 5}Built with RCD2000 — github.com/Al-hussein31/rcd2000")
         self.blank(2)
 
     # ── Units block (continuous beam) ────────────────────────────
@@ -336,7 +340,7 @@ def format_slab(p, r, job: str = "", date: str = "",
         as_percent, 273.5, 1.76, r.defl_required,
     )
 
-    rep.footer()
+    rep.footer("slab")
     return rep.build()
 
 
@@ -390,7 +394,7 @@ def format_column(ci, r, job: str = "", date: str = "",
     rep.lines.append(f"{' ' * 5}*NOTE:- Steel % based on area required please")
     rep.separator("-", 74)
     rep.blank(1)
-    rep.footer()
+    rep.footer("column")
     return rep.build()
 
 
@@ -461,7 +465,7 @@ def format_beam(bi, r, job: str = "", date: str = "",
     )
     rep.blank(1)
 
-    rep.footer()
+    rep.footer("beam")
     return rep.build()
 
 
@@ -492,7 +496,7 @@ def format_stair(si, r, job: str = "", date: str = "",
     rep.bar_schedule("Provide", r.bar_type, r.bar_dia, r.bar_spacing, "Btm")
     rep.blank(1)
 
-    rep.footer()
+    rep.footer("stair")
     return rep.build()
 
 
@@ -540,7 +544,7 @@ def format_base(bi, r, job: str = "", date: str = "",
     rep.label_val("Permissible Bond", r.perm_bond, "N/mm2")
     rep.blank(1)
 
-    rep.footer()
+    rep.footer("footing base")
     return rep.build()
 
 
@@ -587,6 +591,7 @@ def format_continuous_beam(cb_input, r, job: str = "",
         )
 
     rep.blank(1)
-    rep.lines.append(f"{' ' * 5}END OF ANALYSIS - THANKS")
+    rep.lines.append(f"{' ' * 5}Well done! You've analysed a continuous beam to BS 8110.")
+    rep.lines.append(f"{' ' * 5}Built with RCD2000 — github.com/Al-hussein31/rcd2000")
     rep.blank(2)
     return rep.build()
