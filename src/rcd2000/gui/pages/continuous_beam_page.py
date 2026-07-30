@@ -3,16 +3,18 @@
 import os
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QGridLayout, QGroupBox, QLabel, QFileDialog,
+    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFileDialog,
 )
+from PySide6.QtCore import Qt
 
 from rcd2000.continuous_beam import (
     ContinuousBeamAnalyzer, ContinuousBeamInput, ContinuousBeamMember,
 )
 from rcd2000.report import format_continuous_beam
-from rcd2000.gui.theme import GROUP_BOX_STYLE, TEXT_SECONDARY, fmt2
+from rcd2000.gui.theme import TEXT_SECONDARY, fmt2, ACCENT
 from rcd2000.gui.widgets import (
     spinbox, spin_int, combo, button, label, header_label, make_table,
+    Card, SpanDiagram,
 )
 
 
@@ -27,35 +29,44 @@ class ContinuousBeamPage(QWidget):
         layout.setSpacing(16)
         layout.addWidget(header_label("Continuous Beam Analysis - BS 8110"))
 
-        g1 = QGroupBox("Supports & End Conditions")
-        g1.setStyleSheet(GROUP_BOX_STYLE)
-        f1 = QFormLayout(g1)
+        c1 = Card("Supports & End Conditions")
         self.cb_ns = spin_int(2, 10, 3)
         self.cb_nm = spin_int(1, 9, 2)
         self.cb_end1 = combo(["Pinned", "Fixed"])
         self.cb_end2 = combo(["Pinned", "Fixed"])
         self.cb_nm.valueChanged.connect(self._sync_members)
-        f1.addRow("Number of Supports:", self.cb_ns)
-        f1.addRow("Number of Members:", self.cb_nm)
-        f1.addRow("Left End:", self.cb_end1)
-        f1.addRow("Right End:", self.cb_end2)
+        c1.add_row("Number of Supports:", self.cb_ns)
+        c1.add_row("Number of Members:", self.cb_nm)
+        c1.add_row("Left End:", self.cb_end1)
+        c1.add_row("Right End:", self.cb_end2)
+        layout.addWidget(c1)
 
-        g2 = QGroupBox("Member Data")
-        g2.setStyleSheet(GROUP_BOX_STYLE)
-        self.member_grid = QGridLayout(g2)
+        self.diagram = SpanDiagram()
+        self.diagram.setVisible(False)
+        layout.addWidget(self.diagram)
+
+        c2 = Card("Member Data")
+        self.member_grid = QGridLayout()
         self.member_grid.setSpacing(6)
+        c2.add_layout(self.member_grid)
+        layout.addWidget(c2)
 
         self.calc_btn = button("Analyze Beam")
         self.calc_btn.clicked.connect(self._calculate)
-        self.save_btn = button("Save Report to Desktop")
-        self.save_btn.clicked.connect(self._save_report)
-        self.save_btn.setVisible(False)
-        self.results_area = QVBoxLayout()
-
-        layout.addWidget(g1)
-        layout.addWidget(g2)
         layout.addWidget(self.calc_btn)
-        layout.addWidget(self.save_btn)
+
+        self.btn_row = QHBoxLayout()
+        self.save_btn = button("Save .txt Report")
+        self.save_btn.clicked.connect(lambda: self._save_report("txt"))
+        self.save_btn.setVisible(False)
+        self.pdf_btn = button("Save .pdf Report")
+        self.pdf_btn.clicked.connect(lambda: self._save_report("pdf"))
+        self.pdf_btn.setVisible(False)
+        self.btn_row.addWidget(self.save_btn)
+        self.btn_row.addWidget(self.pdf_btn)
+        layout.addLayout(self.btn_row)
+
+        self.results_area = QVBoxLayout()
         layout.addLayout(self.results_area)
         layout.addStretch()
 
@@ -66,7 +77,7 @@ class ContinuousBeamPage(QWidget):
         while len(self._cb_member_widgets) < nm:
             row = len(self._cb_member_widgets) + 1
             lbl = QLabel(f"M{row}")
-            lbl.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px;")
+            lbl.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; background: transparent;")
             length = spinbox(1, 50, 0.5, 5, 2, " m")
             inertia = spinbox(0.0001, 10, 0.001, 0.001, 4)
             e_mod = spinbox(0.1, 10, 0.1, 1, 1)
@@ -87,6 +98,16 @@ class ContinuousBeamPage(QWidget):
         headers = ["", "L (m)", "I (m⁴)", "E-rel", "UDL", "Tri", "Trap", "Dist"]
         for col, h in enumerate(headers):
             self.member_grid.addWidget(label(h, secondary=True, size=11), 0, col)
+
+        self._update_diagram()
+
+    def _update_diagram(self):
+        data = [
+            {"length": w[1].value(), "udl": w[4].value()}
+            for w in self._cb_member_widgets
+        ]
+        self.diagram.set_spans(data)
+        self.diagram.setVisible(len(self._cb_member_widgets) > 0)
 
     def _calculate(self):
         self._clear_results()
@@ -129,16 +150,28 @@ class ContinuousBeamPage(QWidget):
             self.results_area.addWidget(make_table(hdrs, rows))
 
         self.save_btn.setVisible(True)
+        self.pdf_btn.setVisible(True)
+        if hasattr(self, '_history_cb') and self._history_cb:
+            self._history_cb("Continuous Beam", self._last_input, self._last_result)
 
-    def _save_report(self):
+    def _save_report(self, fmt_type="txt"):
         text = format_continuous_beam(self._last_input, self._last_result)
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_CBEAM.txt"),
-            "Text Files (*.txt)",
-        )
-        if path:
-            with open(path, "w") as f:
-                f.write(text)
+        if fmt_type == "txt":
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_CBEAM.txt"),
+                "Text Files (*.txt)",
+            )
+            if path:
+                with open(path, "w") as f:
+                    f.write(text)
+        else:
+            from rcd2000.report import export_pdf
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save PDF Report", os.path.expanduser("~/Desktop/RCD2000_CBEAM.pdf"),
+                "PDF Files (*.pdf)",
+            )
+            if path:
+                export_pdf(text, path)
 
     def _clear_results(self):
         while self.results_area.count():
@@ -146,3 +179,4 @@ class ContinuousBeamPage(QWidget):
             if w:
                 w.deleteLater()
         self.save_btn.setVisible(False)
+        self.pdf_btn.setVisible(False)

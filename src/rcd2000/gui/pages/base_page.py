@@ -2,12 +2,15 @@
 
 import os
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox, QFileDialog
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
 
 from rcd2000.base import BaseDesigner, BaseInput
 from rcd2000.report import format_base
-from rcd2000.gui.theme import GROUP_BOX_STYLE, fmt, fmt2
-from rcd2000.gui.widgets import spinbox, combo, button, label, header_label, make_table
+from rcd2000.gui.theme import fmt, fmt2
+from rcd2000.gui.widgets import (
+    spinbox, combo, button, label, header_label, make_table,
+    Card, fcu_combo, fy_combo, badge, load_combo_group,
+)
 
 
 class BasePage(QWidget):
@@ -20,23 +23,20 @@ class BasePage(QWidget):
         layout.setSpacing(16)
         layout.addWidget(header_label("Foundation Design - BS 8110"))
 
-        g1 = QGroupBox("Base Type & Materials")
-        g1.setStyleSheet(GROUP_BOX_STYLE)
-        f1 = QFormLayout(g1)
+        c1 = Card("Base Type & Materials")
         self.base_type = combo(["Square Isolated", "Rectangular Isolated", "Combined"])
         self.col_shape = combo(["Rectangular", "Circular"])
-        self.base_fcu = spinbox(15, 60, 5, 25)
-        self.base_fy = spinbox(250, 600, 10, 460)
+        self.base_fcu = fcu_combo()
+        self.base_fy = fy_combo()
         self.base_pb = spinbox(50, 500, 10, 150, 0, " kN/m²")
-        f1.addRow("Base Type:", self.base_type)
-        f1.addRow("Column Shape:", self.col_shape)
-        f1.addRow("fcu (N/mm²):", self.base_fcu)
-        f1.addRow("fy (N/mm²):", self.base_fy)
-        f1.addRow("Allowable Bearing (kN/m²):", self.base_pb)
+        c1.add_row("Base Type:", self.base_type)
+        c1.add_row("Column Shape:", self.col_shape)
+        c1.add_row("fcu (N/mm²):", self.base_fcu)
+        c1.add_row("fy (N/mm²):", self.base_fy)
+        c1.add_row("Allowable Bearing (kN/m²):", self.base_pb)
+        layout.addWidget(c1)
 
-        g2 = QGroupBox("Loads & Dimensions")
-        g2.setStyleSheet(GROUP_BOX_STYLE)
-        f2 = QFormLayout(g2)
+        c2 = Card("Loads & Dimensions")
         self.base_load = spinbox(0, 50000, 100, 1000)
         self.base_a1 = spinbox(100, 2000, 25, 300, 0)
         self.base_a2 = spinbox(100, 2000, 25, 300, 0)
@@ -45,80 +45,105 @@ class BasePage(QWidget):
         self.base_l1 = spinbox(0, 20, 0.5, 0, 2, " m")
         self.base_l2 = spinbox(0, 20, 0.5, 0, 2, " m")
         self.base_dowel = spinbox(8, 40, 2, 12, 0)
-        f2.addRow("Axial Load (kN):", self.base_load)
-        f2.addRow("Col Dim a1 (mm):", self.base_a1)
-        f2.addRow("Col Dim a2 (mm):", self.base_a2)
-        f2.addRow("Col Diameter (mm):", self.base_dia)
-        f2.addRow("Base Thickness h (mm):", self.base_h)
-        f2.addRow("Base Length L1 (m):", self.base_l1)
-        f2.addRow("Base Width L2 (m):", self.base_l2)
-        f2.addRow("Dowel Diameter (mm):", self.base_dowel)
+        c2.add_row("Axial Load (kN):", self.base_load)
+        c2.add_row("Col Dim a1 (mm):", self.base_a1)
+        c2.add_row("Col Dim a2 (mm):", self.base_a2)
+        c2.add_row("Col Diameter (mm):", self.base_dia)
+        c2.add_row("Base Thickness h (mm):", self.base_h)
+        c2.add_row("Base Length L1 (m):", self.base_l1)
+        c2.add_row("Base Width L2 (m):", self.base_l2)
+        c2.add_row("Dowel Diameter (mm):", self.base_dowel)
+
+        load_w, self.gk, self.qk, self.load_result = load_combo_group()
+        c2.add_widget(label("Loads"))
+        c2.add_widget(load_w)
+        layout.addWidget(c2)
 
         self.calc_btn = button("Design Foundation")
         self.calc_btn.clicked.connect(self._calculate)
-        self.save_btn = button("Save Report to Desktop")
-        self.save_btn.clicked.connect(self._save_report)
-        self.save_btn.setVisible(False)
-        self.results_area = QVBoxLayout()
-
-        layout.addWidget(g1)
-        layout.addWidget(g2)
         layout.addWidget(self.calc_btn)
-        layout.addWidget(self.save_btn)
+
+        self.btn_row = QHBoxLayout()
+        self.save_btn = button("Save .txt Report")
+        self.save_btn.clicked.connect(lambda: self._save_report("txt"))
+        self.save_btn.setVisible(False)
+        self.pdf_btn = button("Save .pdf Report")
+        self.pdf_btn.clicked.connect(lambda: self._save_report("pdf"))
+        self.pdf_btn.setVisible(False)
+        self.btn_row.addWidget(self.save_btn)
+        self.btn_row.addWidget(self.pdf_btn)
+        layout.addLayout(self.btn_row)
+
+        self.results_area = QVBoxLayout()
         layout.addLayout(self.results_area)
         layout.addStretch()
 
     def _calculate(self):
         self._clear_results()
         btype = self.base_type.currentIndex() + 1
+        fcu = int(self.base_fcu.currentText())
+        fy = int(self.base_fy.currentText())
+
         self._last_input = BaseInput(
             base_id="F1",
             base_type=btype,
             col_type=1 if self.col_shape.currentIndex() == 0 else 2,
             load=self.base_load.value(),
-            pb=self.base_pb.value(), fcu=self.base_fcu.value(),
-            fy=self.base_fy.value(),
+            pb=self.base_pb.value(), fcu=fcu, fy=fy,
             a1=self.base_a1.value(), a2=self.base_a2.value(),
             dia=self.base_dia.value(), dowel_dia=self.base_dowel.value(),
             h=self.base_h.value(),
             l1=self.base_l1.value(), l2=self.base_l2.value(),
         )
         designer = BaseDesigner(
-            pb=self.base_pb.value(), fcu=self.base_fcu.value(),
-            fy=self.base_fy.value(),
+            pb=self.base_pb.value(), fcu=fcu, fy=fy,
         )
         self._last_result = designer.design([self._last_input])[0]
         r = self._last_result
 
         rows = [
-            ["Base Length L1 (mm)", fmt(r.l1)],
-            ["Base Width L2 (mm)", fmt(r.l2)],
-            ["Base Depth h (mm)", fmt(r.h)],
-            ["Net Upward Pressure (kN/m²)", fmt2(r.fnet)],
-            ["Moment L1 (kN·m)", fmt2(r.m1)],
-            ["Steel L1 (mm²)", fmt(r.as1)],
-            [f"Bar L1", f"Y{r.rd1:.0f} @ {r.sp1:.0f} c/c"],
-            ["Moment L2 (kN·m)", fmt2(r.m2)],
-            ["Steel L2 (mm²)", fmt(r.as2)],
-            [f"Bar L2", f"Y{r.rd2:.0f} @ {r.sp2:.0f} c/c"],
-            ["Shear Stress (N/mm²)", fmt2(r.shear_stress)],
-            ["Permissible Shear (N/mm²)", fmt2(r.perm_shear)],
-            ["Punching Shear (N/mm²)", fmt2(r.punching_shear)],
-            ["Local Bond (N/mm²)", fmt2(r.local_bond)],
-            ["Permissible Bond (N/mm²)", fmt2(r.perm_bond)],
+            ["Base Length L1 (mm)", fmt(r.l1), ""],
+            ["Base Width L2 (mm)", fmt(r.l2), ""],
+            ["Base Depth h (mm)", fmt(r.h), ""],
+            ["Net Upward Pressure (kN/m²)", fmt2(r.fnet), ""],
+            ["Moment L1 (kN·m)", fmt2(r.m1), ""],
+            ["Steel L1 (mm²)", fmt(r.as1), ""],
+            [f"Bar L1", f"Y{r.rd1:.0f} @ {r.sp1:.0f} c/c", ""],
+            ["Moment L2 (kN·m)", fmt2(r.m2), ""],
+            ["Steel L2 (mm²)", fmt(r.as2), ""],
+            [f"Bar L2", f"Y{r.rd2:.0f} @ {r.sp2:.0f} c/c", ""],
+            ["Shear Stress (N/mm²)", fmt2(r.shear_stress),
+             badge(r.shear_stress <= r.perm_shear)],
+            ["Permissible Shear (N/mm²)", fmt2(r.perm_shear), ""],
+            ["Punching Shear (N/mm²)", fmt2(r.punching_shear), ""],
+            ["Local Bond (N/mm²)", fmt2(r.local_bond),
+             badge(r.local_bond <= r.perm_bond)],
+            ["Permissible Bond (N/mm²)", fmt2(r.perm_bond), ""],
         ]
-        self.results_area.addWidget(make_table(["Parameter", "Value"], rows))
+        self.results_area.addWidget(make_table(["Parameter", "Value", "Status"], rows))
         self.save_btn.setVisible(True)
+        self.pdf_btn.setVisible(True)
+        if hasattr(self, '_history_cb') and self._history_cb:
+            self._history_cb("Base", self._last_input, self._last_result)
 
-    def _save_report(self):
+    def _save_report(self, fmt_type="txt"):
         text = format_base(self._last_input, self._last_result)
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_BASE.txt"),
-            "Text Files (*.txt)",
-        )
-        if path:
-            with open(path, "w") as f:
-                f.write(text)
+        if fmt_type == "txt":
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_BASE.txt"),
+                "Text Files (*.txt)",
+            )
+            if path:
+                with open(path, "w") as f:
+                    f.write(text)
+        else:
+            from rcd2000.report import export_pdf
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save PDF Report", os.path.expanduser("~/Desktop/RCD2000_BASE.pdf"),
+                "PDF Files (*.pdf)",
+            )
+            if path:
+                export_pdf(text, path)
 
     def _clear_results(self):
         while self.results_area.count():
@@ -126,3 +151,4 @@ class BasePage(QWidget):
             if w:
                 w.deleteLater()
         self.save_btn.setVisible(False)
+        self.pdf_btn.setVisible(False)

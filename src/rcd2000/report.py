@@ -248,6 +248,49 @@ def _decimal_places(v: float) -> int:
     return 3
 
 
+def export_pdf(text: str, output_path: str):
+    """Export a plain-text report to PDF using QPrinter + QTextDocument."""
+    try:
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtGui import QTextDocument
+        from PySide6.QtPrintSupport import QPrinter
+    except ImportError:
+        raise ImportError("PySide6 is required for PDF export. Install with: pip install rcd2000[gui]")
+
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    doc = QTextDocument()
+    html = (
+        "<html><head><style>"
+        "body { font-family: 'SF Mono', 'Menlo', 'Consolas', monospace; "
+        "       font-size: 9pt; color: #1a1a1a; line-height: 1.15; }"
+        "pre { white-space: pre; }"
+        "</style></head><body><pre>" + _escape_html(text) + "</pre></body></html>"
+    )
+    doc.setHtml(html)
+
+    printer = QPrinter(QPrinter.HighResolution)
+    printer.setOutputFormat(QPrinter.PdfFormat)
+    printer.setOutputFileName(output_path)
+    printer.setPageSize(QPrinter.A4)
+    printer.setPageMargins(15, 15, 15, 15, QPrinter.Millimeter)
+
+    doc.setPageSize(printer.pageRect(QPrinter.DevicePixel).size())
+    doc.print(printer)
+
+
+def _escape_html(text: str) -> str:
+    """Escape HTML special characters."""
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════
 # Module-specific formatters
 # ═══════════════════════════════════════════════════════════════════

@@ -2,12 +2,15 @@
 
 import os
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox, QFileDialog
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
 
 from rcd2000.stair import StairDesigner, StairInput
 from rcd2000.report import format_stair
-from rcd2000.gui.theme import GROUP_BOX_STYLE, fmt, fmt2
-from rcd2000.gui.widgets import spinbox, button, label, header_label, make_table
+from rcd2000.gui.theme import fmt, fmt2
+from rcd2000.gui.widgets import (
+    spinbox, button, label, header_label, make_table,
+    Card, badge, load_combo_group,
+)
 
 
 class StairPage(QWidget):
@@ -20,32 +23,42 @@ class StairPage(QWidget):
         layout.setSpacing(16)
         layout.addWidget(header_label("Stair Design - BS 8110"))
 
-        g = QGroupBox("Stair Geometry & Loading")
-        g.setStyleSheet(GROUP_BOX_STYLE)
-        f = QFormLayout(g)
+        c = Card("Stair Geometry & Loading")
         self.s_span = spinbox(1, 12, 0.5, 4, 2, " m")
-        self.s_tread = spinbox(150, 400, 5, 250, 0, " mm")
-        self.s_rise = spinbox(100, 250, 5, 175, 0, " mm")
+        self.s_tread = spinbox(150, 400, 5, 250, 0)
+        self.s_rise = spinbox(100, 250, 5, 175, 0)
+        c.add_row("Span (m):", self.s_span)
+        c.add_row("Tread (mm):", self.s_tread)
+        c.add_row("Rise (mm):", self.s_rise)
+
         self.s_imp = spinbox(0, 20, 0.5, 1.5, 2, " kN/m²")
         self.s_spl = spinbox(0, 10, 0.5, 0, 2, " kN/m²")
         self.s_wld = spinbox(0, 50, 1, 0, 1, " kN/m³")
-        f.addRow("Span (m):", self.s_span)
-        f.addRow("Tread (mm):", self.s_tread)
-        f.addRow("Rise (mm):", self.s_rise)
-        f.addRow("Imposed Load (kN/m²):", self.s_imp)
-        f.addRow("Superimposed DL (kN/m²):", self.s_spl)
-        f.addRow("WLD (kN/m³):", self.s_wld)
+        c.add_row("Imposed Load (kN/m²):", self.s_imp)
+        c.add_row("Sup. DL (kN/m²):", self.s_spl)
+        c.add_row("WLD (kN/m³):", self.s_wld)
+
+        load_w, self.gk, self.qk, self.load_result = load_combo_group()
+        c.add_widget(label("Load Combination (for reference)", secondary=True, size=12))
+        c.add_widget(load_w)
+        layout.addWidget(c)
 
         self.calc_btn = button("Design Stair")
         self.calc_btn.clicked.connect(self._calculate)
-        self.save_btn = button("Save Report to Desktop")
-        self.save_btn.clicked.connect(self._save_report)
-        self.save_btn.setVisible(False)
-        self.results_area = QVBoxLayout()
-
-        layout.addWidget(g)
         layout.addWidget(self.calc_btn)
-        layout.addWidget(self.save_btn)
+
+        self.btn_row = QHBoxLayout()
+        self.save_btn = button("Save .txt Report")
+        self.save_btn.clicked.connect(lambda: self._save_report("txt"))
+        self.save_btn.setVisible(False)
+        self.pdf_btn = button("Save .pdf Report")
+        self.pdf_btn.clicked.connect(lambda: self._save_report("pdf"))
+        self.pdf_btn.setVisible(False)
+        self.btn_row.addWidget(self.save_btn)
+        self.btn_row.addWidget(self.pdf_btn)
+        layout.addLayout(self.btn_row)
+
+        self.results_area = QVBoxLayout()
         layout.addLayout(self.results_area)
         layout.addStretch()
 
@@ -65,30 +78,42 @@ class StairPage(QWidget):
         r = self._last_result
 
         rows = [
-            ["Waist Thickness (mm)", fmt(r.waist_thickness)],
-            ["Total UDL (kN/m)", fmt2(r.total_udl)],
-            ["Design Moment (kN·m)", fmt2(r.design_moment)],
-            ["Effective Depth (mm)", fmt(r.effective_depth)],
-            ["K Value", fmt2(r.k_value)],
-            ["Lever Arm Factor", fmt2(r.lever_arm_factor)],
-            ["Lever Arm z (mm)", fmt2(r.lever_arm_z)],
-            ["Steel Required (mm²)", fmt(r.steel_required)],
-            ["Bar Type", r.bar_type],
-            ["Bar Diameter (mm)", fmt(r.bar_dia)],
-            ["Bar Spacing (mm)", fmt(r.bar_spacing)],
+            ["Waist Thickness (mm)", fmt(r.waist_thickness), ""],
+            ["Total UDL (kN/m)", fmt2(r.total_udl), ""],
+            ["Design Moment (kN·m)", fmt2(r.design_moment), ""],
+            ["Effective Depth (mm)", fmt(r.effective_depth), ""],
+            ["K Value", fmt2(r.k_value), ""],
+            ["Lever Arm Factor", fmt2(r.lever_arm_factor), ""],
+            ["Lever Arm z (mm)", fmt2(r.lever_arm_z), ""],
+            ["Steel Required (mm²)", fmt(r.steel_required), ""],
+            ["Bar Type", r.bar_type, ""],
+            ["Bar Diameter (mm)", fmt(r.bar_dia), ""],
+            ["Bar Spacing (mm)", fmt(r.bar_spacing), ""],
         ]
-        self.results_area.addWidget(make_table(["Parameter", "Value"], rows))
+        self.results_area.addWidget(make_table(["Parameter", "Value", "Status"], rows))
         self.save_btn.setVisible(True)
+        self.pdf_btn.setVisible(True)
+        if hasattr(self, '_history_cb') and self._history_cb:
+            self._history_cb("Stair", self._last_input, self._last_result)
 
-    def _save_report(self):
+    def _save_report(self, fmt_type="txt"):
         text = format_stair(self._last_input, self._last_result)
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_STAIR.txt"),
-            "Text Files (*.txt)",
-        )
-        if path:
-            with open(path, "w") as f:
-                f.write(text)
+        if fmt_type == "txt":
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_STAIR.txt"),
+                "Text Files (*.txt)",
+            )
+            if path:
+                with open(path, "w") as f:
+                    f.write(text)
+        else:
+            from rcd2000.report import export_pdf
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save PDF Report", os.path.expanduser("~/Desktop/RCD2000_STAIR.pdf"),
+                "PDF Files (*.pdf)",
+            )
+            if path:
+                export_pdf(text, path)
 
     def _clear_results(self):
         while self.results_area.count():
@@ -96,3 +121,4 @@ class StairPage(QWidget):
             if w:
                 w.deleteLater()
         self.save_btn.setVisible(False)
+        self.pdf_btn.setVisible(False)

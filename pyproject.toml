@@ -10,7 +10,7 @@ readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [
-    {name = "RCD2000 Contributors", email = "info@rcd2000.dev"},
+    {name = "RCD2000 Contributors"},
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -23,6 +23,13 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Al-hussein31/rcd2000"
+Repository = "https://github.com/Al-hussein31/rcd2000"
+
+[tool.setuptools]
+package-data = {"rcd2000" = ["gui/icons/*", "*.svg"]}
 
 [project.optional-dependencies]
 dev = [

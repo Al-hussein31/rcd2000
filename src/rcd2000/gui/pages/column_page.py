@@ -2,13 +2,14 @@
 
 import os
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QFormLayout, QGroupBox, QFileDialog
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
 
 from rcd2000.column import ColumnDesigner, ColumnInput
 from rcd2000.report import format_column
-from rcd2000.gui.theme import GROUP_BOX_STYLE, fmt
+from rcd2000.gui.theme import fmt, ACCENT
 from rcd2000.gui.widgets import (
     spinbox, spin_int, combo, button, label, header_label, make_table,
+    Card, badge,
 )
 
 
@@ -22,52 +23,51 @@ class ColumnPage(QWidget):
         layout.setSpacing(16)
         layout.addWidget(header_label("Column Design - BS 8110"))
 
-        g1 = QGroupBox("Column Type")
-        g1.setStyleSheet(GROUP_BOX_STYLE)
-        f1 = QFormLayout(g1)
+        c1 = Card("Column Type")
         self.col_type = combo(["1 - Axially Loaded", "2 - Uniaxial Bending", "3 - Biaxial Bending"])
         self.shape = combo(["Rectangular", "Circular"])
-        f1.addRow("Type:", self.col_type)
-        f1.addRow("Shape:", self.shape)
+        c1.add_row("Type:", self.col_type)
+        c1.add_row("Shape:", self.shape)
+        layout.addWidget(c1)
 
-        g2 = QGroupBox("Loads & Geometry")
-        g2.setStyleSheet(GROUP_BOX_STYLE)
-        f2 = QFormLayout(g2)
+        c2 = Card("Loads & Geometry")
         self.load = spinbox(0, 50000, 100, 1000)
         self.bx = spinbox(100, 2000, 25, 300, 0)
         self.by = spinbox(100, 2000, 25, 300, 0)
         self.dia = spinbox(100, 2000, 25, 300, 0)
         self.depth = spinbox(100, 2000, 25, 300, 0)
-        f2.addRow("Axial Load (kN):", self.load)
-        f2.addRow("b/h width - x (mm):", self.bx)
-        f2.addRow("b/h width - y (mm):", self.by)
-        f2.addRow("Diameter (mm):", self.dia)
-        f2.addRow("Overall depth (mm):", self.depth)
+        c2.add_row("Axial Load (kN):", self.load)
+        c2.add_row("b/h width - x (mm):", self.bx)
+        c2.add_row("b/h width - y (mm):", self.by)
+        c2.add_row("Diameter (mm):", self.dia)
+        c2.add_row("Overall depth (mm):", self.depth)
+        layout.addWidget(c2)
 
-        g3 = QGroupBox("Moments")
-        g3.setStyleSheet(GROUP_BOX_STYLE)
-        f3 = QFormLayout(g3)
+        c3 = Card("Moments")
         self.moment_x = spinbox(0, 5000, 10, 0)
         self.moment_y = spinbox(0, 5000, 10, 0)
         self.moment = spinbox(0, 5000, 10, 0)
-        f3.addRow("Mx (kN·m):", self.moment_x)
-        f3.addRow("My (kN·m):", self.moment_y)
-        f3.addRow("M (uniaxial, kN·m):", self.moment)
+        c3.add_row("Mx (kN·m):", self.moment_x)
+        c3.add_row("My (kN·m):", self.moment_y)
+        c3.add_row("M (uniaxial, kN·m):", self.moment)
+        layout.addWidget(c3)
 
         self.calc_btn = button("Design Column")
         self.calc_btn.clicked.connect(self._calculate)
-        self.save_btn = button("Save Report to Desktop")
-        self.save_btn.clicked.connect(self._save_report)
+        layout.addWidget(self.calc_btn)
+
+        self.btn_row = QHBoxLayout()
+        self.save_btn = button("Save .txt Report")
+        self.save_btn.clicked.connect(lambda: self._save_report("txt"))
         self.save_btn.setVisible(False)
+        self.pdf_btn = button("Save .pdf Report")
+        self.pdf_btn.clicked.connect(lambda: self._save_report("pdf"))
+        self.pdf_btn.setVisible(False)
+        self.btn_row.addWidget(self.save_btn)
+        self.btn_row.addWidget(self.pdf_btn)
+        layout.addLayout(self.btn_row)
 
         self.results_area = QVBoxLayout()
-        self.results_area.setContentsMargins(0, 0, 0, 0)
-
-        layout.addWidget(g1)
-        layout.addWidget(g2)
-        layout.addWidget(g3)
-        layout.addWidget(self.calc_btn)
-        layout.addWidget(self.save_btn)
         layout.addLayout(self.results_area)
         layout.addStretch()
 
@@ -87,34 +87,48 @@ class ColumnPage(QWidget):
         designer = ColumnDesigner()
         self._last_result = designer.design([self._last_input])[0]
         result = self._last_result
-        c = self._last_input
+        ci = self._last_input
 
         rows = [
             ["Steel Required", f"{result.steel_required:,.0f} mm²", ""],
             ["Steel Percentage", f"{result.steel_percent:.2f}%", ""],
             ["Axial Capacity (Nu)", f"{result.axial_capacity:,.0f} kN",
-             "✓" if result.axial_capacity >= c.load else "✗"],
+             badge(result.axial_capacity >= ci.load)],
             ["Moment Capacity (Mux)", f"{result.moment_capacity_x:,.0f} kN·m", ""],
             ["Moment Capacity (Muy)", f"{result.moment_capacity_y:,.0f} kN·m", ""],
         ]
-        if c.col_type == 3:
-            rows.append(["Biaxial Check", "OK" if result.biaxial_check_ok else "FAIL",
-                         "✓" if result.biaxial_check_ok else "✗"])
+        if ci.col_type == 3:
+            ok = result.biaxial_check_ok
+            rows.append(["Biaxial Check", "OK" if ok else "FAIL", badge(ok)])
 
         self.results_area.addWidget(make_table(["Parameter", "Value", "Status"], rows))
         if result.heck:
-            self.results_area.addWidget(label("Section inadequate - increase dimensions", size=13))
+            self.results_area.addWidget(
+                label("Section inadequate - increase dimensions", size=13)
+            )
         self.save_btn.setVisible(True)
+        self.pdf_btn.setVisible(True)
+        if hasattr(self, '_history_cb') and self._history_cb:
+            self._history_cb("Column", self._last_input, self._last_result)
 
-    def _save_report(self):
+    def _save_report(self, fmt_type="txt"):
         text = format_column(self._last_input, self._last_result)
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_COLUMN.txt"),
-            "Text Files (*.txt)",
-        )
-        if path:
-            with open(path, "w") as f:
-                f.write(text)
+        if fmt_type == "txt":
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_COLUMN.txt"),
+                "Text Files (*.txt)",
+            )
+            if path:
+                with open(path, "w") as f:
+                    f.write(text)
+        else:
+            from rcd2000.report import export_pdf
+            path, _ = QFileDialog.getSaveFileName(
+                self, "Save PDF Report", os.path.expanduser("~/Desktop/RCD2000_COLUMN.pdf"),
+                "PDF Files (*.pdf)",
+            )
+            if path:
+                export_pdf(text, path)
 
     def _clear_results(self):
         while self.results_area.count():
@@ -122,3 +136,4 @@ class ColumnPage(QWidget):
             if w:
                 w.deleteLater()
         self.save_btn.setVisible(False)
+        self.pdf_btn.setVisible(False)
