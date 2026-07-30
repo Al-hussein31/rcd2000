@@ -50,6 +50,15 @@ pip install "rcd2000[gui]"
 rcd2000-gui
 ```
 
+### TUI (terminal interface)
+
+```bash
+pip install "rcd2000[tui]"
+rcd2000-tui
+```
+
+A DOSBox‑style retro Terminal UI with full keyboard navigation (Tab, F‑keys), retro amber-on‑dark‑blue styling, and support for all 6 design modules. Uses [Textual](https://textual.textualize.io/) framework.
+
 ### From source (development)
 
 ```bash
@@ -62,7 +71,7 @@ pip install -e ".[gui,dev]"
 
 ```bash
 pip install "rcd2000[dev]"       # pytest, coverage
-pip install "rcd2000[gui,dev]"   # everything
+pip install "rcd2000[gui,dev]"   # GUI + everything (add tui)
 ```
 
 ---
@@ -117,6 +126,10 @@ results = designer.design([beam_input])
 | `stair` | Straight-flight stairs | Waist slab design, effective span, imposed load distribution |
 | `base` | Square isolated, rectangular isolated, combined footings | Bearing pressure, punching shear, local bond, combined footing centroid method |
 | `continuous-beam` | Continuous beam analysis (no design) | Clapeyron three-moment equation, support moment distribution |
+
+| Interface | Command | Description |
+|---|---|---|
+| Terminal UI | `rcd2000-tui` | Retro DOS-style TUI with keyboard navigation for all 6 modules |
 
 ---
 

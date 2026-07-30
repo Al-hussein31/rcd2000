@@ -1,0 +1,208 @@
+Screen {
+    background: #0c0c3a;
+    color: #c0c8d0;
+    overflow: auto;
+}
+
+#header {
+    height: 3;
+    background: #1a1a5e;
+    color: #ffb000;
+    content-align: center middle;
+    text-style: bold;
+    border: ascii #ffb000;
+}
+
+#tabs {
+    height: 3;
+    background: #0c0c3a;
+    border: ascii #4a4a8a;
+}
+
+#tabs TabbedContent Tab {
+    padding: 0 2;
+    color: #8080b0;
+}
+
+#tabs TabbedContent Tab.-active {
+    color: #ffb000;
+    text-style: bold;
+}
+
+#footer {
+    height: 3;
+    background: #1a1a5e;
+    color: #ffb000;
+    content-align: center middle;
+    border: ascii #4a4a8a;
+}
+
+#results-panel {
+    background: #0a0a2e;
+    color: #c0c8d0;
+    border: ascii #ffb000;
+    padding: 1 2;
+    min-height: 8;
+    margin: 0 0 1 0;
+}
+
+#results-panel Static {
+    color: #c0c8d0;
+}
+
+#results-panel .result-label {
+    color: #ffb000;
+    text-style: bold;
+}
+
+#results-panel .result-value {
+    color: #ffffff;
+}
+
+.status-ok {
+    color: #00ff00;
+    text-style: bold;
+}
+
+.status-fail {
+    color: #ff4444;
+    text-style: bold;
+}
+
+.section-box {
+    border: ascii #4a4a8a;
+    background: #0e0e42;
+    padding: 1 2;
+    margin: 0 0 1 0;
+}
+
+.section-title {
+    color: #ffb000;
+    text-style: bold;
+    background: #0e0e42;
+    margin: 0 0 1 0;
+}
+
+.field-row {
+    height: 3;
+    margin: 0 1;
+}
+
+.field-label {
+    color: #a0a8d0;
+    width: 20;
+    height: 3;
+    content-align: right middle;
+    padding: 0 1 0 0;
+}
+
+.field-unit {
+    color: #606090;
+    width: 6;
+    height: 3;
+    content-align: left middle;
+}
+
+Input {
+    background: #0a0a2e;
+    color: #ffffff;
+    border: ascii #4a4a8a;
+    height: 3;
+    padding: 0 1;
+}
+
+Input:focus {
+    border: ascii #ffb000;
+}
+
+Select {
+    background: #0a0a2e;
+    color: #ffffff;
+    border: ascii #4a4a8a;
+    height: 3;
+    padding: 0 1;
+}
+
+Select:focus {
+    border: ascii #ffb000;
+}
+
+Select > SelectCurrent {
+    background: #0a0a2e;
+    color: #ffffff;
+}
+
+Select > SelectCurrent:focus {
+    background: #0a0a2e;
+    color: #ffffff;
+}
+
+RadioSet {
+    background: #0e0e42;
+    color: #a0a8d0;
+    border: ascii #4a4a8a;
+    padding: 1 2;
+    height: auto;
+}
+
+RadioSet > RadioButton {
+    padding: 0 1;
+    color: #a0a8d0;
+}
+
+RadioSet > RadioButton.-selected {
+    color: #ffb000;
+    text-style: bold;
+}
+
+Button {
+    background: #1a1a5e;
+    color: #ffb000;
+    border: ascii #ffb000;
+    padding: 0 3;
+    height: 3;
+    margin: 0 1;
+}
+
+Button:hover {
+    background: #2a2a7e;
+    color: #ffd040;
+}
+
+Button:focus {
+    border: ascii #ffd040;
+}
+
+.button-bar {
+    height: 5;
+    align: center middle;
+    margin: 1 0;
+}
+
+#error-banner {
+    background: #441a1a;
+    color: #ff6666;
+    border: ascii #ff4444;
+    padding: 1 2;
+    margin: 0 0 1 0;
+    text-style: bold;
+}
+
+#empty-state {
+    color: #606090;
+    content-align: center middle;
+    text-style: italic;
+}
+
+.member-group {
+    border: ascii #4a4a8a;
+    background: #0d0d3a;
+    padding: 1 2;
+    margin: 0 0 1 0;
+}
+
+.member-title {
+    color: #ffb000;
+    text-style: bold;
+    background: #0d0d3a;
+}

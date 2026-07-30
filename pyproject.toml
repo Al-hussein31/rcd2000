@@ -29,7 +29,7 @@ Homepage = "https://github.com/Al-hussein31/rcd2000"
 Repository = "https://github.com/Al-hussein31/rcd2000"
 
 [tool.setuptools]
-package-data = {"rcd2000" = ["gui/icons/*", "*.svg"]}
+package-data = {"rcd2000" = ["gui/icons/*", "tui/*.tcss", "*.svg"]}
 
 [project.optional-dependencies]
 dev = [
@@ -39,10 +39,14 @@ dev = [
 gui = [
     "PySide6>=6.6",
 ]
+tui = [
+    "textual>=1.0",
+]
 
 [project.scripts]
 rcd2000 = "rcd2000.cli:app"
 rcd2000-gui = "rcd2000.gui:main"
+rcd2000-tui = "rcd2000.tui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
