@@ -58,3 +58,6 @@ target-version = "py311"
 [tool.mypy]
 strict = false
 python_version = "3.11"
+
+[tool.appimage.build]
+icon = "rcd2000.png"

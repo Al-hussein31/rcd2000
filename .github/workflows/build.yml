@@ -135,7 +135,7 @@ jobs:
 
       - name: Build AppImage
         run: |
-          python -m appimage.build
+          APPIMAGE_EXTRACT_AND_RUN=1 python -m appimage.build
           mv dist/*.AppImage RCD2000-linux.AppImage
 
       - name: Upload asset
