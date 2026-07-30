@@ -20,12 +20,12 @@ class ColumnPage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
-        layout.addWidget(header_label("Column Design — BS 8110"))
+        layout.addWidget(header_label("Column Design - BS 8110"))
 
         g1 = QGroupBox("Column Type")
         g1.setStyleSheet(GROUP_BOX_STYLE)
         f1 = QFormLayout(g1)
-        self.col_type = combo(["1 — Axially Loaded", "2 — Uniaxial Bending", "3 — Biaxial Bending"])
+        self.col_type = combo(["1 - Axially Loaded", "2 - Uniaxial Bending", "3 - Biaxial Bending"])
         self.shape = combo(["Rectangular", "Circular"])
         f1.addRow("Type:", self.col_type)
         f1.addRow("Shape:", self.shape)
@@ -39,8 +39,8 @@ class ColumnPage(QWidget):
         self.dia = spinbox(100, 2000, 25, 300, 0)
         self.depth = spinbox(100, 2000, 25, 300, 0)
         f2.addRow("Axial Load (kN):", self.load)
-        f2.addRow("b/h width — x (mm):", self.bx)
-        f2.addRow("b/h width — y (mm):", self.by)
+        f2.addRow("b/h width - x (mm):", self.bx)
+        f2.addRow("b/h width - y (mm):", self.by)
         f2.addRow("Diameter (mm):", self.dia)
         f2.addRow("Overall depth (mm):", self.depth)
 
@@ -103,7 +103,7 @@ class ColumnPage(QWidget):
 
         self.results_area.addWidget(make_table(["Parameter", "Value", "Status"], rows))
         if result.heck:
-            self.results_area.addWidget(label("Section inadequate — increase dimensions", size=13))
+            self.results_area.addWidget(label("Section inadequate - increase dimensions", size=13))
         self.save_btn.setVisible(True)
 
     def _save_report(self):

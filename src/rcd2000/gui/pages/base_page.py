@@ -18,7 +18,7 @@ class BasePage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
-        layout.addWidget(header_label("Foundation Design — BS 8110"))
+        layout.addWidget(header_label("Foundation Design - BS 8110"))
 
         g1 = QGroupBox("Base Type & Materials")
         g1.setStyleSheet(GROUP_BOX_STYLE)

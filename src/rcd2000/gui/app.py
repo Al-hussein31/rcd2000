@@ -29,7 +29,7 @@ MODULES = [
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle(f"RCD2000 v{__version__} — BS 8110 Design")
+        self.setWindowTitle(f"RCD2000 v{__version__} - BS 8110 Design")
         self.setMinimumSize(1000, 720)
         self._setup_stylesheet()
         self._setup_ui()

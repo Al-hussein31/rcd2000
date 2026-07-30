@@ -23,7 +23,7 @@ class BeamPage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
-        layout.addWidget(header_label("Beam Design — BS 8110"))
+        layout.addWidget(header_label("Beam Design - BS 8110"))
 
         g1 = QGroupBox("Material Properties")
         g1.setStyleSheet(GROUP_BOX_STYLE)
@@ -43,9 +43,9 @@ class BeamPage(QWidget):
         self.b_h = spinbox(100, 2000, 25, 450, 0)
         self.b_hf = spinbox(0, 500, 10, 0, 0)
         f2.addRow("b (mm):", self.b_b)
-        f2.addRow("bf — flange width (mm):", self.b_bf)
-        f2.addRow("h — overall depth (mm):", self.b_h)
-        f2.addRow("hf — flange depth (mm):", self.b_hf)
+        f2.addRow("bf - flange width (mm):", self.b_bf)
+        f2.addRow("h - overall depth (mm):", self.b_h)
+        f2.addRow("hf - flange depth (mm):", self.b_hf)
 
         g3 = QGroupBox("Supports & Members")
         g3.setStyleSheet(GROUP_BOX_STYLE)

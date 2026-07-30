@@ -23,7 +23,7 @@ class SlabPage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
-        layout.addWidget(header_label("Slab Design — BS 8110"))
+        layout.addWidget(header_label("Slab Design - BS 8110"))
 
         g1 = QGroupBox("Slab Type & Materials")
         g1.setStyleSheet(GROUP_BOX_STYLE)
@@ -46,7 +46,7 @@ class SlabPage(QWidget):
         f2.addRow("Depth (mm):", self.s_depth)
         f2.addRow("Span (m):", self.s_span)
         f2.addRow("UDL (kN/m²):", self.s_udl)
-        f2.addRow("Ly — long span (m):", self.s_ly)
+        f2.addRow("Ly - long span (m):", self.s_ly)
         f2.addRow("Case (1-9):", self.s_case)
 
         g3 = QGroupBox("Continuous Slab Spans (if applicable)")

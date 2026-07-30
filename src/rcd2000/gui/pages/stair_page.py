@@ -18,7 +18,7 @@ class StairPage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
-        layout.addWidget(header_label("Stair Design — BS 8110"))
+        layout.addWidget(header_label("Stair Design - BS 8110"))
 
         g = QGroupBox("Stair Geometry & Loading")
         g.setStyleSheet(GROUP_BOX_STYLE)

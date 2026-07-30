@@ -25,7 +25,7 @@ class ContinuousBeamPage(QWidget):
     def _build_ui(self):
         layout = QVBoxLayout(self)
         layout.setSpacing(16)
-        layout.addWidget(header_label("Continuous Beam Analysis — BS 8110"))
+        layout.addWidget(header_label("Continuous Beam Analysis - BS 8110"))
 
         g1 = QGroupBox("Supports & End Conditions")
         g1.setStyleSheet(GROUP_BOX_STYLE)
