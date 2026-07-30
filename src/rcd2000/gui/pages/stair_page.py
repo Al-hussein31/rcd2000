@@ -31,6 +31,12 @@ class StairPage(DesignFormPage):
         self.s_imp = spinbox(0, 20, 0.5, 1.5, 2, " kN/m²")
         self.s_spl = spinbox(0, 10, 0.5, 0, 2, " kN/m²")
         self.s_wld = spinbox(0, 50, 1, 0, 1, " kN/m³")
+        self.s_imp.setToolTip("Imposed (live) load on the staircase (kN/m²)")
+        self.s_spl.setToolTip("Superimposed dead load beyond self-weight (kN/m²), e.g. finishes")
+        self.s_wld.setToolTip(
+            "Weight density of staircase concrete (kN/m³). "
+            "Set to 0 to use the default self-weight calculation based on waist thickness."
+        )
         c.add_row("Imposed Load (kN/m²):", self.s_imp)
         c.add_row("Sup. DL (kN/m²):", self.s_spl)
         c.add_row("WLD (kN/m³):", self.s_wld)

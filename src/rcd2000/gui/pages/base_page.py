@@ -19,6 +19,14 @@ class BasePage(DesignFormPage):
         self.base_fcu = fcu_combo()
         self.base_fy = fy_combo()
         self.base_pb = spinbox(50, 500, 10, 150, 0, " kN/m²")
+        self.base_type.setToolTip(
+            "Square Isolated: single column, square base. "
+            "Rectangular Isolated: single column, rectangular base. "
+            "Combined: two or more columns on one base."
+        )
+        self.base_fcu.setToolTip("Characteristic concrete cube strength (N/mm²) at 28 days")
+        self.base_fy.setToolTip("Characteristic steel reinforcement yield strength (N/mm²)")
+        self.base_pb.setToolTip("Allowable bearing capacity of the supporting soil (kN/m²)")
         c1.add_row("Base Type:", self.base_type)
         c1.add_row("Column Shape:", self.col_shape)
         c1.add_row("fcu (N/mm²):", self.base_fcu)
@@ -54,6 +62,10 @@ class BasePage(DesignFormPage):
         self.base_l2 = spinbox(0, 20, 0.5, 0, 2, " m")
         # AUDIT: dowel_dia 8–40 mm is fine.
         self.base_dowel = spinbox(8, 40, 2, 12, 0)
+        self.base_dowel.setToolTip(
+            "Diameter (mm) of starter bars connecting the column to the foundation. "
+            "Dowel bars transfer the column load into the base."
+        )
         c2.add_row("Axial Load (kN):", self.base_load)
         c2.add_row("Col Dim a1 (mm):", self.base_a1)
         c2.add_row("Col Dim a2 (mm):", self.base_a2)

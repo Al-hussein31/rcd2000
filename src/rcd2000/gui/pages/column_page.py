@@ -54,6 +54,8 @@ class ColumnPage(DesignFormPage):
         from rcd2000.gui.widgets import fcu_combo, fy_combo
         self.col_fcu = fcu_combo()
         self.col_fy = fy_combo()
+        self.col_fcu.setToolTip("Characteristic concrete cube strength (N/mm²) at 28 days")
+        self.col_fy.setToolTip("Characteristic steel reinforcement yield strength (N/mm²)")
         c3.add_row("fcu (N/mm²):", self.col_fcu)
         c3.add_row("fy (N/mm²):", self.col_fy)
         layout.addWidget(c3)

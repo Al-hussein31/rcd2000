@@ -73,12 +73,21 @@ class ContinuousBeamPage(DesignFormPage):
             # AUDIT: e_mod 0.1–10 — relative modulus, fine as-is.
             e_mod = spinbox(0.1, 10, 0.1, 1, 1)
             udl = spinbox(0, 500, 5, 0, 1, " kN/m")
+            inertia = spinbox(0.0001, 10, 0.001, 0.001, 4)
+            inertia.setToolTip("Second moment of area (m⁴) for stiffness calculations")
+            # AUDIT: e_mod 0.1–10 — relative modulus, fine as-is.
+            e_mod = spinbox(0.1, 10, 0.1, 1, 1)
+            e_mod.setToolTip("Relative modulus of elasticity (E / E_concrete)")
+            udl = spinbox(0, 500, 5, 0, 1, " kN/m")
             wt = spinbox(0, 200, 5, 0, 1)
             wb = spinbox(0, 200, 5, 0, 1)
+            wt.setToolTip("Triangularly distributed load magnitude (kN/m), peak at left support")
+            wb.setToolTip("Trapezoidally distributed load magnitude (kN/m), varies along member")
             # AUDIT: ab 0–10 m — trapezoidal load position. If ab > length,
             # the load is outside the member. The engine clamps alpha =
             # ab/l which could exceed 1.0, producing invalid results.
             ab = spinbox(0, 10, 0.5, 0, 2)
+            ab.setToolTip("Distance (m) from left support to load application point")
             self._auto_clear_invalid(length)
             self._auto_clear_invalid(inertia)
             self._auto_clear_invalid(e_mod)

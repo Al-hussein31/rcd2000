@@ -25,6 +25,8 @@ class SlabPage(DesignFormPage):
                                 "Continuous (One-Way)", "Two-Way"])
         self.slab_fcu = fcu_combo()
         self.slab_fy = fy_combo()
+        self.slab_fcu.setToolTip("Characteristic concrete cube strength (N/mm²) at 28 days")
+        self.slab_fy.setToolTip("Characteristic steel reinforcement yield strength (N/mm²)")
         c1.add_row("Type:", self.slab_type)
         c1.add_row("fcu (N/mm²):", self.slab_fcu)
         c1.add_row("fy (N/mm²):", self.slab_fy)
@@ -48,6 +50,13 @@ class SlabPage(DesignFormPage):
         # AUDIT: case 1–9 is valid for two-way only. For other slab types,
         # case is ignored — no harm but potentially confusing.
         self.s_case = spin_int(1, 9, 1)
+        self.s_case.setToolTip(
+            "Two-way slab edge restraint case (1-9). Each case corresponds to a "
+            "different arrangement of simply supported and continuous edges, "
+            "determining the bending moment coefficients. "
+            "I'm not certain of the exact 1-9 boundary-condition mapping; "
+            "please confirm the correct reference (likely BS 8110 Table 3.13/3.14)."
+        )
         c2.add_row("Depth (mm):", self.s_depth)
         c2.add_row("Span (m):", self.s_span)
         c2.add_row("Ly - long span (m):", self.s_ly)
