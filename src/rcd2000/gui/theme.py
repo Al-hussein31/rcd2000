@@ -40,6 +40,7 @@ RADIUS_LG = 12
 
 # ── Typography ────────────────────────────────────────────────────
 FONT_FAMILY = "'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+PAINTER_FONT = "SF Pro Display"
 FONT_MONO = "'SF Mono', 'Menlo', 'Consolas', monospace"
 
 # ── GroupBox (kept for compatibility, prefer Card) ─────────────────

@@ -11,9 +11,9 @@ from PySide6.QtGui import QPainter, QColor, QPen, QPolygonF, QFont
 
 from rcd2000.gui.theme import (
     BG_DARK, BG_MID, BG_LIGHT, BG_CARD, TEXT_PRIMARY, TEXT_SECONDARY,
-    ACCENT, ACCENT_HOVER, BORDER, CARD_STYLE, RADIUS_SM, RADIUS_MD,
+    ACCENT, ACCENT_HOVER, ACCENT_MUTED, BORDER, CARD_STYLE, RADIUS_SM, RADIUS_MD,
     SUCCESS, SUCCESS_BG, ERROR, ERROR_BG, WARNING, WARNING_BG, TEXT_MUTED,
-    FONT_FAMILY,
+    FONT_FAMILY, PAINTER_FONT,
 )
 
 
@@ -366,7 +366,12 @@ class SpanDiagram(QWidget):
             return
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
+        try:
+            self._do_paint(painter)
+        finally:
+            painter.end()
 
+    def _do_paint(self, painter):
         w = self.width()
         h = self.height()
         pad = 24
@@ -387,28 +392,16 @@ class SpanDiagram(QWidget):
 
             # Span label above
             painter.setPen(QColor(TEXT_PRIMARY))
-            painter.setFont(QFont(FONT_FAMILY, 10, QFont.Bold))
+            painter.setFont(QFont(PAINTER_FONT, 10, QFont.Bold))
             painter.drawText(QRectF(x, y_beam - 20, span_w, 16), Qt.AlignCenter, f"S{i+1}")
 
             # Length below
             painter.setPen(QColor(TEXT_SECONDARY))
-            painter.setFont(QFont(FONT_FAMILY, 9))
+            painter.setFont(QFont(PAINTER_FONT, 9))
             lbl = f'{span.get("length", 0):.1f}m'
             if span.get("udl", 0):
                 lbl += f' / {span["udl"]:.0f} kN/m'
             painter.drawText(QRectF(x, y_beam + beam_h + 2, span_w, 16), Qt.AlignCenter, lbl)
-
-            # Support triangle between spans
-            if i > 0:
-                sx = x
-                pts = QPolygonF([
-                    QRectF(sx - 7, y_beam + beam_h, 14, 14),
-                ])
-                painter.setBrush(QColor(ACCENT))
-                painter.setPen(QPen(QColor(ACCENT_MUTED), 1))
-                tri = QPolygonF([
-                    QRectF(sx, y_beam + beam_h, 0, 0).topLeft(),  # will adjust
-                ])
 
             x += span_w
 
@@ -449,5 +442,3 @@ class SpanDiagram(QWidget):
             QRectF(sx, y_beam + beam_h + 14, 0, 0).topLeft(),
         ])
         painter.drawPolygon(tri)
-
-        painter.end()
