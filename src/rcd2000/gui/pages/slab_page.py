@@ -147,10 +147,58 @@ class SlabPage(DesignFormPage):
                 ["Long Span Moment (kN·m/m)", fmt2(r.moment_long_span), ""],
                 ["Long Span Steel (mm²/m)", fmt(r.steel_long_span), ""],
                 ["Support Moment (kN·m/m)", fmt2(r.moment_support), ""],
-                ["Support Steel (mm²/m)", fmt(r.steel_support), ""],
+                ["Support Steel (mm²)", fmt(r.steel_support), ""],
             ]
         if ptype == 3 and r.span_moments:
             for i, (m, a) in enumerate(zip(r.span_moments, r.span_steels)):
                 rows.append([f"Span {i+1} Moment (kN·m)", fmt2(m), ""])
                 rows.append([f"Span {i+1} Steel (mm²)", fmt(a), ""])
         return rows
+
+    def get_state(self) -> dict:
+        return {
+            "slab_type": self.slab_type.currentIndex(),
+            "slab_fcu": int(self.slab_fcu.currentText()),
+            "slab_fy": int(self.slab_fy.currentText()),
+            "s_depth": self.s_depth.value(),
+            "s_span": self.s_span.value(),
+            "s_ly": self.s_ly.value(),
+            "s_case": self.s_case.value(),
+            "gk": self.gk.value(),
+            "qk": self.qk.value(),
+            "cont_nspan": self.cont_nspan.value(),
+            "cont_spans": [
+                {"length": w[0].value(), "udl": w[1].value()}
+                for w in self._cont_span_widgets
+            ],
+        }
+
+    def set_state(self, state: dict) -> None:
+        if "slab_type" in state:
+            self.slab_type.setCurrentIndex(state["slab_type"])
+        if "slab_fcu" in state:
+            self._set_combo_int(self.slab_fcu, state["slab_fcu"])
+        if "slab_fy" in state:
+            self._set_combo_int(self.slab_fy, state["slab_fy"])
+        if "s_depth" in state:
+            self.s_depth.setValue(state["s_depth"])
+        if "s_span" in state:
+            self.s_span.setValue(state["s_span"])
+        if "s_ly" in state:
+            self.s_ly.setValue(state["s_ly"])
+        if "s_case" in state:
+            self.s_case.setValue(state["s_case"])
+        if "gk" in state:
+            self.gk.setValue(state["gk"])
+        if "qk" in state:
+            self.qk.setValue(state["qk"])
+        if "cont_nspan" in state:
+            self.cont_nspan.setValue(state["cont_nspan"])
+        if "cont_spans" in state and self._cont_span_widgets:
+            for i, w in enumerate(self._cont_span_widgets):
+                if i < len(state["cont_spans"]):
+                    s = state["cont_spans"][i]
+                    if "length" in s:
+                        w[0].setValue(s["length"])
+                    if "udl" in s:
+                        w[1].setValue(s["udl"])

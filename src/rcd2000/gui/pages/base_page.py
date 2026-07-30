@@ -109,3 +109,54 @@ class BasePage(DesignFormPage):
             ["Permissible Bond (N/mm²)", fmt2(r.perm_bond), ""],
         ]
         return rows
+
+    def get_state(self) -> dict:
+        return {
+            "base_type": self.base_type.currentIndex(),
+            "col_shape": self.col_shape.currentIndex(),
+            "base_fcu": int(self.base_fcu.currentText()),
+            "base_fy": int(self.base_fy.currentText()),
+            "base_pb": self.base_pb.value(),
+            "base_load": self.base_load.value(),
+            "base_a1": self.base_a1.value(),
+            "base_a2": self.base_a2.value(),
+            "base_dia": self.base_dia.value(),
+            "base_h": self.base_h.value(),
+            "base_l1": self.base_l1.value(),
+            "base_l2": self.base_l2.value(),
+            "base_dowel": self.base_dowel.value(),
+            "gk": self.gk.value(),
+            "qk": self.qk.value(),
+        }
+
+    def set_state(self, state: dict) -> None:
+        if "base_type" in state:
+            self.base_type.setCurrentIndex(state["base_type"])
+        if "col_shape" in state:
+            self.col_shape.setCurrentIndex(state["col_shape"])
+        if "base_fcu" in state:
+            self._set_combo_int(self.base_fcu, state["base_fcu"])
+        if "base_fy" in state:
+            self._set_combo_int(self.base_fy, state["base_fy"])
+        if "base_pb" in state:
+            self.base_pb.setValue(state["base_pb"])
+        if "base_load" in state:
+            self.base_load.setValue(state["base_load"])
+        if "base_a1" in state:
+            self.base_a1.setValue(state["base_a1"])
+        if "base_a2" in state:
+            self.base_a2.setValue(state["base_a2"])
+        if "base_dia" in state:
+            self.base_dia.setValue(state["base_dia"])
+        if "base_h" in state:
+            self.base_h.setValue(state["base_h"])
+        if "base_l1" in state:
+            self.base_l1.setValue(state["base_l1"])
+        if "base_l2" in state:
+            self.base_l2.setValue(state["base_l2"])
+        if "base_dowel" in state:
+            self.base_dowel.setValue(state["base_dowel"])
+        if "gk" in state:
+            self.gk.setValue(state["gk"])
+        if "qk" in state:
+            self.qk.setValue(state["qk"])

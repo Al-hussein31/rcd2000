@@ -142,3 +142,51 @@ class ContinuousBeamPage(DesignFormPage):
             ):
                 rows.append([f"Span {i+1}", fmt2(m), fmt2(sl), fmt2(sr)])
         return rows
+
+    def get_state(self) -> dict:
+        return {
+            "cb_ns": self.cb_ns.value(),
+            "cb_nm": self.cb_nm.value(),
+            "cb_end1": self.cb_end1.currentIndex(),
+            "cb_end2": self.cb_end2.currentIndex(),
+            "members": [
+                {
+                    "length": w[1].value(),
+                    "inertia": w[2].value(),
+                    "e_mod": w[3].value(),
+                    "udl": w[4].value(),
+                    "wt": w[5].value(),
+                    "wb": w[6].value(),
+                    "ab": w[7].value(),
+                }
+                for w in self._cb_member_widgets
+            ],
+        }
+
+    def set_state(self, state: dict) -> None:
+        if "cb_ns" in state:
+            self.cb_ns.setValue(state["cb_ns"])
+        if "cb_nm" in state:
+            self.cb_nm.setValue(state["cb_nm"])
+        if "cb_end1" in state:
+            self.cb_end1.setCurrentIndex(state["cb_end1"])
+        if "cb_end2" in state:
+            self.cb_end2.setCurrentIndex(state["cb_end2"])
+        if "members" in state and self._cb_member_widgets:
+            for i, w in enumerate(self._cb_member_widgets):
+                if i < len(state["members"]):
+                    m = state["members"][i]
+                    if "length" in m:
+                        w[1].setValue(m["length"])
+                    if "inertia" in m:
+                        w[2].setValue(m["inertia"])
+                    if "e_mod" in m:
+                        w[3].setValue(m["e_mod"])
+                    if "udl" in m:
+                        w[4].setValue(m["udl"])
+                    if "wt" in m:
+                        w[5].setValue(m["wt"])
+                    if "wb" in m:
+                        w[6].setValue(m["wb"])
+                    if "ab" in m:
+                        w[7].setValue(m["ab"])

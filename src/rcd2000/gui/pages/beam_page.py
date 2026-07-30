@@ -153,3 +153,72 @@ class BeamPage(DesignFormPage):
                          fmt2(s.shear_left), fmt2(s.shear_right),
                          badge(s.defl_ok)])
         return rows
+
+    def get_state(self) -> dict:
+        return {
+            "beam_fcu": int(self.beam_fcu.currentText()),
+            "beam_fy": int(self.beam_fy.currentText()),
+            "beam_fyv": int(self.beam_fyv.currentText()),
+            "b_b": self.b_b.value(),
+            "b_bf": self.b_bf.value(),
+            "b_h": self.b_h.value(),
+            "b_hf": self.b_hf.value(),
+            "n_supports": self.n_supports.value(),
+            "n_members": self.n_members.value(),
+            "ty1": self.ty1.currentIndex(),
+            "ty2": self.ty2.currentIndex(),
+            "gk": self.gk.value(),
+            "qk": self.qk.value(),
+            "members": [
+                {
+                    "length": w[1].value(),
+                    "udl": w[2].value(),
+                    "wt": w[3].value(),
+                    "wb": w[4].value(),
+                    "ab": w[5].value(),
+                }
+                for w in self._member_widgets
+            ],
+        }
+
+    def set_state(self, state: dict) -> None:
+        if "beam_fcu" in state:
+            self._set_combo_int(self.beam_fcu, state["beam_fcu"])
+        if "beam_fy" in state:
+            self._set_combo_int(self.beam_fy, state["beam_fy"])
+        if "beam_fyv" in state:
+            self._set_combo_int(self.beam_fyv, state["beam_fyv"])
+        if "b_b" in state:
+            self.b_b.setValue(state["b_b"])
+        if "b_bf" in state:
+            self.b_bf.setValue(state["b_bf"])
+        if "b_h" in state:
+            self.b_h.setValue(state["b_h"])
+        if "b_hf" in state:
+            self.b_hf.setValue(state["b_hf"])
+        if "n_supports" in state:
+            self.n_supports.setValue(state["n_supports"])
+        if "n_members" in state:
+            self.n_members.setValue(state["n_members"])
+        if "ty1" in state:
+            self.ty1.setCurrentIndex(state["ty1"])
+        if "ty2" in state:
+            self.ty2.setCurrentIndex(state["ty2"])
+        if "gk" in state:
+            self.gk.setValue(state["gk"])
+        if "qk" in state:
+            self.qk.setValue(state["qk"])
+        if "members" in state and self._member_widgets:
+            for i, w in enumerate(self._member_widgets):
+                if i < len(state["members"]):
+                    m = state["members"][i]
+                    if "length" in m:
+                        w[1].setValue(m["length"])
+                    if "udl" in m:
+                        w[2].setValue(m["udl"])
+                    if "wt" in m:
+                        w[3].setValue(m["wt"])
+                    if "wb" in m:
+                        w[4].setValue(m["wb"])
+                    if "ab" in m:
+                        w[5].setValue(m["ab"])

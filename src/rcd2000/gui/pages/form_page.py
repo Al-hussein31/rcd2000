@@ -100,6 +100,26 @@ class DesignFormPage(QWidget):
         """Return a formatted text report string.  Override in subclass."""
         raise NotImplementedError
 
+    def get_state(self) -> dict:
+        """Return a plain-dict snapshot of all input widget values.
+
+        Keys are stable field names (str); values are primitives
+        (int, float, str, list[dict]).  No Qt objects are returned.
+
+        Override in subclass.
+        """
+        raise NotImplementedError
+
+    def set_state(self, state: dict) -> None:
+        """Restore widget values from a state dict.
+
+        Unknown keys are silently ignored so that old saved states
+        remain forward-compatible when new fields are added.
+
+        Override in subclass.
+        """
+        raise NotImplementedError
+
     def _build_result_rows(self, result_obj) -> list:
         """Return ``[[label, value, status], ...]`` for the results table.
 
@@ -107,6 +127,16 @@ class DesignFormPage(QWidget):
         returns an empty list.
         """
         return []
+
+    def _set_combo_int(self, combo_widget, value: int) -> None:
+        """Set a QComboBox to the item whose text matches *value*."""
+        for i in range(combo_widget.count()):
+            try:
+                if int(combo_widget.itemText(i)) == value:
+                    combo_widget.setCurrentIndex(i)
+                    return
+            except (ValueError, TypeError):
+                pass
 
     # ── Event handlers ───────────────────────────────────────────────
 

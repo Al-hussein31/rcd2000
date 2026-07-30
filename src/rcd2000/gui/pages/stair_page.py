@@ -72,3 +72,33 @@ class StairPage(DesignFormPage):
             ["Bar Spacing (mm)", fmt(r.bar_spacing), ""],
         ]
         return rows
+
+    def get_state(self) -> dict:
+        return {
+            "s_span": self.s_span.value(),
+            "s_tread": self.s_tread.value(),
+            "s_rise": self.s_rise.value(),
+            "s_imp": self.s_imp.value(),
+            "s_spl": self.s_spl.value(),
+            "s_wld": self.s_wld.value(),
+            "gk": self.gk.value(),
+            "qk": self.qk.value(),
+        }
+
+    def set_state(self, state: dict) -> None:
+        if "s_span" in state:
+            self.s_span.setValue(state["s_span"])
+        if "s_tread" in state:
+            self.s_tread.setValue(state["s_tread"])
+        if "s_rise" in state:
+            self.s_rise.setValue(state["s_rise"])
+        if "s_imp" in state:
+            self.s_imp.setValue(state["s_imp"])
+        if "s_spl" in state:
+            self.s_spl.setValue(state["s_spl"])
+        if "s_wld" in state:
+            self.s_wld.setValue(state["s_wld"])
+        if "gk" in state:
+            self.gk.setValue(state["gk"])
+        if "qk" in state:
+            self.qk.setValue(state["qk"])

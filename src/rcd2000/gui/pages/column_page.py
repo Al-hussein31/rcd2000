@@ -97,6 +97,48 @@ class ColumnPage(DesignFormPage):
         from rcd2000.gui.theme import fmt as _fmt  # noqa: F811
         return format_column(inp, result)
 
+    def get_state(self) -> dict:
+        return {
+            "col_type": self.col_type.currentIndex(),
+            "shape": self.shape.currentIndex(),
+            "load": self.load.value(),
+            "bx": self.bx.value(),
+            "by": self.by.value(),
+            "dia": self.dia.value(),
+            "depth": self.depth.value(),
+            "col_fcu": int(self.col_fcu.currentText()),
+            "col_fy": int(self.col_fy.currentText()),
+            "moment_x": self.moment_x.value(),
+            "moment_y": self.moment_y.value(),
+            "moment": self.moment.value(),
+        }
+
+    def set_state(self, state: dict) -> None:
+        if "col_type" in state:
+            self.col_type.setCurrentIndex(state["col_type"])
+        if "shape" in state:
+            self.shape.setCurrentIndex(state["shape"])
+        if "load" in state:
+            self.load.setValue(state["load"])
+        if "bx" in state:
+            self.bx.setValue(state["bx"])
+        if "by" in state:
+            self.by.setValue(state["by"])
+        if "dia" in state:
+            self.dia.setValue(state["dia"])
+        if "depth" in state:
+            self.depth.setValue(state["depth"])
+        if "col_fcu" in state:
+            self._set_combo_int(self.col_fcu, state["col_fcu"])
+        if "col_fy" in state:
+            self._set_combo_int(self.col_fy, state["col_fy"])
+        if "moment_x" in state:
+            self.moment_x.setValue(state["moment_x"])
+        if "moment_y" in state:
+            self.moment_y.setValue(state["moment_y"])
+        if "moment" in state:
+            self.moment.setValue(state["moment"])
+
     def _build_result_rows(self, r):
         ci = self._last_input
         rows = [
