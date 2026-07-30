@@ -739,6 +739,15 @@ class RCD2000TUI(App):
 
     def on_mount(self) -> None:
         self.refresh_footer()
+        self.set_timer(0.1, self._focus_first_input)
+
+    def _focus_first_input(self) -> None:
+        try:
+            screen = self.get_current_screen()
+            first = screen.query(Input).first()
+            first.focus()
+        except Exception:
+            pass
 
     def refresh_footer(self) -> None:
         footer = self.query_one("#footer", Static)
