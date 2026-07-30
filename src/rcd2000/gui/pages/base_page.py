@@ -1,31 +1,18 @@
 """Foundation design form page."""
 
-import os
-import logging
-
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox,
-)
-
 from rcd2000.base import BaseDesigner, BaseInput
 from rcd2000.report import format_base
 from rcd2000.gui.theme import fmt, fmt2
 from rcd2000.gui.widgets import (
-    spinbox, combo, button, label, header_label, make_table,
-    Card, fcu_combo, fy_combo, badge, load_combo_group,
+    spinbox, combo, label, Card, badge, fcu_combo, fy_combo, load_combo_group,
 )
+from rcd2000.gui.pages.form_page import DesignFormPage
 
 
-class BasePage(QWidget):
-    def __init__(self):
-        super().__init__()
-        self._build_ui()
+class BasePage(DesignFormPage):
+    module_name = "Base"
 
-    def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.addWidget(header_label("Foundation Design - BS 8110"))
-
+    def build_inputs(self, layout):
         c1 = Card("Base Type & Materials")
         self.base_type = combo(["Square Isolated", "Rectangular Isolated", "Combined"])
         self.col_shape = combo(["Rectangular", "Circular"])
@@ -76,32 +63,12 @@ class BasePage(QWidget):
         c2.add_widget(load_w)
         layout.addWidget(c2)
 
-        self.calc_btn = button("Design Foundation")
-        self.calc_btn.clicked.connect(self._calculate)
-        layout.addWidget(self.calc_btn)
-
-        self.btn_row = QHBoxLayout()
-        self.save_btn = button("Save .txt Report")
-        self.save_btn.clicked.connect(lambda: self._save_report("txt"))
-        self.save_btn.setVisible(False)
-        self.pdf_btn = button("Save .pdf Report")
-        self.pdf_btn.clicked.connect(lambda: self._save_report("pdf"))
-        self.pdf_btn.setVisible(False)
-        self.btn_row.addWidget(self.save_btn)
-        self.btn_row.addWidget(self.pdf_btn)
-        layout.addLayout(self.btn_row)
-
-        self.results_area = QVBoxLayout()
-        layout.addLayout(self.results_area)
-        layout.addStretch()
-
-    def _calculate(self):
-        self._clear_results()
+    def calculate(self):
         btype = self.base_type.currentIndex() + 1
         fcu = int(self.base_fcu.currentText())
         fy = int(self.base_fy.currentText())
 
-        self._last_input = BaseInput(
+        inp = BaseInput(
             base_id="F1",
             base_type=btype,
             col_type=1 if self.col_shape.currentIndex() == 0 else 2,
@@ -115,18 +82,13 @@ class BasePage(QWidget):
         designer = BaseDesigner(
             pb=self.base_pb.value(), fcu=fcu, fy=fy,
         )
-        try:
-            self._last_result = designer.design([self._last_input])[0]
-        except Exception as exc:
-            logging.error("Base design failed", exc_info=True)
-            QMessageBox.warning(
-                self, "Design Error",
-                f"Could not complete the design — check your inputs: {exc}",
-            )
-            return
+        result = designer.design([inp])[0]
+        return inp, result
 
-        r = self._last_result
+    def format_report(self, inp, result):
+        return format_base(inp, result)
 
+    def _build_result_rows(self, r):
         rows = [
             ["Base Length L1 (mm)", fmt(r.l1), ""],
             ["Base Width L2 (mm)", fmt(r.l2), ""],
@@ -146,35 +108,4 @@ class BasePage(QWidget):
              badge(r.local_bond <= r.perm_bond)],
             ["Permissible Bond (N/mm²)", fmt2(r.perm_bond), ""],
         ]
-        self.results_area.addWidget(make_table(["Parameter", "Value", "Status"], rows))
-        self.save_btn.setVisible(True)
-        self.pdf_btn.setVisible(True)
-        if hasattr(self, '_history_cb') and self._history_cb:
-            self._history_cb("Base", self._last_input, self._last_result)
-
-    def _save_report(self, fmt_type="txt"):
-        text = format_base(self._last_input, self._last_result)
-        if fmt_type == "txt":
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_BASE.txt"),
-                "Text Files (*.txt)",
-            )
-            if path:
-                with open(path, "w") as f:
-                    f.write(text)
-        else:
-            from rcd2000.report import export_pdf
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Save PDF Report", os.path.expanduser("~/Desktop/RCD2000_BASE.pdf"),
-                "PDF Files (*.pdf)",
-            )
-            if path:
-                export_pdf(text, path)
-
-    def _clear_results(self):
-        while self.results_area.count():
-            w = self.results_area.takeAt(0).widget()
-            if w:
-                w.deleteLater()
-        self.save_btn.setVisible(False)
-        self.pdf_btn.setVisible(False)
+        return rows

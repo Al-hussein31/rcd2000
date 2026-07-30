@@ -1,36 +1,32 @@
 """Continuous beam analysis form page."""
 
-import os
-import logging
-
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QFileDialog,
-    QMessageBox,
-)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QGridLayout, QLabel
 
 from rcd2000.continuous_beam import (
     ContinuousBeamAnalyzer, ContinuousBeamInput, ContinuousBeamMember,
 )
 from rcd2000.report import format_continuous_beam
-from rcd2000.gui.theme import TEXT_SECONDARY, fmt2, ACCENT
+from rcd2000.gui.theme import TEXT_SECONDARY, fmt2
 from rcd2000.gui.widgets import (
-    spinbox, spin_int, combo, button, label, header_label, make_table,
-    Card, SpanDiagram,
+    spinbox, spin_int, combo, label, Card, SpanDiagram,
 )
+from rcd2000.gui.pages.form_page import DesignFormPage
 
 
-class ContinuousBeamPage(QWidget):
+class ContinuousBeamPage(DesignFormPage):
+    module_name = "Continuous Beam"
+
     def __init__(self):
-        super().__init__()
         self._cb_member_widgets = []
-        self._build_ui()
+        super().__init__()
 
-    def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.addWidget(header_label("Continuous Beam Analysis - BS 8110"))
+    def _page_title(self):
+        return "Continuous Beam Analysis - BS 8110"
 
+    def _calc_button_text(self):
+        return "Analyze Beam"
+
+    def build_inputs(self, layout):
         c1 = Card("Supports & End Conditions")
         self.cb_ns = spin_int(2, 10, 3)
         self.cb_nm = spin_int(1, 9, 2)
@@ -53,25 +49,6 @@ class ContinuousBeamPage(QWidget):
         c2.add_layout(self.member_grid)
         layout.addWidget(c2)
 
-        self.calc_btn = button("Analyze Beam")
-        self.calc_btn.clicked.connect(self._calculate)
-        layout.addWidget(self.calc_btn)
-
-        self.btn_row = QHBoxLayout()
-        self.save_btn = button("Save .txt Report")
-        self.save_btn.clicked.connect(lambda: self._save_report("txt"))
-        self.save_btn.setVisible(False)
-        self.pdf_btn = button("Save .pdf Report")
-        self.pdf_btn.clicked.connect(lambda: self._save_report("pdf"))
-        self.pdf_btn.setVisible(False)
-        self.btn_row.addWidget(self.save_btn)
-        self.btn_row.addWidget(self.pdf_btn)
-        layout.addLayout(self.btn_row)
-
-        self.results_area = QVBoxLayout()
-        layout.addLayout(self.results_area)
-        layout.addStretch()
-
         self._sync_members()
 
     def _sync_members(self):
@@ -79,7 +56,10 @@ class ContinuousBeamPage(QWidget):
         while len(self._cb_member_widgets) < nm:
             row = len(self._cb_member_widgets) + 1
             lbl = QLabel(f"M{row}")
-            lbl.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; background: transparent;")
+            lbl.setStyleSheet(
+                f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; "
+                f"background: transparent;"
+            )
             # AUDIT: length 1–50 m is fine. inertia 0.0001–10 m⁴ is
             # very small but the engine uses it directly in the stiffness
             # matrix — zero would cause division-by-zero, but the min
@@ -107,7 +87,9 @@ class ContinuousBeamPage(QWidget):
 
         headers = ["", "L (m)", "I (m⁴)", "E-rel", "UDL", "Tri", "Trap", "Dist"]
         for col, h in enumerate(headers):
-            self.member_grid.addWidget(label(h, secondary=True, size=11), 0, col)
+            self.member_grid.addWidget(
+                label(h, secondary=True, size=11), 0, col
+            )
 
         self._update_diagram()
 
@@ -119,8 +101,7 @@ class ContinuousBeamPage(QWidget):
         self.diagram.set_spans(data)
         self.diagram.setVisible(len(self._cb_member_widgets) > 0)
 
-    def _calculate(self):
-        self._clear_results()
+    def calculate(self):
         nm = self.cb_nm.value()
         members = []
         for i, w in enumerate(self._cb_member_widgets):
@@ -134,7 +115,7 @@ class ContinuousBeamPage(QWidget):
                 wb=w[6].value(),
                 ab=w[7].value(),
             ))
-        self._last_input = ContinuousBeamInput(
+        inp = ContinuousBeamInput(
             n_supports=self.cb_ns.value(),
             n_members=nm,
             members=members,
@@ -142,60 +123,22 @@ class ContinuousBeamPage(QWidget):
             end2_type=self.cb_end2.currentIndex(),
         )
         analyzer = ContinuousBeamAnalyzer()
-        try:
-            self._last_result = analyzer.analyze(self._last_input)
-        except Exception as exc:
-            logging.error("Continuous beam analysis failed", exc_info=True)
-            QMessageBox.warning(
-                self, "Analysis Error",
-                f"Could not complete the analysis — check your inputs: {exc}",
-            )
-            return
+        result = analyzer.analyze(inp)
+        return inp, result
 
-        r = self._last_result
+    def format_report(self, inp, result):
+        return format_continuous_beam(inp, result)
 
+    def _build_result_rows(self, r):
+        rows = []
         if r.support_moments:
-            hdrs = ["Support", "Moment (kN·m)", "Reaction (kN)"]
-            rows = [[f"Sup {i+1}", fmt2(m), fmt2(re)]
-                    for i, (m, re) in enumerate(zip(r.support_moments, r.support_reactions))]
-            self.results_area.addWidget(label("Support Results", bold=True, size=14))
-            self.results_area.addWidget(make_table(hdrs, rows))
-
+            for i, (m, re) in enumerate(
+                zip(r.support_moments, r.support_reactions)
+            ):
+                rows.append([f"Sup {i+1}", fmt2(m), fmt2(re)])
         if r.span_moments:
-            hdrs = ["Span", "M (kN·m)", "Shear L (kN)", "Shear R (kN)"]
-            rows = [[f"Span {i+1}", fmt2(m), fmt2(sl), fmt2(sr)]
-                    for i, (m, sl, sr) in enumerate(zip(r.span_moments, r.span_shear_left, r.span_shear_right))]
-            self.results_area.addWidget(label("Span Results", bold=True, size=14))
-            self.results_area.addWidget(make_table(hdrs, rows))
-
-        self.save_btn.setVisible(True)
-        self.pdf_btn.setVisible(True)
-        if hasattr(self, '_history_cb') and self._history_cb:
-            self._history_cb("Continuous Beam", self._last_input, self._last_result)
-
-    def _save_report(self, fmt_type="txt"):
-        text = format_continuous_beam(self._last_input, self._last_result)
-        if fmt_type == "txt":
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_CBEAM.txt"),
-                "Text Files (*.txt)",
-            )
-            if path:
-                with open(path, "w") as f:
-                    f.write(text)
-        else:
-            from rcd2000.report import export_pdf
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Save PDF Report", os.path.expanduser("~/Desktop/RCD2000_CBEAM.pdf"),
-                "PDF Files (*.pdf)",
-            )
-            if path:
-                export_pdf(text, path)
-
-    def _clear_results(self):
-        while self.results_area.count():
-            w = self.results_area.takeAt(0).widget()
-            if w:
-                w.deleteLater()
-        self.save_btn.setVisible(False)
-        self.pdf_btn.setVisible(False)
+            for i, (m, sl, sr) in enumerate(
+                zip(r.span_moments, r.span_shear_left, r.span_shear_right)
+            ):
+                rows.append([f"Span {i+1}", fmt2(m), fmt2(sl), fmt2(sr)])
+        return rows

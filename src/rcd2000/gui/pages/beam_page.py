@@ -1,34 +1,28 @@
 """Beam design form page."""
 
-import os
 import logging
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QGridLayout, QLabel, QFileDialog,
-    QMessageBox,
-)
+from PySide6.QtWidgets import QHBoxLayout, QGridLayout, QLabel
 from PySide6.QtCore import Qt
 
 from rcd2000.beam import BeamDesigner, BeamInput
 from rcd2000.report import format_beam
-from rcd2000.gui.theme import GROUP_BOX_STYLE, TEXT_SECONDARY, fmt, fmt2, ACCENT, BG_CARD, BORDER
+from rcd2000.gui.theme import TEXT_SECONDARY, fmt, fmt2
 from rcd2000.gui.widgets import (
-    spinbox, spin_int, combo, button, label, header_label, make_table,
-    Card, fcu_combo, fy_combo, badge, load_combo_group, SpanDiagram, divider,
+    spinbox, spin_int, combo, label, Card, fcu_combo, fy_combo, badge,
+    SpanDiagram,
 )
+from rcd2000.gui.pages.form_page import DesignFormPage
 
 
-class BeamPage(QWidget):
+class BeamPage(DesignFormPage):
+    module_name = "Beam"
+
     def __init__(self):
-        super().__init__()
         self._member_widgets = []
-        self._build_ui()
+        super().__init__()
 
-    def _build_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setSpacing(16)
-        layout.addWidget(header_label("Beam Design - BS 8110"))
-
+    def build_inputs(self, layout):
         c1 = Card("Material Properties")
         self.beam_fcu = fcu_combo()
         self.beam_fy = fy_combo()
@@ -71,6 +65,7 @@ class BeamPage(QWidget):
         layout.addWidget(self.diagram)
 
         c4 = Card("Loads")
+        from rcd2000.gui.widgets import load_combo_group
         load_w, self.gk, self.qk, self.load_result = load_combo_group()
         c4.add_widget(load_w)
         layout.addWidget(c4)
@@ -81,25 +76,6 @@ class BeamPage(QWidget):
         c5.add_layout(self.member_grid)
         layout.addWidget(c5)
 
-        self.calc_btn = button("Design Beam")
-        self.calc_btn.clicked.connect(self._calculate)
-        layout.addWidget(self.calc_btn)
-
-        self.btn_row = QHBoxLayout()
-        self.save_btn = button("Save .txt Report")
-        self.save_btn.clicked.connect(lambda: self._save_report("txt"))
-        self.save_btn.setVisible(False)
-        self.pdf_btn = button("Save .pdf Report")
-        self.pdf_btn.clicked.connect(lambda: self._save_report("pdf"))
-        self.pdf_btn.setVisible(False)
-        self.btn_row.addWidget(self.save_btn)
-        self.btn_row.addWidget(self.pdf_btn)
-        layout.addLayout(self.btn_row)
-
-        self.results_area = QVBoxLayout()
-        layout.addLayout(self.results_area)
-        layout.addStretch()
-
         self._sync_members()
 
     def _sync_members(self):
@@ -107,7 +83,10 @@ class BeamPage(QWidget):
         while len(self._member_widgets) < nm:
             row = len(self._member_widgets) + 1
             lbl = QLabel(f"M{row}")
-            lbl.setStyleSheet(f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; background: transparent;")
+            lbl.setStyleSheet(
+                f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; "
+                f"background: transparent;"
+            )
             length = spinbox(1, 50, 0.5, 5, 2, " m")
             udl = spinbox(0, 500, 5, 0, 1, " kN/m")
             wt = spinbox(0, 200, 5, 0, 1)
@@ -123,7 +102,9 @@ class BeamPage(QWidget):
 
         headers = ["", "Length", "UDL", "Tri (wt)", "Trap (wb)", "Dist (ab)"]
         for col, h in enumerate(headers):
-            self.member_grid.addWidget(label(h, secondary=True, size=11), 0, col)
+            self.member_grid.addWidget(
+                label(h, secondary=True, size=11), 0, col
+            )
 
         self._update_diagram()
 
@@ -135,92 +116,40 @@ class BeamPage(QWidget):
         self.diagram.set_spans(data)
         self.diagram.setVisible(len(self._member_widgets) > 0)
 
-    def _calculate(self):
-        self._clear_results()
-        try:
-            nm = self.n_members.value()
-            fcu = int(self.beam_fcu.currentText())
-            fy = int(self.beam_fy.currentText())
-            fyv = int(self.beam_fyv.currentText())
+    def calculate(self):
+        nm = self.n_members.value()
+        fcu = int(self.beam_fcu.currentText())
+        fy = int(self.beam_fy.currentText())
+        fyv = int(self.beam_fyv.currentText())
 
-            self._last_input = BeamInput(
-                beam_id="B1",
-                n_supports=self.n_supports.value(),
-                n_members=nm,
-                b=self.b_b.value(), bf=self.b_bf.value(),
-                h=self.b_h.value(), hf=self.b_hf.value(),
-                fcu=fcu, fy=fy, fyv=fyv,
-                member_lengths=[w[1].value() for w in self._member_widgets],
-                member_udl=[w[2].value() for w in self._member_widgets],
-                member_wt=[w[3].value() for w in self._member_widgets],
-                member_wb=[w[4].value() for w in self._member_widgets],
-                member_ab=[w[5].value() for w in self._member_widgets],
-                ty1=self.ty1.currentIndex(),
-                ty2=self.ty2.currentIndex(),
-            )
-            designer = BeamDesigner(fcu=fcu, fy=fy, fyv=fyv)
-            self._last_result = designer.design([self._last_input])[0]
-        except Exception as exc:
-            logging.error("Beam design failed", exc_info=True)
-            QMessageBox.warning(
-                self, "Design Error",
-                f"Could not complete the design — check your inputs: {exc}",
-            )
-            return
+        inp = BeamInput(
+            beam_id="B1",
+            n_supports=self.n_supports.value(),
+            n_members=nm,
+            b=self.b_b.value(), bf=self.b_bf.value(),
+            h=self.b_h.value(), hf=self.b_hf.value(),
+            fcu=fcu, fy=fy, fyv=fyv,
+            member_lengths=[w[1].value() for w in self._member_widgets],
+            member_udl=[w[2].value() for w in self._member_widgets],
+            member_wt=[w[3].value() for w in self._member_widgets],
+            member_wb=[w[4].value() for w in self._member_widgets],
+            member_ab=[w[5].value() for w in self._member_widgets],
+            ty1=self.ty1.currentIndex(),
+            ty2=self.ty2.currentIndex(),
+        )
+        designer = BeamDesigner(fcu=fcu, fy=fy, fyv=fyv)
+        result = designer.design([inp])[0]
+        return inp, result
 
-        result = self._last_result
+    def format_report(self, inp, result):
+        return format_beam(inp, result)
 
-        if result.spans:
-            hdrs = ["Span", "L (m)", "M (kN·m)", "As_bot (mm²)", "As_top (mm²)",
-                     "V_left (kN)", "V_right (kN)", "Defl"]
-            rows = [
-                [s.span_id, fmt2(s.length), fmt2(s.moment),
-                 fmt(s.steel_bot), fmt(s.steel_top),
-                 fmt2(s.shear_left), fmt2(s.shear_right),
-                 badge(s.defl_ok)]
-                for s in result.spans
-            ]
-            self.results_area.addWidget(label("Span Results", bold=True, size=14))
-            self.results_area.addWidget(make_table(hdrs, rows))
-
-        if result.supports:
-            hdrs2 = ["Support", "Reaction (kN)", "M (kN·m)", "As_top (mm²)", "As_bot (mm²)"]
-            rows2 = [
-                [s.support_id, fmt2(s.reaction), fmt2(s.moment),
-                 fmt(s.steel_top), fmt(s.steel_bot)]
-                for s in result.supports
-            ]
-            self.results_area.addWidget(label("Support Results", bold=True, size=14))
-            self.results_area.addWidget(make_table(hdrs2, rows2))
-
-        self.save_btn.setVisible(True)
-        self.pdf_btn.setVisible(True)
-        if hasattr(self, '_history_cb') and self._history_cb:
-            self._history_cb("Beam", self._last_input, self._last_result)
-
-    def _save_report(self, fmt_type="txt"):
-        text = format_beam(self._last_input, self._last_result)
-        if fmt_type == "txt":
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Save Report", os.path.expanduser("~/Desktop/RCD2000_BEAM.txt"),
-                "Text Files (*.txt)",
-            )
-            if path:
-                with open(path, "w") as f:
-                    f.write(text)
-        else:
-            from rcd2000.report import export_pdf
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Save PDF Report", os.path.expanduser("~/Desktop/RCD2000_BEAM.pdf"),
-                "PDF Files (*.pdf)",
-            )
-            if path:
-                export_pdf(text, path)
-
-    def _clear_results(self):
-        while self.results_area.count():
-            w = self.results_area.takeAt(0).widget()
-            if w:
-                w.deleteLater()
-        self.save_btn.setVisible(False)
-        self.pdf_btn.setVisible(False)
+    def _build_result_rows(self, r):
+        # Span results
+        rows = []
+        for s in r.spans:
+            rows.append([s.span_id, fmt2(s.length), fmt2(s.moment),
+                         fmt(s.steel_bot), fmt(s.steel_top),
+                         fmt2(s.shear_left), fmt2(s.shear_right),
+                         badge(s.defl_ok)])
+        return rows
