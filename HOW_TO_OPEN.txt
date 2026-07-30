@@ -1,0 +1,14 @@
+HOW TO OPEN RCD2000 (macOS)
+=============================
+
+Because RCD2000 is not signed with an Apple Developer certificate,
+macOS Gatekeeper will block the first launch. Here's how to open it:
+
+1. Right-click (or Ctrl+click) RCD2000.app
+2. Select "Open" from the menu
+3. Click "Open" in the dialog that appears
+
+You only need to do this once. After that, the app opens normally.
+
+Alternatively, move RCD2000.app to your Applications folder first,
+then run: xattr -dr com.apple.quarantine /Applications/RCD2000.app

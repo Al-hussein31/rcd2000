@@ -10,83 +10,136 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            pyinstaller_flags: --onefile
-            icon_flag: ""
-            sep: ":"
-            uploaded_asset: dist/RCD2000-linux
-
-          - os: macos-latest
-            pyinstaller_flags: --windowed
-            icon_flag: --icon src/rcd2000/gui/icons/logo.icns
-            sep: ":"
-            uploaded_asset: dist/RCD2000-macos.zip
-
-          - os: windows-latest
-            pyinstaller_flags: --onefile --windowed
-            icon_flag: --icon src/rcd2000/gui/icons/logo.ico
-            sep: ";"
-            uploaded_asset: dist/RCD2000-windows.exe
-
-    runs-on: ${{ matrix.os }}
-
+  #################################################
+  # macOS — .dmg with drag-to-Applications UX
+  #################################################
+  macos:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
 
-      - name: Install system deps (Linux)
-        if: runner.os == 'Linux'
+      - name: Install deps
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libegl1 libglib2.0-0t64 \
-            libxcb-cursor0 libxkbcommon0 libfontconfig1 2>&1 | tail -5
-
-      - name: Install Python deps
-        run: |
+          brew install create-dmg
           python -m pip install --upgrade pip
           pip install pyinstaller
           pip install -e ".[gui]"
 
-      - name: Build with PyInstaller
-        shell: bash
+      - name: Build .app with PyInstaller
         run: |
           pyinstaller \
-            ${{ matrix.pyinstaller_flags }} \
+            --windowed \
             --clean \
             --noconfirm \
             --name RCD2000 \
-            ${{ matrix.icon_flag }} \
-            --add-data "src/rcd2000/gui/icons${{ matrix.sep }}rcd2000/gui/icons" \
+            --icon src/rcd2000/gui/icons/logo.icns \
+            --add-data "src/rcd2000/gui/icons:rcd2000/gui/icons" \
             --hidden-import qtawesome \
             --hidden-import PySide6.QtSvg \
             --hidden-import PySide6.QtXml \
             run_gui.py
 
-      - name: Package .app into zip (macOS)
-        if: runner.os == 'macOS'
+      - name: Ad-hoc sign .app (required for Apple Silicon)
         run: |
-          ditto -c -k --sequesterRsrc dist/RCD2000.app dist/RCD2000-macos.zip
-          ls -lh dist/RCD2000-macos.zip
+          codesign --force --deep -s - dist/RCD2000.app
 
-      - name: Rename executable (Linux)
-        if: runner.os == 'Linux'
-        run: mv dist/RCD2000 dist/RCD2000-linux
+      - name: Create DMG
+        run: |
+          cp HOW_TO_OPEN.txt dist/
+          create-dmg \
+            --volname "RCD2000" \
+            --window-size 540 400 \
+            --icon-size 96 \
+            --icon "RCD2000.app" 130 200 \
+            --icon "HOW_TO_OPEN.txt" 270 200 \
+            --app-drop-link 410 200 \
+            --no-internet-enable \
+            --hdiutil-retries 5 \
+            "RCD2000-macos.dmg" \
+            "dist/"
 
-      - name: Rename executable (Windows)
-        if: runner.os == 'Windows'
-        run: mv dist/RCD2000.exe dist/RCD2000-windows.exe
-
-      - name: Upload release assets
+      - name: Upload asset
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: ${{ matrix.uploaded_asset }}
+          files: RCD2000-macos.dmg
+
+  #################################################
+  # Windows — Inno Setup installer
+  #################################################
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install deps
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -e ".[gui]"
+          choco install innosetup --no-progress -y
+
+      - name: Build with PyInstaller (onedir)
+        shell: pwsh
+        run: |
+          pyinstaller `
+            --onedir `
+            --windowed `
+            --clean `
+            --noconfirm `
+            --name RCD2000 `
+            --icon src/rcd2000/gui/icons/logo.ico `
+            --add-data "src/rcd2000/gui/icons;rcd2000/gui/icons" `
+            --hidden-import qtawesome `
+            --hidden-import PySide6.QtSvg `
+            --hidden-import PySide6.QtXml `
+            run_gui.py
+
+      - name: Build installer with Inno Setup
+        shell: cmd
+        run: |
+          "C:\Program Files (x86)\Inno Setup 6\iscc.exe" installer.iss
+
+      - name: Upload asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: RCD2000-windows.exe
+
+  #################################################
+  # Linux — AppImage
+  #################################################
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gui]"
+          pip install appimage
+
+      - name: Build AppImage
+        run: |
+          python -m appimage.build
+          mv dist/*.AppImage RCD2000-linux.AppImage
+
+      - name: Upload asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: RCD2000-linux.AppImage
