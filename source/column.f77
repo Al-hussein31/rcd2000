@@ -215,7 +215,235 @@ C
   525 CONTINUE
 C
  5255 FORMAT(1X,A40,2X,I2,2X,F10.2)
+
+C=======================================================================
+C     PAGE 243: UNBRACED COLUMN DESIGN SECTION
+C=======================================================================
 C
+C     SLENDERNESS RATIO REFERENCE TABLE DISPLAY
+C
+      WRITE(1,403)
+      WRITE(1,219) '   Braced Column'
+      WRITE(1,219) '   Top End Cond  Bottom End Cond     BX       BY'
+      WRITE(1,219) '        1              1             1.00    1.20'
+      WRITE(1,219) '        1              2             1.30    1.60'
+      WRITE(1,219) '        2              1             1.30    1.50'
+      WRITE(1,219) '        3              2             1.60    1.80'
+      WRITE(1,219) ' '
+      WRITE(1,219) '   Unbraced Column'
+      WRITE(1,219) '        1              1             0.90    0.95'
+      WRITE(1,219) '        1              2             1.00    0.95'
+      WRITE(1,219) '        2              1             0.80    0.85'
+      WRITE(1,219) '        2              2             0.95    0.75'
+      WRITE(1,219) '        3              1             0.80    0.90'
+      WRITE(1,229) 'NOTE:-'
+      WRITE(1,239) 'Cond. 1: Connected member deeper or equal to',
+     +             ' Column Size'
+      WRITE(1,239) 'Cond. 2: Connected member shallower than',
+     +             ' Column Size'
+      WRITE(1,239) 'Cond. 3: Connected member provides nominal',
+     +             ' restraints'
+      WRITE(1,239) 'Cond. 4: Column end is unrestrained'
+C
+      IF (CS(I) .EQ. 1) THEN
+        HX = AX(I)
+        HY = AY(I)
+      ELSE
+        HX = DIA(I)
+        HY = DIA(I)
+      END IF
+C
+C     CHECK FOR SLENDERNESS
+C
+      LEX(I) = L(I) * BX(I) * 1000.0
+      LEY(I) = L(I) * BY(I) * 1000.0
+      WRITE(1,403)
+      WRITE(1,249) 'Enter values of BX & BY'
+      READ(1,*) BX(I), BY(I)
+C
+      IF (CS(I) .EQ. 1) THEN
+        IF (TY(I) .EQ. 1) THEN
+          MIX(I) = 0.0
+          MIY(I) = 0.0
+          WRITE(1,149) 'Enter Column DIMENSIONS (X-Y axis),',
+     +                 ' LENGTH and LOAD'
+          READ(1,*) AX(I), AY(I), L(I), W(I)
+        ELSE
+          WRITE(1,169) 'Enter Column DIMENSIONS (X-Y axis),',
+     +                 ' LENGTH, LOAD and MOMENTS (Mxx, Myy)'
+          READ(1,*) AX(I), AY(I), L(I), W(I), MIX(I), MIY(I)
+        END IF
+      ELSE IF (CS(I) .EQ. 2) THEN
+        IF (TY(I) .EQ. 1) THEN
+          MIX(I) = 0.0
+          MIY(I) = 0.0
+          WRITE(1,179) 'Enter Column DIAMETER, LENGTH and LOAD'
+          READ(1,*) DIA(I), L(I), W(I)
+        ELSE
+          WRITE(1,199) 'Enter Column DIAMETER, LENGTH, LOAD',
+     +                 ' and MOMENTS (Mxx, Myy)'
+          READ(1,*) DIA(I), L(I), W(I), MIX(I), MIY(I)
+        END IF
+      END IF
+   17 CONTINUE
+C
+C     FILE INPUT PATH FOR BRACED/UNBRACED COLUMNS
+C
+  555 IF (NI .EQ. 3) THEN
+        READ(3,*) (BRC(I), I = 1, NCOL)
+        READ(3,*) (BX(I), I = 1, NCOL)
+        READ(3,*) (BY(I), I = 1, NCOL)
+        DO 7 I = 1, NCOL
+          READ(3,119) CID(I)
+          IF (CS(I) .EQ. 1) THEN
+            IF (TY(I) .EQ. 1) THEN
+              MIX(I) = 0.0
+              MIY(I) = 0.0
+              READ(3,*) AX(I), AY(I), L(I), W(I)
+            ELSE
+              READ(3,*) AX(I), AY(I), L(I), W(I), MIX(I), MIY(I)
+            END IF
+          ELSE IF (CS(I) .EQ. 2) THEN
+            IF (TY(I) .EQ. 1) THEN
+              MIX(I) = 0.0
+              MIY(I) = 0.0
+              READ(3,*) DIA(I), L(I), W(I)
+            ELSE
+              READ(3,*) DIA(I), L(I), W(I), MIX(I), MIY(I)
+            END IF
+          END IF
+    7   CONTINUE
+      END IF
+C
+C=======================================================================
+C     PAGE 245: COLUMN OUTPUT REPORT AND FORMAT STATEMENTS
+C=======================================================================
+C
+C     CHECK FOR MORE COLUMNS TO DESIGN
+C
+      WRITE(1,279) 'Any More Column to be Designed - Y/N'
+      READ(1,289) DECIDE
+      IF (DECIDE .EQ. 'Y') GOTO 515
+      IF (DECIDE .EQ. 'y') GOTO 515
+      WRITE(NO,158) '*NOTE:- Steel % based on area required please'
+      WRITE(NO,168)
+C
+   57 CONTINUE
+C
+C     COLUMN OUTPUT REPORT HEADER
+C
+      WRITE(NO,403)
+      WRITE(NO,28) 'JOB REF :', JOB, 'DATE :', DATE
+      WRITE(NO,28) 'DESIGNED :', ENGR, 'CHECKED :', ' '
+C
+      IF (I .NE. 1) THEN
+        WRITE(NO,606) 'PAGE', I, 'OF', NCOL
+      END IF
+      WRITE(NO,403)
+      WRITE(NO,38) 'COLUMN ID.:', CID(I)
+      WRITE(NO,178) 'FCU =', FCU, 'N/Sq. mm', 'FY =',
+     +               FY, 'N/Sq. mm'
+C
+      IF (CS(I) .EQ. 1) THEN
+        IAX = INT(AX(I))
+        IAY = INT(AY(I))
+        WRITE(NO,48) 'SIZE :', IAX, 'BY', IAY, 'mm', 'TYPE :',
+     +               TYPE(I)
+      ELSE IF (CS(I) .EQ. 2) THEN
+        IDIA = INT(DIA(I))
+        WRITE(NO,18) 'SIZE :', IDIA, 'mm DIA.', 'TYPE :',
+     +               TYPE(I)
+      END IF
+C
+C     INPUT DATA SECTION
+C
+      WRITE(NO,58) 'A. INPUT DATA'
+      WRITE(NO,68) '~~~~~~~~~~~~~~~~~~~'
+      WRITE(NO,78) 'AXIAL LOAD =', W(I), 'kN'
+      WRITE(NO,88) 'MOMENT ABOUT X - AXIS =', MIX(I), 'kN.m'
+      WRITE(NO,88) 'MOMENT ABOUT Y-AXIS =', MIY(I), 'kN.m'
+C
+C     FINAL INPUT MOMENTS
+C
+      WRITE(NO,188) 'B. FINAL INPUT MOMENTS'
+      WRITE(NO,198) '~~~~~~~~~~~~~~~~~~~'
+      WRITE(NO,88) 'MOMENT ABOUT X - AXIS =', MX(I), 'kN.m'
+      WRITE(NO,88) 'MOMENT ABOUT Y-AXIS =', MY(I), 'kN.m'
+C
+C     OUTPUT DATA
+C
+      WRITE(NO,58) 'C. OUTPUT DATA'
+      WRITE(NO,68) '~~~~~~~~~~~~~~~~~~~'
+      WRITE(NO,98) 'AREA OF STEEL REQUIRED =', ASC(I), 'Sq.mm'
+      WRITE(NO,108) 'MAIN BARS: Provide_____ BARS'
+      WRITE(NO,118) 'LINKS : Provide___@___c/c'
+      WRITE(NO,128) 'ULTIMATE AXIAL LOAD =', NU(I), 'kN'
+C
+      IF (TY(I) .NE. 1) THEN
+        WRITE(NO,138) 'ULTIMATE MOMENT ABOUT X-AXIS =', MUX(I),
+     +                'kN.m'
+        WRITE(NO,138) 'ULTIMATE MOMENT ABOUT Y-AXIS =', MUY(I),
+     +                'kN.m'
+      END IF
+C
+      WRITE(NO,148) '*STEEL PERCENTAGE =', PC(I), '%'
+      WRITE(1,404)
+      WRITE(1,99) 'FOR COLUMN', I
+      WRITE(1,269) 'About to write - press <ENTER> when ready...'
+      PAUSE
+C
+      WRITE(NO,403)
+      IF (I .EQ. 1) THEN
+        WRITE(NO,8) 'COLUMN ANALYSIS AND DESIGN TO BS-8110'
+        WRITE(NO,8) 'Reinforced Concrete Design'
+      END IF
+C
+C=======================================================================
+C     FORMAT STATEMENTS FROM PAGES 243 AND 245
+C=======================================================================
+C
+    8 FORMAT(20X,A39)
+   18 FORMAT(/5X,A11,1X,I4,A7,19X,A8,1X,A17)
+   28 FORMAT(5X,A11,1X,A20,10X,A8,1X,A20)
+   38 FORMAT(5X,A11,1X,A40)
+   48 FORMAT(/5X,A11,1X,I4,1X,A2,1X,I4,1X,A2,15X,A8,1X,A17)
+   58 FORMAT(5X,A15)
+   68 FORMAT(5X,A15)
+   78 FORMAT(10X,A28,1X,F7.1,1X,A3)
+   88 FORMAT(10X,A28,1X,F6.2,1X,A6)
+   89 FORMAT(/5X,A41,1X,A31)
+   98 FORMAT(10X,A28,1X,F6.0,1X,A7)
+   99 FORMAT(/5X,A15,1X,I2)
+  108 FORMAT(10X,A43)
+  109 FORMAT(/5X,A27)
+  118 FORMAT(/10X,A43)
+  119 FORMAT(A40)
+  128 FORMAT(10X,A31,1X,F7.1,1X,A3)
+  129 FORMAT(/5X,A25)
+  138 FORMAT(10X,A31,1X,F6.2,1X,A6)
+  148 FORMAT(/9X,A32,1X,F5.1,A11)
+  149 FORMAT(/5X,A43,1X,A8)
+  158 FORMAT(/5X,A45)
+  168 FORMAT(/80('-'))
+  169 FORMAT(/5X,A46,1X,A26)
+  178 FORMAT(/5X,A6,1X,F4.1,1X,A8,21X,A6,1X,F5.1,1X,A8)
+  179 FORMAT(/5X,A39)
+  188 FORMAT(5X,A23)
+  189 FORMAT(/5X,A46)
+  198 FORMAT(5X,A23)
+  199 FORMAT(/5X,A36,1X,A22)
+  209 FORMAT(/5X,A43,1X,A20)
+  219 FORMAT(5X,A47)
+  229 FORMAT(/5X,A6)
+  239 FORMAT(5X,A43,1X,A11)
+  249 FORMAT(/5X,A23)
+  259 FORMAT(/5X,A47)
+  269 FORMAT(/5X,A46)
+  279 FORMAT(5X,A38)
+  289 FORMAT(A1)
+  829 FORMAT(/5X,A35)
+  939 FORMAT(/5X,A22)
+
       STOP
       END
 C

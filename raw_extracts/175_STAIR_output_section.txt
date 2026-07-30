@@ -1,0 +1,101 @@
+=== PAGE 175: STAIR_output_section ===
+
+END IF
+WRITE (0,606) 'PAGE',I,'OF',NSTAIR
+606 FORMAT
+(/56X,A4,1X,I2,1X,A2, 1 X,I2/)
+WRITE (0, 38) 'STAIR No.',I,':',TYPE(I)
+WRITE (0, 48),SPAN =',LST(I),'m',
+'TREAD=',TR(I),'mm',
++'RISER=',RS(I),'mm','W AlST =
+',WAlST(I),'mm'
+WRITE (0, 58) 'Loading:'
+RSO=RS(I)*0.012
+OWN=WAIST(I)*0.024
+WRITE (0, 68) 'Concrete own load =
+',OWN,'kN/mm"2'
+WRITE (0, 78) 'Finishes, say, =
+1.20kN/mm"2'
+WRITE (0, 68) 'Steps own load =
+',RSO,'kN/mm"2'
+WRITE (0, 68) 'Imposed live loads =
+',LLD(I),'kN/mm"2'
+WRITE (0,168)' Slope Factor =
+',SLF(I)
+WRITI;:(0, 88) 'MOMENT IMPOSED=',MST(I)~'kN.m.'
+WRITE (0, 98)'STEEL AREA
+'REQUIRED =',ASST(I),'mm"2'
+WRITE (0,108)
+'PROYIDE',T,RD,'@',SV,'mm c/cBTM.'
+C
+C LANDING DESIGN.
+IF «ANSL(I) .EQ. 'y') .OR. (ANSL(I)
+.EQ. 'Y'» THEN
+UD=(OWN+1.2)*1.400 +LLD(I)* 1.60
+UD=UD+UDL(I)*LST(I)*0.5
+B=1000
+IF (WLD(I) .LT. 1000) B =WLD(I)
+25 M=0.125*UD*SPLD(I)**2.00
+VK=(M*1.OE06)/(FCU*B*D**2.0)
+IF(VK .GT. 0.156)THENWRITE (0,28) 'lOB REF:',10B,'DATE
+:',DATE
+WRITE (0,28)
+'DESIGNED: ',ENGR,'CHECKED: ',' _C
+C WRITE OUT THE RESULTS.
+IF (I. EQ. I) THEN
+WRITE (0, 808) COY
+808 FORMAT (/15X,A5011)
+WRITE (0,8) 'STAIR ANALYSIS AND
+DESIGN - BS 8110'
+WRITE (0,18)'-- -----------------------------159 STAIR DESION
+CWRITE (1,239) 'Stair SPAN(m),
+TREAD(mm), RISER(mm)',
++'LIVELOADS(kN/mm"2)'
+READ(1, *)LST(I), TR(I), RS(I), LLD(I)
+WRITE (1, 259) 'Any Landing to be
+designed? - YIN'
+READ (1,179)ANSL(I)
+IF «ANSL(I) .EQ. 'Y') .OR. (ANSL(I)
+.EQ.'y'» THEN
+WRITE (1, 269) 'Enter the Landing SPAN
+and WIDTH'
+READ(1,*) SPLD(I), WLD(I)
+END IF
+WRITE (1, 249) 'Enter Moment Choice -
+AorB'
+WRITE (1,249) 'A -- 0.125WL"2: B--
+0.10WL"2'
+READ(I,179) ANS
+C Calculate and design for stair.
+IF (LST(I) .LT. 3.800) WAlST(I) =150
+IF (LST(I) .GE. 3.800) WAlST(I)=175
+SLF(I)=(TR(I)**2.0 +RS(I)**2.00)
+SLF(I)=SQRT(SLF(I»ITR(I)
+15 UDL(I)=(WAlST(I)*2411000+1.20) *
+SLF(I)
+UDL(I)=(UDL(I)+
+RS(I)*12/1000)* 1.40
+UDL(I)=UDL(I)+LLD(I)* 1.60
+IF «ANS .EQ. 'A') .OR. (ANS .EQ. 'a'»
+THEN
+MST(I)=0.125*UDL(I)*LST(I)**2.0
+ELSE
+MST(I)=0.100*UDL(I)*LST(I)**2.0
+ENDIF
+M=MST(I)
+D=WAlST(I) - 26.00
+CALL STEEi(M,D,FCU,FY ,HECK,AS)
+IF (HECK .EQ. 0) WAlST(I)=
+WAlST(I)+25
+IF(HECK .EQ. 0) GOTO 15
+ASST(I)=AS
+SPAN=LST(I)
+CALL
+DEFLEC(I~,D:AS;FY,SP AN,20.0,HECK,DI,
+ASD,A,FS,FACT)
+ASST('I)=ASD
+IF (HECK .EQ. 0) WAlST(I) =
+WAlST(I) +25
+IF (HECK .EQ. 0) GO TO 15
+ASN=ASST(I)
+CALL RODDIA(ASN, FY, T, RD, SV)Reinforced Concrete Design

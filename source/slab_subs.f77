@@ -87,6 +87,110 @@ C
       RETURN
       END
 C
+      SUBROUTINE RODDIA(AST, FY, T, RD, SV)
+      CHARACTER T*1
+      DIMENSION BD(7)
+      DATA BD / 8.0, 10.0, 12.0, 16.0, 20.0, 25.0, 32.0 /
+      T = 'Y'
+      IF (AST .LE. 0.0) THEN
+         RD = 10.0
+         SV = 200.0
+         RETURN
+      END IF
+      DO 5 I = 1, 7
+         RD = BD(I)
+         SV = 1000.0 * 3.14159 * RD ** 2.0 / (4.0 * AST)
+         IF (SV .GE. 100.0 .AND. SV .LE. 200.0) GO TO 10
+ 5    CONTINUE
+      RD = BD(7)
+      SV = 1000.0 * 3.14159 * RD ** 2.0 / (4.0 * AST)
+      IF (SV .GT. 200.0) SV = 200.0
+      IF (SV .LT. 75.0) SV = 75.0
+ 10   RETURN
+      END
+C
+      SUBROUTINE SIMPLY(N, FCU, FY, L, HN, U, NPL, PL, AP, SR, MSS,
+     +                  V, VB, ASS, DN, AXP, FF, FX)
+      REAL L, MSS
+      INTEGER HECK
+      DIMENSION PL(20), AP(20)
+      V = U * L / 2.0
+      VB = V
+      MSS = U * L ** 2.0 / 8.0
+      IF (NPL .NE. 0) THEN
+         DO 7 I = 1, NPL
+            MSS = MSS + PL(I) * AP(I) * (L - AP(I)) / L
+            V = V + PL(I) * (L - AP(I)) / L
+            VB = VB + PL(I) * AP(I) / L
+ 7       CONTINUE
+      END IF
+ 5    D = HN - 25.0
+      HECK = 1
+      CALL STEEL(MSS, D, FCU, FY, HECK, AST)
+      IF (HECK .EQ. 0) HN = HN + 25
+      IF (HECK .EQ. 0) GO TO 5
+      ASS = AST
+      HECK = 1
+      CALL DEFLEC(N, 2, D, ASS, FY, L, MSS, SR, HECK, DN, ASS, AXP,
+     +            FF, FX)
+      RETURN
+      END
+C
+      SUBROUTINE CONTI(N, NSP, LCO, HN, UCO, NPLC, PLC, ALC, FCU, FY,
+     +                 CTM, CTL, SR, MSC, ASC, MTC, ATC, RCT, DN,
+     +                 ASP, FF, FX)
+      INTEGER NSP, NPLC(20), HECK
+      REAL LCO(20), UCO(20), MSC(20), MTC(20), ASC(20), ATC(20)
+      REAL RCT(20), CTM(20), CTL(20)
+      DIMENSION PLC(20,6), ALC(20,6)
+      NS = NSP + 1
+      DO 10 J = 1, NSP
+         L = LCO(J)
+         W = UCO(J)
+         F = W * L
+         IF (NPLC(J) .NE. 0) THEN
+            DO 5 K = 1, NPLC(J)
+               F = F + PLC(J,K)
+ 5          CONTINUE
+         END IF
+         IF (J .EQ. 1) THEN
+            MSC(J) = F * L / 9.0
+            MTC(J) = -F * L / 9.0
+         ELSE IF (J .EQ. NSP) THEN
+            MSC(J) = F * L / 9.0
+            MTC(J+1) = -F * L / 9.0
+         ELSE
+            MSC(J) = F * L / 16.0
+            MTC(J) = -F * L / 12.0
+            MTC(J+1) = -F * L / 12.0
+         END IF
+         RCT(J) = F / 2.0
+ 10   CONTINUE
+      RCT(1) = RCT(1) + CTL(1)
+      RCT(NS) = RCT(NS) + CTL(NS)
+      MTC(1) = MTC(1) + CTM(1)
+      MTC(NS) = MTC(NS) + CTM(NS)
+ 15   D = HN - 25.0
+      DO 20 J = 1, NSP
+         HECK = 1
+         CALL STEEL(MSC(J), D, FCU, FY, HECK, AST)
+         IF (HECK .EQ. 0) HN = HN + 25
+         IF (HECK .EQ. 0) GO TO 15
+         ASC(J) = AST
+ 20   CONTINUE
+      DO 25 J = 1, NS
+         HECK = 1
+         CALL STEEL(ABS(MTC(J)), D, FCU, FY, HECK, AST)
+         IF (HECK .EQ. 0) HN = HN + 25
+         IF (HECK .EQ. 0) GO TO 15
+         ATC(J) = AST
+ 25   CONTINUE
+      HECK = 1
+      CALL DEFLEC(N, 3, D, ASC(1), FY, LCO(1), MSC(1), SR, HECK, DN,
+     +            ASC(1), ASP, FF, FX)
+      RETURN
+      END
+C
       SUBROUTINE TWTYPE
       OPEN (1, FILE = 'CON')
       WRITE (1, 9) 'ENTER -1- FOR INTERIOR PANEL'
@@ -190,12 +294,16 @@ C
       IF (NPL .NE. 0) THEN
          DO 7 I = 1, NPL
             MC = MC + PL(I) * APC(I)
-7           V = V + PL(I)
+ 7           V = V + PL(I)
       END IF
-5     D = HN - 25.0
+ 5    D = HN - 25.0
       HECK = 1
       CALL STEEL(MC, D, FCU, FY, HECK, AST)
       IF (HECK .EQ. 0) HN = HN + 25
       IF (HECK .EQ. 0) GO TO 5
+      ACT = AST
+      HECK = 1
+      CALL DEFLEC(N, 1, D, ACT, FY, L, MC, SR, HECK, DN, ACT, AXP,
+     +            FF, FX)
       RETURN
       END

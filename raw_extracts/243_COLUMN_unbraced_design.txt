@@ -1,0 +1,139 @@
+=== PAGE 243: COLUMN_unbraced_design ===
+
+C1.20 1.30 1.60'
+1.30 J.50 1.80'WRITE (1,219)' I
+TWRITE0,219), 2Unbraced ColumnIF(CS(I).EQ. I) THEN
+HX= AX(I)
+HY = AY(I)
+ELSE
+HX=DfA(1)
+HY= DIA(I)
+ENDIF3'
+0.90 '
+0.95 '
+1.00 '2
+0.80
+0.85
+0.95I
+0.75
+0.80
+0.90I
+2
+3C
+CC
+C CHECK fUR SLENDERNESS.
+C
+lEX(I) = L(I)*BX(I)*I000.
+LEY(I) = L(I)*BY(I)*IOOO.+'
+WRITE (1,403)
+WRITE (1,249) 'Enter values ofBX &BY'
+READ(I,*)BX(I), OY(I)
+IF(CS(!) .EQ. I)THEN
+IF(TY(I) .EQ. I)THEN
+MIX(I) = 0.00
+MIY(I) = O.()()
+WRITE (1,149)'Enter Column DIMENSIONS (X,Y -
+axis), lENGTH',
++'and LOAD'
+READ (1,*) AX(I),AY(I),L(I),W(I)
+ELSB
+WRITE (I,169)'EnterColumn DIMENSIONS (X,Y­
+axis), LENGTH "
++'LOAD and MOMENTS (Mxx,Myy)'
+READ (1,*) AX(I), AY(I), L(I), W(I), MIX(I),
+MIY(I)
+ENDfF
+ELSEIF (CS(f) .EQ. 2)THEN
+IF(TY(I) .EQ.I)THEN
+MIX(I) = O.()()
+MIY(I)=O.()()
+WRITE (I,I79),EnterColumn DIAMETER,
+LENGTH and LOAD'
+READ 0,·) DIA(I), L(I), W(I)
+ELSE
+WRITE (1,199)'Enter Column DIAMETER,
+LENGTH, LOAD "
++'and MOMENTS (Mxx, Myy)'
+READ(I.*)DfA(I), L(I), W(f), MIX(I), MIY(I)
+END IF
+END IF
+17 CONTINUE
+C
+55500 271= I,NCOl
+C
+5 IF(CS(I) .EQ. I) AG(I) =AX(I).A Y(I)
+IF(CS(l) .EQ.2)AG(I) = 0 .25.PI.DlA(I) •• 2.0C '
+C IF(NI .EQ.I)THEN
+WRITE(1,404)
+WRITE(1,404)
+WRITE(1,404)
+WRITE(1,939)'ENTER JOB REFERENCE'
+READ(I,59)1OB
+WRITE(1,939)'ENTER DESIGN ENGINEER'
+READ(1,59)ENGR
+WRITE(1,939)'ENTER DESIGNING DATE'
+,'i':r'READ(1,59) DATE
+515 WRITE(1,89),Enter CONCRETE & STEEL
+STRESSES,TOTAL NO',
++'OFCOLUMNS, MAX. STEEL % & DJH '
+READ(I,.) rcu,FY,NCOL, PS, DH
+DO171= I,NCOl
+WRITE 0,99) 'R)R COLUMN NO. ',I
+WRITE(1,109) 'Enter Column IDENTIFICATION'
+tREAD(1,119) CID(I)
+WRITE (1,129) 'Enter Column TYPE &SHAPE'
+WRITE (1,139) '(Type - I:AXIAL 2:UNIAXIAl
+3:BlAXlAl) ,
+WRITE 0,139) '(Shape -
+I:RECTANGULARISQUARE 2:CIRCULAR),
+READ(I,·)TY(I), CS(I)
+WRITE (1,259) 'Enter -1- for BRACED col. OR -2-
+forUNBRACED'
+READ(I,.)BRC(I)
+WRITE(1,209)'Obtain values of slenderness ratios
+(OX,BY)',
++'from theTABLE below'
+WRITE (1,403)
+.'WRITE (1,219)' Braced Column
+WRITE (1,219), Top EndCondo Bottom End
+Condition '
+WRITE (1,219),
+WRITE (1,219)'
+WRITE (1,219),
+WRITE (1,219)'
+WRITE (1,219),WRITE (1,219)' 3 1.60 1.80
+WRITE (1,219)' 4 2.20
+WRITE (1,229)'NOTE:-'
+WRITE (J,239),Cond .J:Connected member deeper or
+equal to',
++'Column Size'
+WRITE (J,239)'Cond. 2:Connected member
+shallower than "
++'Column Size'
+WRITE (1,239),Cond .3:Connected member provides
+nominal "
++'restraints'
+WRITE (J,239)'Cond. 4:CoJumn end is unrestrainedREAD(3,·) (BRC(I), I = I,NCOl)
+READ(3,·) (BX(I), 1 =I,NCOl)
+READ(3,·)(BY(I), I = I,NCOl)
+00\71=I,NCOl
+READ(3,119) CID(I)
+IF(eS(I) .BQ .I) THENIF.('I'Y(I).EQ. I) THEN
+MIX(I) :: O.()()
+MIV(!) ::o.()()
+READ(3,·)AX(I),AY(I),L(I) ,W(I)
+BLSE
+READ(3,·)AX(I),AY(I),L(f),W(f),MIX(f),MIY(l)
+SNDIF
+BLSEIF(CS(I) .EQ .2)THEN
+IF(TY(I) .EQ .I) THEN
+MlX(I)=ooe
+MlY(1)=o.()()
+READ(3,·) D1A(I),L(I),W(I)
+BLSE
+READ(3,·) D1A(I),L(I),W(I),MIX(f),MIY(I)
+'ENDIF
+ENDIF
+7CONTINUE
+00 TO555
+SNDtF227COLUMN DESIGN Reinforced Concrete Design
