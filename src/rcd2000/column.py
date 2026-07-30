@@ -190,28 +190,44 @@ class ColumnDesigner:
         h = c.depth if c.depth > 0 else c.bx
         b = c.by if c.by > 0 else c.bx
 
+        # Compute x-axis uniaxial result in a temporary result to avoid
+        # overwriting r's fields before we capture Mux.
+        tmp_x = ColumnResult(
+            column_id=c.column_id, col_type=c.col_type, shape=c.shape,
+            steel_required=0.0, axial_capacity=0.0,
+            moment_capacity_x=0.0, moment_capacity_y=0.0,
+            steel_percent=0.0, heck=0,
+        )
         mem_x = ColumnInput(
             column_id=c.column_id, col_type=2, shape=c.shape,
             load=c.load, bx=c.bx, by=c.by, dia=c.dia,
             depth=c.depth, moment=c.moment_x or c.moment,
         )
-        self._uniaxial(mem_x, ag, r)
-        mux = r.moment_capacity_x
-        steel_x = r.steel_required
+        self._uniaxial(mem_x, ag, tmp_x)
+        mux = tmp_x.moment_capacity_x
+        steel_x = tmp_x.steel_required
 
+        # Compute y-axis uniaxial result in a separate temporary result.
+        tmp_y = ColumnResult(
+            column_id=c.column_id, col_type=c.col_type, shape=c.shape,
+            steel_required=0.0, axial_capacity=0.0,
+            moment_capacity_x=0.0, moment_capacity_y=0.0,
+            steel_percent=0.0, heck=0,
+        )
         mem_y = ColumnInput(
             column_id=c.column_id, col_type=2, shape=c.shape,
             load=c.load, bx=c.by, by=c.bx, dia=c.dia,
             depth=c.depth, moment=c.moment_y or c.moment,
         )
-        self._uniaxial(mem_y, ag, r)
-        muy = r.moment_capacity_y
+        self._uniaxial(mem_y, ag, tmp_y)
+        muy = tmp_y.moment_capacity_y
+        steel_y = tmp_y.steel_required
 
         if mux > 0 and muy > 0:
             alpha = 1.0
             if c.shape == 1:
                 n_bh = c.load * 1000.0 / (b * h)
-                nuz = 0.45 * self.fcu * ag + 0.95 * self.fy * r.steel_required
+                nuz = 0.45 * self.fcu * ag + 0.95 * self.fy * max(steel_x, steel_y)
                 nuz = nuz / 1000.0
                 if abs(nuz - c.load) > 0.001:
                     n_ratio = c.load / nuz
@@ -225,7 +241,10 @@ class ColumnDesigner:
             biaxial_ratio = ((c.moment_x or c.moment) / mux) ** alpha + \
                             ((c.moment_y or c.moment) / muy) ** alpha
             r.biaxial_check_ok = biaxial_ratio <= 1.0
-            r.steel_required = max(steel_x, r.steel_required)
+            r.steel_required = max(steel_x, steel_y)
+            r.axial_capacity = max(tmp_x.axial_capacity, tmp_y.axial_capacity)
+            r.moment_capacity_x = mux
+            r.moment_capacity_y = muy
         else:
             r.biaxial_check_ok = False
             r.heck = 1

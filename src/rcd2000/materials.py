@@ -34,7 +34,7 @@ class Steel:
 
     @property
     def design_stress(self) -> float:
-        return 0.95 * self.fy / self.gamma_m * self.gamma_m
+        return 0.95 * self.fy
 
     @property
     def fy_design(self) -> float:

@@ -76,6 +76,8 @@ class SlabPanelResult:
     support_moments: List[float] = field(default_factory=list)
     support_steels: List[float] = field(default_factory=list)
     support_reactions: List[float] = field(default_factory=list)
+    # Effective depth
+    depth: float = 0.0
 
 
 class SlabDesigner:
