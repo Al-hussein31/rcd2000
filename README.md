@@ -3,45 +3,35 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/rcd2000/"><img src="https://img.shields.io/pypi/v/rcd2000?color=d48c28&label=PyPI" alt="PyPI"></a>
   <a href="https://github.com/Al-hussein31/rcd2000/releases/latest"><img src="https://img.shields.io/github/v/release/Al-hussein31/rcd2000?color=2ea44f&label=Download&logo=github" alt="Download"></a>
   <a href="https://python.org"><img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
-  <a href="https://github.com/Al-hussein31/rcd2000/actions"><img src="https://img.shields.io/github/actions/workflow/status/Al-hussein31/rcd2000/test.yml?branch=main&label=tests" alt="Tests"></a>
+  <a href="https://github.com/Al-hussein31/rcd2000/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/Al-hussein31/rcd2000/build.yml?branch=master&label=build" alt="Build"></a>
   <a href="https://github.com/Al-hussein31/rcd2000"><img src="https://img.shields.io/github/languages/code-size/Al-hussein31/rcd2000" alt="Code size"></a>
-  <a href=""><img src="https://img.shields.io/badge/code-BS%208110%3A1997-orange" alt="BS 8110"></a>
+  <a href="https://en.wikipedia.org/wiki/BS_8110"><img src="https://img.shields.io/badge/code-BS%208110%3A1997-orange" alt="BS 8110"></a>
 </p>
 
 <p align="center">
   <strong>Reinforced concrete design to BS 8110:1997.</strong> Python port of Oyenuga's RCD2000 FORTRAN programs with a professional desktop GUI.
 </p>
 
-<p align="center">
-  <img src="screenshot.png" width="700" alt="RCD2000 GUI Screenshot">
-</p>
-
 RCD2000 is a structural engineering tool that designs beams, columns, slabs, stairs, and foundations in accordance with British Standard BS 8110. It uses the Clapeyron three-moment equation for continuous analysis and strain compatibility for column interaction curves.
 
 ---
 
-## Features
+## Downloads
 
-- **Beam design** — simply supported and continuous beams with full reinforcement design including tension steel, compression steel, and shear links
-- **Column design** — axial, uniaxial, and biaxial columns using strain compatibility interaction curves
-- **Slab design** — cantilever, simply supported, continuous one-way, and two-way slabs
-- **Stair design** — straight-flight waist slabs spanning longitudinally
-- **Foundation design** — square isolated, rectangular isolated, and combined footings
-- **Continuous beam analysis** — Clapeyron three-moment equation solver
-- **FORTRAN-verified** — 44 validation tests matching the original FORTRAN 77 output exactly
-- **Dual interface** — CLI tool for batch processing, Python API for programmatic use, and PySide6 desktop GUI
+| Platform | File | How to use |
+|---|---|---|
+| **Windows** | <a href="https://github.com/Al-hussein31/rcd2000/releases/latest/download/RCD2000-windows.exe">RCD2000.exe</a> | Download and run. No installation needed. |
+| **macOS** | <a href="https://github.com/Al-hussein31/rcd2000/releases/latest/download/RCD2000-macos.zip">RCD2000-macos.zip</a> | Download, unzip, right-click the app → Open (first launch only). |
+| **Linux** | <a href="https://github.com/Al-hussein31/rcd2000/releases/latest/download/RCD2000-linux">RCD2000-linux</a> | Download, `chmod +x`, run. |
+
+Or install via pip (CLI only or with GUI):
 
 ---
 
 ## Installation
-
-### Standalone executable (no Python required)
-
-<a href="https://github.com/Al-hussein31/rcd2000/releases/latest">Download the latest release</a> for your platform (Windows, macOS, or Linux). No Python installation needed — just download and run.
 
 ### Quick install (CLI only)
 
@@ -153,12 +143,12 @@ Full input schemas with all parameters are available in the module documentation
 
 ## Validation
 
-Every design module is validated against the original FORTRAN 77 source code. The test suite confirms:
+Every design module is verified against the original FORTRAN 77 source output. The test suite confirms:
 
-- 44 validation tests all passing
-- Numerical agreement within 1% of FORTRAN output
+- 35 validation tests all passing
+- Numerical agreement within 1% of FORTRAN reference values
 - Edge cases discovered and corrected (including a latent array bug in the original FORTRAN)
-- Punched shear unit mismatch identified and fixed (N/m2 vs N/mm2)
+- Punching shear unit mismatch identified and fixed (N/m² vs N/mm²)
 
 Run the tests:
 

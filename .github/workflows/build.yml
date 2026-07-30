@@ -72,7 +72,7 @@ jobs:
             --hidden-import qtawesome \
             --hidden-import PySide6.QtSvg \
             --hidden-import PySide6.QtXml \
-            build/run_gui.py
+            run_gui.py
 
       - name: Package .app for upload (macOS)
         if: runner.os == 'macOS'
