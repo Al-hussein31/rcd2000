@@ -18,8 +18,9 @@ import logging
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog, QMessageBox,
 )
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import Qt, QStandardPaths
 
+from rcd2000.gui.theme import TEXT_MUTED, FONT_SIZE
 from rcd2000.gui.widgets import button, header_label, mark_invalid
 
 
@@ -87,6 +88,18 @@ class DesignFormPage(QWidget):
         # --- results area ---
         self.results_area = QVBoxLayout()
         layout.addLayout(self.results_area)
+
+        btn_text = self._calc_button_text()
+        self._results_placeholder = QLabel(
+            f"Enter your inputs and click \"{btn_text}\" to see results"
+        )
+        self._results_placeholder.setWordWrap(True)
+        self._results_placeholder.setAlignment(Qt.AlignCenter)
+        self._results_placeholder.setStyleSheet(
+            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['md']}px;"
+            f" padding: 40px 20px; background: transparent;"
+        )
+        layout.addWidget(self._results_placeholder)
         layout.addStretch()
 
     # ── Template methods (overridden by subclasses) ─────────────────
@@ -233,6 +246,7 @@ class DesignFormPage(QWidget):
 
         self.save_btn.setVisible(True)
         self.pdf_btn.setVisible(True)
+        self._results_placeholder.setVisible(False)
 
         if self._history_cb:
             self._history_cb(self.module_name, self._last_input, self._last_result)
@@ -248,6 +262,7 @@ class DesignFormPage(QWidget):
             )
         self.save_btn.setVisible(True)
         self.pdf_btn.setVisible(True)
+        self._results_placeholder.setVisible(False)
 
     # ── Save / export ────────────────────────────────────────────────
 
@@ -278,6 +293,16 @@ class DesignFormPage(QWidget):
         if not path:
             return
 
+        if os.path.exists(path):
+            reply = QMessageBox.question(
+                self, "Confirm Overwrite",
+                f"The file \"{os.path.basename(path)}\" already exists.\n\nOverwrite?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            if reply != QMessageBox.Yes:
+                return
+
         self._last_save_dir = os.path.dirname(path)
 
         try:
@@ -306,6 +331,7 @@ class DesignFormPage(QWidget):
                 w.deleteLater()
         self.save_btn.setVisible(False)
         self.pdf_btn.setVisible(False)
+        self._results_placeholder.setVisible(True)
 
     def set_history_callback(self, cb):
         """Set the callback invoked after a successful calculation."""

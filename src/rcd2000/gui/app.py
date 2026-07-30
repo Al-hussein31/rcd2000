@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QListWidget, QListWidgetItem, QStackedWidget, QLabel, QScrollArea,
     QStatusBar, QSplashScreen, QDialog, QMessageBox, QToolButton, QSizePolicy,
+    QLineEdit,
 )
 from PySide6.QtCore import Qt, QTimer, QSize, QStandardPaths
 from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence, QColor, QFont
@@ -149,6 +150,7 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1000, 720)
         self._history = []
         self._drafts: dict[str, dict] = {}
+        self._dirty_modules: set[str] = set()
         self._last_active_page: int | None = None
         self._persist_timer: QTimer | None = None
         self._sidebar_expanded = True
@@ -158,6 +160,7 @@ class MainWindow(QMainWindow):
         self._setup_shortcuts()
         self._last_active_page = 0
         self._load_state()
+        self._refresh_sidebar_labels()
 
     def _setup_icon(self):
         icon_path = _find_icon("logo.png")
@@ -238,10 +241,10 @@ class MainWindow(QMainWindow):
         title_block.setSpacing(0)
         title_label = QLabel("RCD2000")
         title_label.setStyleSheet(f"color: {TEXT_PRIMARY}; font-size: 16px; font-weight: 700; background: transparent;")
-        subtitle = QLabel("Reinforced Concrete Design · BS 8110")
-        subtitle.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px; background: transparent;")
+        self._header_subtitle = QLabel("Reinforced Concrete Design · BS 8110")
+        self._header_subtitle.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px; background: transparent;")
         title_block.addWidget(title_label)
-        title_block.addWidget(subtitle)
+        title_block.addWidget(self._header_subtitle)
         h.addLayout(title_block)
         h.addStretch()
 
@@ -319,8 +322,20 @@ class MainWindow(QMainWindow):
         # Collapsible "Recent Calculations" section
         self.history_list = HistoryList()
         self.history_list.itemClicked.connect(self._history_clicked)
+        self.history_placeholder = QLabel("  No calculations yet")
+        self.history_placeholder.setStyleSheet(
+            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px;"
+            f" padding: 8px 16px; background: transparent;"
+        )
+        history_container = QWidget()
+        history_container.setStyleSheet("background: transparent;")
+        hc_layout = QVBoxLayout(history_container)
+        hc_layout.setContentsMargins(0, 0, 0, 0)
+        hc_layout.setSpacing(0)
+        hc_layout.addWidget(self.history_list)
+        hc_layout.addWidget(self.history_placeholder)
         self.history_section = CollapsibleSection(
-            "RECENT CALCULATIONS", self.history_list, expanded=True,
+            "RECENT CALCULATIONS", history_container, expanded=True,
         )
         sb.addSpacing(SPACE[3])
         sb.addWidget(self.history_section, 1)
@@ -357,24 +372,23 @@ class MainWindow(QMainWindow):
             self.sidebar.setFixedWidth(SIDEBAR_EXPANDED)
             self._sidebar_title.setVisible(True)
             self.history_section.setVisible(True)
-            for i, (name, _, key, qta_name, glyph) in enumerate(MODULES):
-                item = self.sidebar_list.item(i)
-                item.setText(f"  {name}")
-            new_icon = _qta_icon("fa5s.angle-double-left", TEXT_MUTED)
-            self.collapse_btn.setToolTip("Collapse sidebar")
+            self.history_placeholder.setVisible(self.history_list.count() == 0)
         else:
             self.sidebar.setFixedWidth(SIDEBAR_COLLAPSED)
             self._sidebar_title.setVisible(False)
             self.history_section.setVisible(False)
-            for i, (name, _, key, qta_name, glyph) in enumerate(MODULES):
-                item = self.sidebar_list.item(i)
-                item.setText("")
-            new_icon = _qta_icon("fa5s.angle-double-right", TEXT_MUTED)
-            self.collapse_btn.setToolTip("Expand sidebar")
+        self._refresh_sidebar_labels()
+        new_icon = _qta_icon(
+            "fa5s.angle-double-left" if self._sidebar_expanded else "fa5s.angle-double-right",
+            TEXT_MUTED,
+        )
         if new_icon:
             self.collapse_btn.setIcon(new_icon)
         else:
-            self.collapse_btn.setText("»" if not self._sidebar_expanded else "«")
+            self.collapse_btn.setText("«" if self._sidebar_expanded else "»")
+        self.collapse_btn.setToolTip(
+            "Collapse sidebar" if self._sidebar_expanded else "Expand sidebar"
+        )
 
     def _setup_shortcuts(self):
         about_action = QAction("About", self)
@@ -391,6 +405,11 @@ class MainWindow(QMainWindow):
         collapse_action.setShortcut(QKeySequence("Ctrl+B"))
         collapse_action.triggered.connect(self._toggle_sidebar)
         self.addAction(collapse_action)
+
+        switcher_action = QAction("Quick Switch Module", self)
+        switcher_action.setShortcut(QKeySequence("Ctrl+K"))
+        switcher_action.triggered.connect(self._show_quick_switcher)
+        self.addAction(switcher_action)
 
     def keyPressEvent(self, event):
         if event.key() in SHORTCUT_KEYS and event.modifiers() & Qt.ControlModifier:
@@ -410,6 +429,7 @@ class MainWindow(QMainWindow):
         self.stack.setCurrentIndex(new_idx)
         self._restore_draft(new_idx)
         self._last_active_page = new_idx
+        self._header_subtitle.setText(f"{MODULES[new_idx][0]} · BS 8110")
 
     def _on_stack_changed(self, idx: int):
         """Sync sidebar selection when stack changes programmatically."""
@@ -423,7 +443,12 @@ class MainWindow(QMainWindow):
         page = self.pages[idx]
         name = MODULES[idx][0]
         try:
-            self._drafts[name] = page.get_state()
+            state = page.get_state()
+            self._drafts[name] = state
+            # Mark as having unsaved draft if any non-default values exist
+            if any(v not in (0, 0.0, "", 0.0) for v in state.values() if not isinstance(v, (list, dict))):
+                self._dirty_modules.add(name)
+                self._refresh_sidebar_labels()
         except Exception:
             logging.error(f"Failed to capture draft for {name}", exc_info=True)
         self._schedule_persist()
@@ -480,6 +505,8 @@ class MainWindow(QMainWindow):
         """
         self._history = []
         self.history_list.clear()
+        self._dirty_modules.clear()
+        self._refresh_sidebar_labels()
         from datetime import datetime
         for rec in data:
             module_name = rec.get("module", "Unknown")
@@ -505,6 +532,7 @@ class MainWindow(QMainWindow):
             self.history_list.insertItem(0, display)
             while self.history_list.count() > 20:
                 self.history_list.takeItem(self.history_list.count() - 1)
+        self.history_placeholder.setVisible(len(data) == 0)
 
     # ── Disk persistence ──────────────────────────────────────────────
 
@@ -615,8 +643,11 @@ class MainWindow(QMainWindow):
         label = f"{display_name} · {summary} · {ts}" if summary else f"{display_name}  ·  {ts}"
         self._history.append((display_name, inp, result, state_dict))
         self.history_list.insertItem(0, label)
+        self.history_placeholder.setVisible(False)
         while self.history_list.count() > 20:
             self.history_list.takeItem(self.history_list.count() - 1)
+        self._dirty_modules.discard(display_name)
+        self._refresh_sidebar_labels()
         self.status.showMessage(f"{display_name} designed - {ts}")
         self._schedule_persist()
 
@@ -648,6 +679,77 @@ class MainWindow(QMainWindow):
                         )
                     self.status.showMessage(f"Recalled {module_name} from history")
                     break
+
+    def _show_quick_switcher(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Quick Switch Module")
+        dlg.setFixedSize(360, 280)
+        dlg.setStyleSheet(f"background: {BG_MID}; color: {TEXT_PRIMARY};")
+        layout = QVBoxLayout(dlg)
+        layout.setSpacing(SPACE[2])
+
+        search = QLineEdit()
+        search.setPlaceholderText("Type to filter…")
+        search.setStyleSheet(
+            f"background: {BG_LIGHT}; color: {TEXT_PRIMARY};"
+            f" border: 1px solid {BORDER}; border-radius: {RADIUS_SM}px;"
+            f" padding: 8px 12px; font-size: {FONT_SIZE['base']}px;"
+        )
+        layout.addWidget(search)
+
+        lst = QListWidget()
+        lst.setStyleSheet(
+            f"QListWidget {{ background: transparent; border: none;"
+            f"  font-size: {FONT_SIZE['base']}px; }}"
+            f"QListWidget::item {{ padding: 8px 12px; color: {TEXT_SECONDARY};"
+            f"  border-radius: {RADIUS_SM}px; }}"
+            f"QListWidget::item:hover {{ background: {BG_LIGHT}; color: {TEXT_PRIMARY}; }}"
+            f"QListWidget::item:selected {{ background: {ACCENT_SOFT}; color: {ACCENT}; }}"
+        )
+        for name, *_ in MODULES:
+            lst.addItem(f"  {name}")
+        lst.setCurrentRow(0)
+        layout.addWidget(lst)
+
+        hint = QLabel("Esc to close  ·  Enter to switch")
+        hint.setStyleSheet(
+            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px; background: transparent;"
+        )
+        hint.setAlignment(Qt.AlignRight)
+        layout.addWidget(hint)
+
+        def _filter(text):
+            for i in range(lst.count()):
+                item = lst.item(i)
+                match = text.lower() in item.text().lower()
+                item.setHidden(not match)
+            for i in range(lst.count()):
+                if not lst.item(i).isHidden():
+                    lst.setCurrentRow(i)
+                    break
+
+        search.textChanged.connect(_filter)
+        search.returnPressed.connect(
+            lambda: dlg.accept() if lst.currentItem() and not lst.currentItem().isHidden() else None
+        )
+        lst.itemDoubleClicked.connect(lambda: dlg.accept())
+
+        search.setFocus()
+        if dlg.exec() == QDialog.Accepted:
+            idx = lst.currentRow()
+            if 0 <= idx < len(MODULES) and not lst.currentItem().isHidden():
+                self.sidebar_list.setCurrentRow(idx)
+                self.status.showMessage(f"Switched to {MODULES[idx][0]}")
+
+    def _refresh_sidebar_labels(self):
+        for idx in range(len(MODULES)):
+            name = MODULES[idx][0]
+            item = self.sidebar_list.item(idx)
+            if self._sidebar_expanded:
+                prefix = "• " if name in self._dirty_modules else "  "
+                item.setText(f"{prefix}{name}")
+            else:
+                item.setText("")
 
     def _toggle_history(self):
         self.history_section.set_expanded(not self.history_section._expanded)
