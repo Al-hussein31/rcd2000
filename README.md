@@ -15,6 +15,10 @@
   <strong>Reinforced concrete design to BS 8110:1997.</strong> Python port of Oyenuga's RCD2000 FORTRAN programs with a professional desktop GUI.
 </p>
 
+<p align="center">
+  <img src="screenshot.png" width="700" alt="RCD2000 GUI Screenshot">
+</p>
+
 RCD2000 is a structural engineering tool that designs beams, columns, slabs, stairs, and foundations in accordance with British Standard BS 8110. It uses the Clapeyron three-moment equation for continuous analysis and strain compatibility for column interaction curves.
 
 ---
