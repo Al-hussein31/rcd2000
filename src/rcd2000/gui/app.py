@@ -180,7 +180,8 @@ class MainWindow(QMainWindow):
         splitter.setChildrenCollapsible(False)
 
         sidebar = QWidget()
-        sidebar.setFixedWidth(180)
+        sidebar.setMinimumWidth(160)
+        sidebar.setMaximumWidth(300)
         sidebar.setStyleSheet(f"background: {SIDEBAR_BG}; border-right: 1px solid {BORDER};")
         sb_layout = QVBoxLayout(sidebar)
         sb_layout.setContentsMargins(0, 12, 0, 12)
@@ -244,6 +245,7 @@ class MainWindow(QMainWindow):
         splitter.addWidget(pages_container)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
+        splitter.setSizes([180, 820])
 
         main_v = QVBoxLayout()
         main_v.setContentsMargins(0, 0, 0, 0)

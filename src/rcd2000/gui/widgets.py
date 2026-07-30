@@ -176,6 +176,7 @@ class Card(QFrame):
     def __init__(self, title="", parent=None):
         super().__init__(parent)
         self.setStyleSheet(CARD_STYLE)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._layout = QVBoxLayout(self)
         self._layout.setContentsMargins(16, 16, 16, 16)
         self._layout.setSpacing(12)
@@ -317,8 +318,9 @@ def make_table(headers: list, rows: list[list]) -> QTableWidget:
     t.setAlternatingRowColors(True)
     t.verticalHeader().setVisible(False)
     t.horizontalHeader().setStretchLastSection(True)
-    for col in range(len(headers)):
-        t.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeToContents)
+    t.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+    for col in range(1, len(headers)):
+        t.horizontalHeader().setSectionResizeMode(col, QHeaderView.Stretch)
     for r, row in enumerate(rows):
         for c, val in enumerate(row):
             item = QTableWidgetItem(str(val))

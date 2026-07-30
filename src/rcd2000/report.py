@@ -252,8 +252,9 @@ def export_pdf(text: str, output_path: str):
     """Export a plain-text report to PDF using QPrinter + QTextDocument."""
     try:
         from PySide6.QtWidgets import QApplication
-        from PySide6.QtGui import QTextDocument
+        from PySide6.QtGui import QTextDocument, QPageSize, QPageLayout
         from PySide6.QtPrintSupport import QPrinter
+        from PySide6.QtCore import QMarginsF
     except ImportError:
         raise ImportError("PySide6 is required for PDF export. Install with: pip install rcd2000[gui]")
 
@@ -274,11 +275,11 @@ def export_pdf(text: str, output_path: str):
     printer = QPrinter(QPrinter.HighResolution)
     printer.setOutputFormat(QPrinter.PdfFormat)
     printer.setOutputFileName(output_path)
-    printer.setPageSize(QPrinter.A4)
-    printer.setPageMargins(15, 15, 15, 15, QPrinter.Millimeter)
+    printer.setPageSize(QPageSize(QPageSize.A4))
+    printer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout.Millimeter)
 
-    doc.setPageSize(printer.pageRect(QPrinter.DevicePixel).size())
-    doc.print(printer)
+    doc.setPageSize(printer.pageRect(QPrinter.Point).size())
+    doc.print_(printer)
 
 
 def _escape_html(text: str) -> str:
