@@ -44,6 +44,7 @@ class DesignFormPage(QWidget):
         self._status_cb = None
         self._last_save_dir = None
         self._history_viewed = False
+        self._suppress_history = False
         self._error_widgets: list = []
         self._build_ui()
 
@@ -248,12 +249,19 @@ class DesignFormPage(QWidget):
         self.pdf_btn.setVisible(True)
         self._results_placeholder.setVisible(False)
 
-        if self._history_cb:
+        if self._history_cb and not self._suppress_history:
             self._history_cb(self.module_name, self._last_input, self._last_result)
 
     def _show_result(self, result):
-        """Display a stored result dict without re-running the calculation."""
+        """Display a stored result (dataclass or dict) without re-running.
+
+        If *result* is None the placeholder is shown instead of crashing —
+        the page may have been restored from an old state file that did
+        not persist results.
+        """
         self._clear_results()
+        if result is None:
+            return
         rows = self._build_result_rows(result)
         if rows:
             from rcd2000.gui.widgets import make_table

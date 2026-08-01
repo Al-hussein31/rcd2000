@@ -10,9 +10,6 @@ from textual.message import Message
 from textual.widgets import (
     Button,
     Input,
-    RadioButton,
-    RadioSet,
-    Select,
     Static,
     TabbedContent,
     TabPane,
@@ -45,7 +42,7 @@ def _point_loads(val: str) -> list[tuple[float, float]]:
 
 class FieldRow(Horizontal):
     def __init__(self, label: str, widget: Any, unit: str = "") -> None:
-        super().__init__()
+        super().__init__(classes="field-row")
         self._label_text = label
         self._field_widget = widget
         self._unit_text = unit
@@ -103,21 +100,21 @@ def _input(placeholder: str = "") -> Input:
     return Input(placeholder=placeholder)
 
 
-def _select(options: list[tuple[str, str]], default: str = "") -> Select:
-    return Select(options, value=default or options[0][1])
-
-
-def _radio(options: list[str], default_index: int = 0) -> RadioSet:
-    buttons = [RadioButton(opt, value=(i == default_index)) for i, opt in enumerate(options)]
-    return RadioSet(*buttons)
+def _choice(default: str = "1") -> Input:
+    """A multiple-choice field, DOS-style: you type the option number
+    instead of navigating a dropdown or radio list. Every field in the
+    form now works the same way - type a value, Tab to the next one."""
+    return Input(placeholder=default)
 
 
 class ColumnScreen(ScrollableContainer):
-    _widgets: dict[str, Any] = {}
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._widgets: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
-        col_type = _radio(["Axial Load", "Uniaxial Bending", "Biaxial Bending"], 0)
-        shape = _radio(["Rectangular", "Circular"], 0)
+        col_type = _choice("1")
+        shape = _choice("1")
         field_id = _input("e.g. C1")
         load = _input("0")
         bx = _input("0")
@@ -154,16 +151,10 @@ class ColumnScreen(ScrollableContainer):
 
         yield Static("Column Design  —  BS 8110 Clause 3.8", classes="section-title")
         yield SectionBox(
-            "Column Type",
-            col_type,
-        )
-        yield SectionBox(
-            "Shape",
-            shape,
-        )
-        yield SectionBox(
             "General",
             FieldRow("Column ID", field_id),
+            FieldRow("Column Type (1=Axial 2=Uniaxial 3=Biaxial)", col_type),
+            FieldRow("Shape (1=Rectangular 2=Circular)", shape),
         )
         yield SectionBox(
             "Loading",
@@ -203,10 +194,16 @@ class ColumnScreen(ScrollableContainer):
         def _f(key: str, default: float = 0) -> float:
             v = w[key].value
             return float(v) if v else default
+        def _i(key: str, default: int = 1) -> int:
+            v = w[key].value
+            try:
+                return int(v) if v else default
+            except ValueError:
+                return default
         return {
             "column_id": w["col_id"].value or "C1",
-            "col_type": w["col_type"].pressed_index + 1,
-            "shape": w["shape"].pressed_index + 1,
+            "col_type": _i("col_type", 1),
+            "shape": _i("shape", 1),
             "load": _f("load", 0),
             "bx": _f("bx", 0),
             "by": _f("by", 0),
@@ -229,7 +226,9 @@ class ColumnScreen(ScrollableContainer):
 
 
 class BeamScreen(ScrollableContainer):
-    _widgets: dict[str, Any] = {}
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._widgets: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
         beam_id = _input("e.g. B1")
@@ -242,8 +241,8 @@ class BeamScreen(ScrollableContainer):
         fcu = _input("25")
         fy = _input("460")
         fyv = _input("250")
-        ty1 = _select([("Pinned", "0"), ("Fixed", "1")], "1")
-        ty2 = _select([("Pinned", "0"), ("Fixed", "1")], "1")
+        ty1 = _choice("1")
+        ty2 = _choice("1")
         cant_load_1 = _input("0")
         cant_moment_1 = _input("0")
         cant_load_2 = _input("0")
@@ -289,8 +288,8 @@ class BeamScreen(ScrollableContainer):
         )
         yield SectionBox(
             "End Conditions",
-            FieldRow("End 1 Type", ty1),
-            FieldRow("End 2 Type", ty2),
+            FieldRow("End 1 Type (0=Pinned 1=Fixed)", ty1),
+            FieldRow("End 2 Type (0=Pinned 1=Fixed)", ty2),
             FieldRow("Cantilever Load 1", cant_load_1, "kN"),
             FieldRow("Cantilever Moment 1", cant_moment_1, "kN.m"),
             FieldRow("Cantilever Load 2", cant_load_2, "kN"),
@@ -354,10 +353,12 @@ class BeamScreen(ScrollableContainer):
 
 
 class SlabScreen(ScrollableContainer):
-    _widgets: dict[str, Any] = {}
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._widgets: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
-        panel_type = _radio(["Cantilever", "Simply Supported", "Continuous (one-way)", "Two-way"], 0)
+        panel_type = _choice("1")
         panel_id = _input("e.g. S1")
         depth = _input("200")
         fcu = _input("25")
@@ -375,7 +376,7 @@ class SlabScreen(ScrollableContainer):
         span_pls = _input("(load,dist);(load,dist) / (load,dist);(load,dist)")
         cant_moments = _input("0")
         cant_loads = _input("0")
-        case = _select([(f"Case {i}", str(i)) for i in range(1, 10)], "1")
+        case = _choice("1")
 
         self._widgets.update(dict(
             panel_type=panel_type, panel_id=panel_id, depth=depth,
@@ -388,10 +389,10 @@ class SlabScreen(ScrollableContainer):
         ))
 
         yield Static("Slab Design  —  BS 8110 Clause 3.5 & 3.6", classes="section-title")
-        yield SectionBox("Panel Type", FieldRow("Type", panel_type))
         yield SectionBox(
             "General",
             FieldRow("Panel ID", panel_id),
+            FieldRow("Type (1=Cantilever 2=Simply Supp. 3=Continuous 4=Two-way)", panel_type),
             FieldRow("Slab Depth", depth, "mm"),
             FieldRow("Span", span, "m"),
             FieldRow("Long Span ly", ly, "m"),
@@ -437,7 +438,7 @@ class SlabScreen(ScrollableContainer):
             return w[key].value or default
         return {
             "panel_id": w["panel_id"].value or "S1",
-            "panel_type": w["panel_type"].pressed_index + 1,
+            "panel_type": int(w["panel_type"].value or "1"),
             "depth": _f("depth", 200),
             "fcu": _f("fcu", 25),
             "fy": _f("fy", 460),
@@ -465,7 +466,9 @@ class SlabScreen(ScrollableContainer):
 
 
 class StairScreen(ScrollableContainer):
-    _widgets: dict[str, Any] = {}
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._widgets: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
         stair_id = _input("e.g. ST1")
@@ -517,11 +520,13 @@ class StairScreen(ScrollableContainer):
 
 
 class BaseScreen(ScrollableContainer):
-    _widgets: dict[str, Any] = {}
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._widgets: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
-        base_type = _radio(["Square Isolated", "Rectangular Isolated", "Combined Footing"], 0)
-        col_shape = _radio(["Rectangular", "Circular"], 0)
+        base_type = _choice("1")
+        col_shape = _choice("1")
         base_id = _input("e.g. F1")
         load_v = _input("0")
         pb_v = _input("150")
@@ -542,9 +547,12 @@ class BaseScreen(ScrollableContainer):
         ))
 
         yield Static("Foundation Design  —  BS 8110 Clause 3.7", classes="section-title")
-        yield SectionBox("Base Type", FieldRow("Type", base_type))
-        yield SectionBox("Column Shape", FieldRow("Shape", col_shape))
-        yield SectionBox("General", FieldRow("Base ID", base_id))
+        yield SectionBox(
+            "General",
+            FieldRow("Base ID", base_id),
+            FieldRow("Base Type (1=Square 2=Rectangular 3=Combined)", base_type),
+            FieldRow("Column Shape (1=Rectangular 2=Circular)", col_shape),
+        )
         yield SectionBox("Loading", FieldRow("Axial Load", load_v, "kN"))
         yield SectionBox("Material Properties", FieldRow("fcu", fcu_v, "N/mm²"), FieldRow("fy", fy_v, "N/mm²"), FieldRow("Allowable Bearing Pressure", pb_v, "kN/m²"))
         yield SectionBox("Column Dimensions", FieldRow("Dimension a1", a1, "mm"), FieldRow("Dimension a2", a2, "mm"), FieldRow("Diameter (circular)", dia_v, "mm"), FieldRow("Dowel Diameter", dowel, "mm"))
@@ -562,8 +570,8 @@ class BaseScreen(ScrollableContainer):
             return float(w[key].value or str(default))
         return {
             "base_id": w["base_id"].value or "F1",
-            "base_type": w["base_type"].pressed_index + 1,
-            "col_type": w["col_shape"].pressed_index + 1,
+            "base_type": int(w["base_type"].value or "1"),
+            "col_type": int(w["col_shape"].value or "1"),
             "load": _f("load", 0),
             "pb": _f("pb", 150),
             "fcu": _f("fcu", 25),
@@ -587,13 +595,15 @@ class BaseScreen(ScrollableContainer):
 
 
 class ContinuousBeamScreen(ScrollableContainer):
-    _widgets: dict[str, Any] = {}
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._widgets: dict[str, Any] = {}
 
     def compose(self) -> ComposeResult:
         n_supports = _input("2")
         n_members = _input("1")
-        end1_type = _select([("Pinned", "0"), ("Fixed", "1")], "0")
-        end2_type = _select([("Pinned", "0"), ("Fixed", "1")], "0")
+        end1_type = _choice("0")
+        end2_type = _choice("0")
         end1_cl = _input("0")
         end1_cm = _input("0")
         end2_cl = _input("0")
@@ -626,8 +636,8 @@ class ContinuousBeamScreen(ScrollableContainer):
         )
         yield SectionBox(
             "End Conditions",
-            FieldRow("End 1 Type", end1_type),
-            FieldRow("End 2 Type", end2_type),
+            FieldRow("End 1 Type (0=Pinned 1=Fixed)", end1_type),
+            FieldRow("End 2 Type (0=Pinned 1=Fixed)", end2_type),
             FieldRow("Cantilever Load 1", end1_cl, "kN"),
             FieldRow("Cantilever Moment 1", end1_cm, "kN.m"),
             FieldRow("Cantilever Load 2", end2_cl, "kN"),
@@ -716,10 +726,10 @@ class RCD2000TUI(App):
     TITLE = "RCD2000 — Reinforced Concrete Design to BS 8110"
 
     BINDINGS: ClassVar[list[Binding]] = [
-        Binding("f1", "action_show_help", "Help"),
-        Binding("f2", "action_calculate", "Calculate"),
-        Binding("f3", "action_clear_form", "Clear"),
-        Binding("f4", "action_toggle_report", "Report"),
+        Binding("f1", "show_help", "Help"),
+        Binding("f2", "calculate", "Calculate"),
+        Binding("f3", "clear_form", "Clear"),
+        Binding("f4", "toggle_report", "Report"),
         Binding("f10", "quit", "Quit"),
         Binding("q", "quit", "Quit"),
     ]
@@ -741,17 +751,29 @@ class RCD2000TUI(App):
         self.refresh_footer()
         self.set_timer(0.1, self._focus_first_input)
 
+    @on(TabbedContent.TabActivated)
+    def on_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        # Whenever the user switches tabs (click or keyboard), move focus
+        # into the newly visible form. Without this, focus silently stays
+        # on a widget in the now-hidden tab and keystrokes appear to do
+        # nothing - this was the main source of "where do I type" confusion.
+        self.call_after_refresh(self._focus_first_input)
+
     def _focus_first_input(self) -> None:
         try:
             screen = self.get_current_screen()
-            first = screen.query(Input).first()
-            first.focus()
+            focusable = screen.query("Input")
+            if focusable:
+                focusable.first().focus()
         except Exception:
             pass
 
     def refresh_footer(self) -> None:
         footer = self.query_one("#footer", Static)
-        footer.update(" F1:Help  F2:Calculate  F3:Clear  F4:Report  F10:Quit")
+        footer.update(
+            " ↹ Tab/Shift+Tab: move between fields   ⏎ Enter: next field   "
+            "F1:Help  F2:Calculate  F3:Clear  F4:Report  F10:Quit"
+        )
 
     def get_current_screen(self) -> ScrollableContainer:
         tabs = self.query_one(TabbedContent)
@@ -763,10 +785,12 @@ class RCD2000TUI(App):
     def action_show_help(self) -> None:
         self.notify(
             "RCD2000 TUI — Design to BS 8110\n\n"
-            "Fill in the form fields for each module and press F2 or Calculate.\n"
-            "Use Tab/Shift+Tab to navigate fields, Enter to select options.\n"
-            "F4 toggles the detailed report view.\n"
-            "Results show key design values below the form.",
+            "Every field is a plain text box - type a value and press Tab\n"
+            "(or Enter) to move to the next one, like the original DOS tool.\n"
+            "For multiple-choice fields (Type, Shape, End Condition, etc.),\n"
+            "just type the option number shown in the field's label.\n\n"
+            "F2 or Calculate runs the design. F4 toggles the full report.\n"
+            "Results show below the form.",
             title="Help",
             timeout=10,
         )
@@ -789,12 +813,14 @@ class RCD2000TUI(App):
     def action_clear_form(self) -> None:
         screen = self.get_current_screen()
         if isinstance(screen, ScrollableContainer):
-            for w in screen.query_widgets(Input):
+            for w in screen.query(Input):
                 w.value = ""
         self.current_result = None
         self.current_report_text = ""
         self.current_inputs = {}
         self.query_one("#results-panel", ResultsPanel).clear()
+        self.notify("Form cleared", severity="information")
+        self._focus_first_input()
 
     def action_toggle_report(self) -> None:
         if self.current_result is not None:
@@ -833,6 +859,13 @@ class RCD2000TUI(App):
         else:
             for line in rp.render_result(result):
                 rp.mount(line)
+
+    @on(Input.Submitted)
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        # Pressing Enter in a field previously did nothing visible, which
+        # read as "I typed and nothing happened." Now it just advances to
+        # the next field, matching how people expect forms to behave.
+        self.screen.focus_next()
 
     @on(Button.Pressed, "#calc-btn")
     def on_calc_button(self) -> None:

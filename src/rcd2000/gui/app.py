@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import logging
+from types import SimpleNamespace
 from dataclasses import asdict, is_dataclass
 from importlib.resources import files
 
@@ -50,6 +51,16 @@ SHORTCUT_KEYS = {
 }
 
 _PERSIST_FILE = "rcd2000_state.json"
+
+
+def _ns_from_dict(data):
+    """Recursively convert a dict (as loaded from the JSON state file)
+    into a namespace tree so pages can use attribute access on results."""
+    if isinstance(data, dict):
+        return SimpleNamespace(**{k: _ns_from_dict(v) for k, v in data.items()})
+    if isinstance(data, list):
+        return [_ns_from_dict(v) for v in data]
+    return data
 
 
 def _persist_path() -> str:
@@ -671,8 +682,21 @@ class MainWindow(QMainWindow):
                     try:
                         page._history_viewed = True
                         if state_dict:
+                            # Full widget state available: re-run the design so
+                            # the page has fresh dataclass results (and saving
+                            # the report afterwards works).
                             page.set_state(state_dict)
-                        page._show_result(result)
+                            page._suppress_history = True
+                            try:
+                                page._on_calculate()
+                            finally:
+                                page._suppress_history = False
+                        else:
+                            # Legacy entry without saved widget state.
+                            # Show the stored result when we have one.
+                            if isinstance(result, dict):
+                                result = _ns_from_dict(result)
+                            page._show_result(result)
                     except Exception as exc:
                         logging.error(
                             f"Failed to restore history for {module_name}", exc_info=True

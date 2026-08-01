@@ -30,6 +30,9 @@ RCD2000 is a structural engineering tool that designs beams, columns, slabs, sta
 | **Windows** | <a href="https://github.com/Al-hussein31/rcd2000/releases/latest/download/RCD2000-windows.exe">RCD2000-windows.exe</a> | Installer — run it, follow the setup wizard, launch from Start Menu. |
 | **macOS** | <a href="https://github.com/Al-hussein31/rcd2000/releases/latest/download/RCD2000-macos.dmg">RCD2000-macos.dmg</a> | Open the DMG, drag the app to your Applications folder. See `HOW_TO_OPEN.txt` for first-launch steps. |
 | **Linux** | <a href="https://github.com/Al-hussein31/rcd2000/releases/latest/download/RCD2000-linux.AppImage">RCD2000-linux.AppImage</a> | `chmod +x RCD2000-linux.AppImage && ./RCD2000-linux.AppImage` |
+| **Terminal UI (any OS)** | `pip install "rcd2000[tui]"` | No binary needed — the TUI runs in any terminal on Windows, macOS, or Linux. See [TUI install](#terminal-ui-tui) below. |
+
+> **How downloads work:** the Windows/macOS/Linux files above are GUI app bundles built automatically by the [GitHub Actions workflow](.github/workflows/build.yml) on every `v*` tag and attached to the [Releases page](https://github.com/Al-hussein31/rcd2000/releases). The TUI is the same Python package — there is nothing extra to download; install it with pip and run `rcd2000-tui`.
 
 Or install via pip (CLI only or with GUI):
 
@@ -50,7 +53,7 @@ pip install "rcd2000[gui]"
 rcd2000-gui
 ```
 
-### TUI (terminal interface)
+### Terminal UI (TUI)
 
 ```bash
 pip install "rcd2000[tui]"
@@ -83,6 +86,14 @@ pip install "rcd2000[gui,dev]"   # GUI + everything (add tui)
 ```bash
 rcd2000-gui
 ```
+
+### Terminal UI (TUI)
+
+```bash
+rcd2000-tui
+```
+
+Run it in any terminal — no window server needed, works over SSH too.
 
 ### CLI
 
@@ -162,7 +173,7 @@ Full input schemas with all parameters are available in the module documentation
 
 Every design module is verified against the original FORTRAN 77 source output. The test suite confirms:
 
-- 35 validation tests all passing
+- 64 automated tests all passing (35 design validation + 29 state/persistence)
 - Numerical agreement within 1% of FORTRAN reference values
 - Edge cases discovered and corrected (including a latent array bug in the original FORTRAN)
 - Punching shear unit mismatch identified and fixed (N/m² vs N/mm²)
@@ -170,7 +181,7 @@ Every design module is verified against the original FORTRAN 77 source output. T
 Run the tests:
 
 ```bash
-pytest tests/ -v
+python3 -m pytest tests/ -v
 ```
 
 ---
