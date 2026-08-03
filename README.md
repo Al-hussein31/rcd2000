@@ -38,6 +38,77 @@ Or install via pip (CLI only or with GUI):
 
 ---
 
+## Installing Python
+
+Before you can use RCD2000 (either the TUI or the GUI), you need Python 3.11 or newer installed on your computer. Follow the instructions for your operating system below. Even if you have never used a terminal before, these steps will get you running.
+
+### Windows
+
+1. Go to [https://www.python.org/downloads/](https://www.python.org/downloads/)
+2. Click the big yellow button **"Download Python 3.x.x"** (the latest version)
+3. Run the downloaded `.exe` file
+4. **Important:** On the first screen of the installer, check the box that says **"Add python.exe to PATH"** at the bottom — this is the most common mistake beginners make
+5. Click **"Install Now"** and wait for it to finish
+6. Open **Terminal** (press `Win` key, type `Terminal`, hit Enter)
+7. Type this command and press Enter:
+   ```bash
+   python --version
+   ```
+   You should see something like `Python 3.12.x`. If you do, Python is installed correctly.
+
+> **If `python` opens the Microsoft Store instead:** Search "Manage app execution aliases" in the Windows Start menu, turn off the Python aliases, and restart your terminal.
+
+### macOS
+
+1. Open **Terminal** (press `Cmd + Space`, type `Terminal`, hit Enter)
+2. Check if Python is already installed:
+   ```bash
+   python3 --version
+   ```
+   If you see a version number (3.11 or newer), you're good — skip to step 5.
+3. If Python is not installed or is too old, download the installer from [https://www.python.org/downloads/](https://www.python.org/downloads/)
+4. Run the downloaded `.pkg` file and follow the installation wizard
+5. Verify in Terminal:
+   ```bash
+   python3 --version
+   ```
+
+> **Note:** On macOS, always use `python3` (not `python`) and `pip3` (not `pip`) to make sure you're using Python 3.
+
+### Linux
+
+Most Linux distributions come with Python pre-installed. Open a terminal and check:
+
+```bash
+python3 --version
+```
+
+If Python 3 is already installed, you're ready to go. If not, install it with your distribution's package manager:
+
+```bash
+# Ubuntu / Debian
+sudo apt update
+sudo apt install python3 python3-pip
+
+# Fedora / RHEL
+sudo dnf install python3 python3-pip
+
+# Arch Linux
+sudo pacman -S python python-pip
+```
+
+### Online (no install needed)
+
+If you just want to try Python in your browser without installing anything, you can use a free online Python interpreter:
+
+- **[Python Playground](https://python-playground.com/online-python-interpreter)** — runs Python 3 in your browser, supports pip packages
+- **[Playcode](https://playcode.io/python-compiler)** — full Python IDE in the browser, supports NumPy, Matplotlib, and more
+- **[PyRun](https://pyrun.xyz/)** — lightweight, fast, runs entirely in your browser via WebAssembly
+
+> **Note:** Online interpreters are great for testing Python code, but the RCD2000 TUI needs a real terminal to run. For the full TUI experience, install Python locally using the instructions above.
+
+---
+
 ## Installation
 
 ### Quick install (CLI only)
