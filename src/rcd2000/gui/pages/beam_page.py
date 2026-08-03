@@ -59,8 +59,8 @@ class BeamPage(DesignFormPage):
         self._auto_clear_invalid(self.b_hf)
 
         c3 = Card("Supports & Members")
-        self.n_supports = spin_int(2, 10, 2)
-        self.n_members = spin_int(1, 9, 1)
+        self.n_supports = spin_int(2, 999999999, 2)
+        self.n_members = spin_int(1, 999999999, 1)
         self.ty1 = combo(["Pinned", "Fixed"])
         self.ty2 = combo(["Pinned", "Fixed"])
         self.n_members.valueChanged.connect(self._sync_members)
@@ -103,11 +103,11 @@ class BeamPage(DesignFormPage):
                 f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; "
                 f"background: transparent;"
             )
-            length = spinbox(1, 50, 0.5, 5, 2, " m")
-            udl = spinbox(0, 500, 5, 0, 1, " kN/m")
-            wt = spinbox(0, 200, 5, 0, 1)
-            wb = spinbox(0, 200, 5, 0, 1)
-            ab = spinbox(0, 10, 0.5, 0, 2)
+            length = spinbox(0, 999999999, 0.5, 5, 2, " m")
+            udl = spinbox(0, 999999999, 5, 0, 1, " kN/m")
+            wt = spinbox(0, 999999999, 5, 0, 1)
+            wb = spinbox(0, 999999999, 5, 0, 1)
+            ab = spinbox(0, 999999999, 0.5, 0, 2)
             wt.setToolTip("Triangularly distributed load magnitude (kN/m), peak at left support")
             wb.setToolTip("Trapezoidally distributed load magnitude (kN/m), varies along member")
             ab.setToolTip("Distance (m) from left support to load application point")

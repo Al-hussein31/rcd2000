@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QSizePolicy, QToolButton,
 )
-from PySide6.QtCore import Qt, QRectF
+from PySide6.QtCore import Qt, QRectF, QEvent, QObject
 from PySide6.QtGui import QPainter, QColor, QPen, QPolygonF, QFont
 
 try:
@@ -54,8 +54,23 @@ def _base_spin_style(invalid: bool = False) -> str:
     )
 
 
+def _no_wheel(widget):
+    """Install an event filter that ignores mouse wheel events so the
+    spinbox value doesn't change when the user scrolls over it."""
+
+    class _WheelGuard(QObject):
+        def eventFilter(self, obj, event):
+            if event.type() == QEvent.Wheel:
+                event.ignore()
+                return True
+            return False
+
+    guard = _WheelGuard(widget)
+    widget.installEventFilter(guard)
+
+
 def spinbox(
-    min_v=0.0, max_v=999999.0, step=1.0, default=0.0,
+    min_v=0.0, max_v=999999999.0, step=1.0, default=0.0,
     decimals=1, suffix="",
 ) -> QDoubleSpinBox:
     s = QDoubleSpinBox()
@@ -67,6 +82,7 @@ def spinbox(
         s.setSuffix(suffix)
     s.setProperty("invalid", False)
     s.setMinimumHeight(30)
+    _no_wheel(s)
     s.setStyleSheet(
         f"QDoubleSpinBox {{ {_base_spin_style()} }}"
         f"QDoubleSpinBox:hover {{ border-color: {BORDER_LIGHT}; }}"
@@ -76,12 +92,13 @@ def spinbox(
     return s
 
 
-def spin_int(min_v=0, max_v=9999, default=0) -> QSpinBox:
+def spin_int(min_v=0, max_v=999999999, default=0) -> QSpinBox:
     s = QSpinBox()
     s.setRange(min_v, max_v)
     s.setValue(default)
     s.setProperty("invalid", False)
     s.setMinimumHeight(30)
+    _no_wheel(s)
     s.setStyleSheet(
         f"QSpinBox {{ {_base_spin_style()} }}"
         f"QSpinBox:hover {{ border-color: {BORDER_LIGHT}; }}"
@@ -360,14 +377,14 @@ def load_combo_group(gk_default=0.0, qk_default=0.0):
     gk_row = QHBoxLayout()
     gk_lbl = label("Gk (dead):", secondary=True, size=FONT_SIZE["sm"])
     gk_lbl.setFixedWidth(90)
-    gk_spin = spinbox(0, 500, 1, gk_default, 1, " kN/m²")
+    gk_spin = spinbox(0, 999999999, 1, gk_default, 1, " kN/m²")
     gk_row.addWidget(gk_lbl)
     gk_row.addWidget(gk_spin, 1)
 
     qk_row = QHBoxLayout()
     qk_lbl = label("Qk (imposed):", secondary=True, size=FONT_SIZE["sm"])
     qk_lbl.setFixedWidth(90)
-    qk_spin = spinbox(0, 500, 1, qk_default, 1, " kN/m²")
+    qk_spin = spinbox(0, 999999999, 1, qk_default, 1, " kN/m²")
     qk_row.addWidget(qk_lbl)
     qk_row.addWidget(qk_spin, 1)
 

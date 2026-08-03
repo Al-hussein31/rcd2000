@@ -39,7 +39,7 @@ class SlabPage(DesignFormPage):
         # AUDIT: depth 100–500 mm is fine. But for two-way slabs, ly must be
         # >= span for the coefficient tables to be valid. The page allows
         # ly=0 which would cause a division-by-zero in _design_twoway.
-        self.s_depth = spinbox(100, 500, 10, 150, 0)
+        self.s_depth = spinbox(100, 999999999, 10, 150, 0)
         # AUDIT: span 0.5–20 m is reasonable. For two-way, lx must be the
         # short span — the engine takes min(span, ly) but the user might
         # enter them backwards with no warning.
@@ -49,7 +49,7 @@ class SlabPage(DesignFormPage):
         self.s_ly = spinbox(0, 20, 0.5, 5, 2, " m")
         # AUDIT: case 1–9 is valid for two-way only. For other slab types,
         # case is ignored — no harm but potentially confusing.
-        self.s_case = spin_int(1, 9, 1)
+        self.s_case = spin_int(1, 999999999, 1)
         self.s_case.setToolTip(
             "Two-way slab edge restraint case (1-9). Each case corresponds to a "
             "different arrangement of simply supported and continuous edges, "
@@ -77,7 +77,7 @@ class SlabPage(DesignFormPage):
         self._auto_clear_invalid(self.qk)
 
         c3 = Card("Continuous Slab Spans")
-        self.cont_nspan = spin_int(1, 8, 3)
+        self.cont_nspan = spin_int(1, 999999999, 3)
         self.cont_nspan.valueChanged.connect(self._sync_cont_spans)
         c3.add_row("Number of Spans:", self.cont_nspan)
 
@@ -100,8 +100,8 @@ class SlabPage(DesignFormPage):
         for i in range(n):
             h = QHBoxLayout()
             h.addWidget(label(f"S{i+1}:", secondary=True, size=12))
-            le = spinbox(1, 20, 0.5, 4, 2, " m")
-            ud = spinbox(0, 100, 5, 10, 1, " kN/m")
+            le = spinbox(0, 999999999, 0.5, 4, 2, " m")
+            ud = spinbox(0, 999999999, 5, 10, 1, " kN/m")
             self._auto_clear_invalid(le)
             self._auto_clear_invalid(ud)
             h.addWidget(le)

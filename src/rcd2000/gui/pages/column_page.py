@@ -28,16 +28,16 @@ class ColumnPage(DesignFormPage):
         # AUDIT: load range 0–50000 kN may exceed what a rectangular column
         # of the given dimensions can carry — the engine will return heck=1,
         # but the user gets no early guidance. Consider adding a pre-check.
-        self.load = spinbox(0, 50000, 100, 1000)
+        self.load = spinbox(0, 999999999, 100, 1000)
         # AUDIT: bx/by range 100–2000 mm is fine, but for circular columns
         # these are ignored — dia is used instead. No conflict.
-        self.bx = spinbox(100, 2000, 25, 300, 0)
-        self.by = spinbox(100, 2000, 25, 300, 0)
+        self.bx = spinbox(100, 999999999, 25, 300, 0)
+        self.by = spinbox(100, 999999999, 25, 300, 0)
         # AUDIT: dia 100–2000 mm is physically large but not invalid.
-        self.dia = spinbox(100, 2000, 25, 300, 0)
+        self.dia = spinbox(100, 999999999, 25, 300, 0)
         # AUDIT: depth 100–2000 mm — for circular columns, depth must equal
         # dia for the engine to work correctly. The page doesn't enforce this.
-        self.depth = spinbox(100, 2000, 25, 300, 0)
+        self.depth = spinbox(100, 999999999, 25, 300, 0)
         c2.add_row("Axial Load (kN):", self.load)
         c2.add_row("b/h width - x (mm):", self.bx)
         c2.add_row("b/h width - y (mm):", self.by)
@@ -63,9 +63,9 @@ class ColumnPage(DesignFormPage):
         self._auto_clear_invalid(self.col_fy)
 
         c4 = Card("Moments")
-        self.moment_x = spinbox(0, 5000, 10, 0)
-        self.moment_y = spinbox(0, 5000, 10, 0)
-        self.moment = spinbox(0, 5000, 10, 0)
+        self.moment_x = spinbox(0, 999999999, 10, 0)
+        self.moment_y = spinbox(0, 999999999, 10, 0)
+        self.moment = spinbox(0, 999999999, 10, 0)
         c4.add_row("Mx (kN·m):", self.moment_x)
         c4.add_row("My (kN·m):", self.moment_y)
         c4.add_row("M (uniaxial, kN·m):", self.moment)

@@ -16,21 +16,21 @@ class StairPage(DesignFormPage):
         c = Card("Stair Geometry & Loading")
         # AUDIT: span 1–12 m is fine. The engine assumes waist = span/20,
         # so very short spans produce very thin slabs (<100mm min enforced).
-        self.s_span = spinbox(1, 12, 0.5, 4, 2, " m")
+        self.s_span = spinbox(0, 999999999, 0.5, 4, 2, " m")
         # AUDIT: tread 150–400 mm and rise 100–250 mm — rise/tread ratio
         # not enforced. BS 8110 doesn't strictly govern this, but
         # comfort guidelines suggest rise/tread <= 0.75.
-        self.s_tread = spinbox(150, 400, 5, 250, 0)
-        self.s_rise = spinbox(100, 250, 5, 175, 0)
+        self.s_tread = spinbox(0, 999999999, 5, 250, 0)
+        self.s_rise = spinbox(0, 999999999, 5, 175, 0)
         c.add_row("Span (m):", self.s_span)
         c.add_row("Tread (mm):", self.s_tread)
         c.add_row("Rise (mm):", self.s_rise)
 
         # AUDIT: imposed_load 0–20 kN/m² and spl 0–10 kN/m² are fine.
         # wld 0–50 kN/m³ — default 0 means self-weight is the only DL.
-        self.s_imp = spinbox(0, 20, 0.5, 1.5, 2, " kN/m²")
-        self.s_spl = spinbox(0, 10, 0.5, 0, 2, " kN/m²")
-        self.s_wld = spinbox(0, 50, 1, 0, 1, " kN/m³")
+        self.s_imp = spinbox(0, 999999999, 0.5, 1.5, 2, " kN/m²")
+        self.s_spl = spinbox(0, 999999999, 0.5, 0, 2, " kN/m²")
+        self.s_wld = spinbox(0, 999999999, 1, 0, 1, " kN/m³")
         self.s_imp.setToolTip("Imposed (live) load on the staircase (kN/m²)")
         self.s_spl.setToolTip("Superimposed dead load beyond self-weight (kN/m²), e.g. finishes")
         self.s_wld.setToolTip(
