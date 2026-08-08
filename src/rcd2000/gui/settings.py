@@ -35,6 +35,8 @@ class UserProfile:
     default_output_dir: str = ""
     date_format: str = "%a. %d/%m/%y."
     city: str = ""
+    #: Release tag the user dismissed ("v1.2.0") - never nag twice.
+    dismissed_update: str = ""
 
     def is_complete(self) -> bool:
         # Full name + Design Engineer are the profile's required identity:

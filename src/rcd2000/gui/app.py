@@ -39,6 +39,7 @@ from rcd2000.gui.history_page import HistoryPage
 from rcd2000.gui.settings_page import SettingsPage
 from rcd2000.gui.job_header_dialog import JobHeaderDialog
 from rcd2000.gui.workbench import Workbench
+from rcd2000.gui.update_banner import UpdateChecker, UpdateBanner
 
 
 def _find_icon(name: str) -> str:
@@ -128,6 +129,44 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_shortcuts()
         self._maybe_show_first_run()
+        self._start_update_check()
+
+    # ── update check ────────────────────────────────────────────────
+
+    def _start_update_check(self):
+        """Check GitHub Releases in a background thread; show a banner
+        if a newer build exists.  Never blocks startup, never disturbs
+        on network failure - the check is silent either way."""
+        profile = SettingsStore.load()
+        self._dismissed_update = profile.dismissed_update or ""
+        self._update_checker = UpdateChecker(__version__, self)
+        self._update_checker.result.connect(self._on_update_result)
+        self._update_checker.finished.connect(self._update_checker.deleteLater)
+        self._update_checker.start()
+
+    def _on_update_result(self, available: bool, latest_tag: str):
+        if not available:
+            return
+        # Never nag twice about the same release the user dismissed.
+        if latest_tag == self._dismissed_update:
+            return
+        self._show_update_banner(latest_tag)
+
+    def _show_update_banner(self, latest_tag: str):
+        if self._update_banner is not None:
+            self._update_banner.deleteLater()
+        self._update_banner = UpdateBanner(latest_tag)
+        self._update_banner.dismissed.connect(self._on_update_dismissed)
+        self._outer_layout.insertWidget(1, self._update_banner)
+
+    def _on_update_dismissed(self, latest_tag: str):
+        self._dismissed_update = latest_tag
+        profile = SettingsStore.load()
+        profile.dismissed_update = latest_tag
+        try:
+            SettingsStore.save(profile)
+        except Exception:
+            logging.error("Failed to save dismissed update", exc_info=True)
 
     # ── plumbing ────────────────────────────────────────────────────
 
@@ -153,10 +192,13 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         outer = QVBoxLayout(central)
+        self._outer_layout = outer
         outer.setContentsMargins(0, 0, 0, 0)
         outer.setSpacing(0)
 
         outer.addWidget(self._build_header())
+
+        self._update_banner: UpdateBanner | None = None
 
         self._status_banner = QLabel()
         self._status_banner.setFixedHeight(36)
