@@ -294,6 +294,9 @@ class MainWindow(QMainWindow):
 
     def _on_profile_changed(self):
         self.home.refresh_welcome()
+        # Saved → go Home instantly so the personalized greeting shows.
+        self._header_subtitle.setText("Reinforced Concrete Design · BS 8110")
+        self._root.setCurrentWidget(self.home)
 
     # ── job lifecycle ───────────────────────────────────────────────
 
