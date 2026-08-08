@@ -149,7 +149,7 @@ class ColumnScreen(ScrollableContainer):
         self._widgets["fcu"] = fcu
         self._widgets["fy"] = fy
 
-        yield Static("Column Design  —  BS 8110 Clause 3.8", classes="section-title")
+        yield Static("Column Design  -  BS 8110 Clause 3.8", classes="section-title")
         yield SectionBox(
             "General",
             FieldRow("Column ID", field_id),
@@ -266,7 +266,7 @@ class BeamScreen(ScrollableContainer):
             member_npl=member_npl, member_pl=member_pl,
         ))
 
-        yield Static("Continuous Beam Design  —  BS 8110 Clause 3.4", classes="section-title")
+        yield Static("Continuous Beam Design  -  BS 8110 Clause 3.4", classes="section-title")
         yield SectionBox(
             "General",
             FieldRow("Beam ID", beam_id),
@@ -388,7 +388,7 @@ class SlabScreen(ScrollableContainer):
             case=case,
         ))
 
-        yield Static("Slab Design  —  BS 8110 Clause 3.5 & 3.6", classes="section-title")
+        yield Static("Slab Design  -  BS 8110 Clause 3.5 & 3.6", classes="section-title")
         yield SectionBox(
             "General",
             FieldRow("Panel ID", panel_id),
@@ -485,7 +485,7 @@ class StairScreen(ScrollableContainer):
             imposed=imposed, spl=spl, wld=wld, cw=cw,
         ))
 
-        yield Static("Stair Design  —  BS 8110 Clause 3.9", classes="section-title")
+        yield Static("Stair Design  -  BS 8110 Clause 3.9", classes="section-title")
         yield SectionBox("General", FieldRow("Stair ID", stair_id))
         yield SectionBox("Geometry", FieldRow("Span", span, "m"), FieldRow("Tread", tread, "mm"), FieldRow("Rise", rise, "mm"))
         yield SectionBox("Loading", FieldRow("Imposed Load", imposed, "kN/m²"), FieldRow("Sup. Dead Load", spl, "kN/m²"), FieldRow("Waterproof Load", wld, "kN/m²"), FieldRow("Concrete Weight", cw, "kN/m³"))
@@ -546,7 +546,7 @@ class BaseScreen(ScrollableContainer):
             a1=a1, a2=a2, dia=dia_v, dowel=dowel, h=h_v, l1=l1, l2=l2,
         ))
 
-        yield Static("Foundation Design  —  BS 8110 Clause 3.7", classes="section-title")
+        yield Static("Foundation Design  -  BS 8110 Clause 3.7", classes="section-title")
         yield SectionBox(
             "General",
             FieldRow("Base ID", base_id),
@@ -628,7 +628,7 @@ class ContinuousBeamScreen(ScrollableContainer):
             member_npl=member_npl, member_pl=member_pl,
         ))
 
-        yield Static("Continuous Beam Analysis  —  Clapeyron Three-Moment", classes="section-title")
+        yield Static("Continuous Beam Analysis  -  Clapeyron Three-Moment", classes="section-title")
         yield SectionBox(
             "General",
             FieldRow("No. of Supports", n_supports),
@@ -723,7 +723,7 @@ SCREENS: list[tuple[str, type]] = [
 
 class RCD2000TUI(App):
     CSS_PATH = "styles.tcss"
-    TITLE = "RCD2000 — Reinforced Concrete Design to BS 8110"
+    TITLE = "RCD2000 - Reinforced Concrete Design to BS 8110"
 
     BINDINGS: ClassVar[list[Binding]] = [
         Binding("f1", "show_help", "Help"),
@@ -740,7 +740,7 @@ class RCD2000TUI(App):
     show_report_flag: reactive[bool] = reactive(False)
 
     def compose(self) -> ComposeResult:
-        yield Static(" RCD2000 v1.0.0  —  Reinforced Concrete Design to BS 8110  —  Terminal UI", id="header")
+        yield Static(" RCD2000 v1.0.0  -  Reinforced Concrete Design to BS 8110  -  Terminal UI", id="header")
         with TabbedContent(id="tabs"):
             for name, screen_cls in SCREENS:
                 yield TabPane(name, screen_cls(), id=name.lower().replace(" ", "_"))
@@ -784,7 +784,7 @@ class RCD2000TUI(App):
 
     def action_show_help(self) -> None:
         self.notify(
-            "RCD2000 TUI — Design to BS 8110\n\n"
+            "RCD2000 TUI - Design to BS 8110\n\n"
             "Every field is a plain text box - type a value and press Tab\n"
             "(or Enter) to move to the next one, like the original DOS tool.\n"
             "For multiple-choice fields (Type, Shape, End Condition, etc.),\n"

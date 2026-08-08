@@ -64,18 +64,18 @@ class ContinuousBeamPage(DesignFormPage):
                 f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; "
                 f"background: transparent;"
             )
-            # AUDIT: length 1–50 m is fine. inertia 0.0001–10 m⁴ is
+            # AUDIT: length 1-50 m is fine. inertia 0.0001-10 m⁴ is
             # very small but the engine uses it directly in the stiffness
-            # matrix — zero would cause division-by-zero, but the min
+            # matrix - zero would cause division-by-zero, but the min
             # prevents that.
             length = spinbox(0, 999999999, 0.5, 5, 2, " m")
             inertia = spinbox(0, 999999999, 0.001, 0.001, 4)
-            # AUDIT: e_mod 0.1–10 — relative modulus, fine as-is.
+            # AUDIT: e_mod 0.1-10 - relative modulus, fine as-is.
             e_mod = spinbox(0, 999999999, 0.1, 1, 1)
             udl = spinbox(0, 999999999, 5, 0, 1, " kN/m")
             inertia = spinbox(0, 999999999, 0.001, 0.001, 4)
             inertia.setToolTip("Second moment of area (m⁴) for stiffness calculations")
-            # AUDIT: e_mod 0.1–10 — relative modulus, fine as-is.
+            # AUDIT: e_mod 0.1-10 - relative modulus, fine as-is.
             e_mod = spinbox(0, 999999999, 0.1, 1, 1)
             e_mod.setToolTip("Relative modulus of elasticity (E / E_concrete)")
             udl = spinbox(0, 999999999, 5, 0, 1, " kN/m")
@@ -83,7 +83,7 @@ class ContinuousBeamPage(DesignFormPage):
             wb = spinbox(0, 999999999, 5, 0, 1)
             wt.setToolTip("Triangularly distributed load magnitude (kN/m), peak at left support")
             wb.setToolTip("Trapezoidally distributed load magnitude (kN/m), varies along member")
-            # AUDIT: ab 0–10 m — trapezoidal load position. If ab > length,
+            # AUDIT: ab 0-10 m - trapezoidal load position. If ab > length,
             # the load is outside the member. The engine clamps alpha =
             # ab/l which could exceed 1.0, producing invalid results.
             ab = spinbox(0, 999999999, 0.5, 0, 2)

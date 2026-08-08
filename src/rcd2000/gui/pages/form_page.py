@@ -4,9 +4,9 @@ Provides the common widget scaffolding (calc button, save/PDF buttons,
 results area, history callback) and a template-method pattern so
 subclasses only implement:
 
-  - build_inputs(self, layout)  – add page-specific input Cards
-  - calculate(self) -> (input_obj, result_obj)  – run the design engine
-  - format_report(self, input_obj, result_obj) -> str  – delegate to report
+  - build_inputs(self, layout)  - add page-specific input Cards
+  - calculate(self) -> (input_obj, result_obj)  - run the design engine
+  - format_report(self, input_obj, result_obj) -> str  - delegate to report
 
 Subclasses must also set ``self.module_name`` (used for save filenames
 and history labels).
@@ -28,8 +28,8 @@ class DesignFormPage(QWidget):
     """Base class for all design form pages.
 
     Subclasses implement ``build_inputs``, ``calculate``, and
-    ``format_report``.  Everything else — button wiring, result display,
-    save-to-file, PDF export, history callback — is handled here.
+    ``format_report``.  Everything else - button wiring, result display,
+    save-to-file, PDF export, history callback - is handled here.
     """
 
     #: Human-readable name used for save filenames and history labels.
@@ -156,7 +156,11 @@ class DesignFormPage(QWidget):
         return []
 
     def _set_combo_int(self, combo_widget, value: int) -> None:
-        """Set a QComboBox to the item whose text matches *value*."""
+        """Set a QComboBox to the item whose text matches *value*.
+
+        Falls back to typing the value into an editable combo so custom
+        (non-listed) strengths are preserved.
+        """
         for i in range(combo_widget.count()):
             try:
                 if int(combo_widget.itemText(i)) == value:
@@ -164,6 +168,8 @@ class DesignFormPage(QWidget):
                     return
             except (ValueError, TypeError):
                 pass
+        if combo_widget.isEditable():
+            combo_widget.setEditText(str(value))
 
     # ── Validation ──────────────────────────────────────────────────
 
@@ -233,7 +239,7 @@ class DesignFormPage(QWidget):
             logging.error(f"{self.module_name} design failed", exc_info=True)
             QMessageBox.warning(
                 self, "Design Error",
-                f"Could not complete the design — check your inputs: {exc}",
+                f"Could not complete the design - check your inputs: {exc}",
             )
             return
 
@@ -255,7 +261,7 @@ class DesignFormPage(QWidget):
     def _show_result(self, result):
         """Display a stored result (dataclass or dict) without re-running.
 
-        If *result* is None the placeholder is shown instead of crashing —
+        If *result* is None the placeholder is shown instead of crashing -
         the page may have been restored from an old state file that did
         not persist results.
         """

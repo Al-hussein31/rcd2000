@@ -1,13 +1,13 @@
-"""Design tokens for RCD2000 GUI — amber-on-dark engineering aesthetic.
+"""Design tokens for RCD2000 GUI - amber-on-dark engineering aesthetic.
 
 Refined palette: avoids pure black (per Material dark-theme guidance),
 uses a warm off-white for text, and keeps a single desaturated accent
 so the eye always knows where to look. Spacing/typography are scales,
-not magic numbers — reference SPACE/FONT_SIZE from calling code.
+not magic numbers - reference SPACE/FONT_SIZE from calling code.
 """
 
 # ── Colour palette ────────────────────────────────────────────────
-# Base surfaces (blue-black tint, not true black — kinder on the eyes,
+# Base surfaces (blue-black tint, not true black - kinder on the eyes,
 # avoids the "OLED void" look while still reading as dark mode)
 BG_DARKEST = "#0E1013"
 BG_DARK    = "#15171C"   # main canvas
@@ -60,7 +60,7 @@ FONT_SIZE = {
     "lg": 16, "xl": 18, "xxl": 22, "display": 26,
 }
 
-# ── GroupBox (legacy — prefer Card) ─────────────────────────────────
+# ── GroupBox (legacy - prefer Card) ─────────────────────────────────
 GROUP_BOX_STYLE = (
     "QGroupBox {"
     f"  color: {ACCENT}; font-weight: 600; border: 1px solid {BORDER};"
@@ -72,7 +72,7 @@ GROUP_BOX_STYLE = (
 )
 
 # ── Card style ───────────────────────────────────────────────────────
-# Flat + subtle border instead of a heavy top-accent bar on every card —
+# Flat + subtle border instead of a heavy top-accent bar on every card -
 # reserves color for things that actually need attention.
 CARD_STYLE = (
     f"background: {BG_CARD}; border: 1px solid {BORDER};"

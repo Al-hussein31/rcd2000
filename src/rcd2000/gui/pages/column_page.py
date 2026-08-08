@@ -25,17 +25,17 @@ class ColumnPage(DesignFormPage):
         self._auto_clear_invalid(self.shape)
 
         c2 = Card("Loads & Geometry")
-        # AUDIT: load range 0–50000 kN may exceed what a rectangular column
-        # of the given dimensions can carry — the engine will return heck=1,
+        # AUDIT: load range 0-50000 kN may exceed what a rectangular column
+        # of the given dimensions can carry - the engine will return heck=1,
         # but the user gets no early guidance. Consider adding a pre-check.
         self.load = spinbox(0, 999999999, 100, 1000)
-        # AUDIT: bx/by range 100–2000 mm is fine, but for circular columns
-        # these are ignored — dia is used instead. No conflict.
+        # AUDIT: bx/by range 100-2000 mm is fine, but for circular columns
+        # these are ignored - dia is used instead. No conflict.
         self.bx = spinbox(100, 999999999, 25, 300, 0)
         self.by = spinbox(100, 999999999, 25, 300, 0)
-        # AUDIT: dia 100–2000 mm is physically large but not invalid.
+        # AUDIT: dia 100-2000 mm is physically large but not invalid.
         self.dia = spinbox(100, 999999999, 25, 300, 0)
-        # AUDIT: depth 100–2000 mm — for circular columns, depth must equal
+        # AUDIT: depth 100-2000 mm - for circular columns, depth must equal
         # dia for the engine to work correctly. The page doesn't enforce this.
         self.depth = spinbox(100, 999999999, 25, 300, 0)
         c2.add_row("Axial Load (kN):", self.load)

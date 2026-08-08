@@ -36,19 +36,19 @@ class SlabPage(DesignFormPage):
         self._auto_clear_invalid(self.slab_fy)
 
         c2 = Card("Panel Geometry & Loading")
-        # AUDIT: depth 100–500 mm is fine. But for two-way slabs, ly must be
+        # AUDIT: depth 100-500 mm is fine. But for two-way slabs, ly must be
         # >= span for the coefficient tables to be valid. The page allows
         # ly=0 which would cause a division-by-zero in _design_twoway.
         self.s_depth = spinbox(100, 999999999, 10, 150, 0)
-        # AUDIT: span 0.5–20 m is reasonable. For two-way, lx must be the
-        # short span — the engine takes min(span, ly) but the user might
+        # AUDIT: span 0.5-20 m is reasonable. For two-way, lx must be the
+        # short span - the engine takes min(span, ly) but the user might
         # enter them backwards with no warning.
         self.s_span = spinbox(0.5, 20, 0.5, 4, 2, " m")
-        # AUDIT: ly 0–20 m — ly=0 with two-way selected causes division by
+        # AUDIT: ly 0-20 m - ly=0 with two-way selected causes division by
         # zero (k = ly/lx). Should enforce ly >= span for two-way.
         self.s_ly = spinbox(0, 20, 0.5, 5, 2, " m")
-        # AUDIT: case 1–9 is valid for two-way only. For other slab types,
-        # case is ignored — no harm but potentially confusing.
+        # AUDIT: case 1-9 is valid for two-way only. For other slab types,
+        # case is ignored - no harm but potentially confusing.
         self.s_case = spin_int(1, 999999999, 1)
         self.s_case.setToolTip(
             "Two-way slab edge restraint case (1-9). Each case corresponds to a "
@@ -161,7 +161,7 @@ class SlabPage(DesignFormPage):
                 errors.append("Ly (long span) must be > 0 for two-way slabs")
                 self._mark_invalid(self.s_ly)
             if self.s_case.value() < 1 or self.s_case.value() > 9:
-                errors.append("Case must be 1–9 for two-way slabs")
+                errors.append("Case must be 1-9 for two-way slabs")
                 self._mark_invalid(self.s_case)
         if ptype == 2:
             for i, w in enumerate(self._cont_span_widgets):

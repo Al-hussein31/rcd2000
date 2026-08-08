@@ -1,6 +1,6 @@
 """Reusable widget factories for the RCD2000 GUI.
 
-API-compatible with the previous version — every function page files
+API-compatible with the previous version - every function page files
 already import (spinbox, combo, button, Card, make_table, etc.) keeps
 the same name and signature. Only the visuals underneath changed, so
 existing pages get the refresh for free.
@@ -149,7 +149,8 @@ def combo(items: list) -> QComboBox:
 def material_combo(values: list) -> QComboBox:
     c = QComboBox()
     c.addItems([str(v) for v in values])
-    c.setEditable(False)
+    c.setEditable(True)
+    c.setInsertPolicy(QComboBox.NoInsert)
     c.setCurrentIndex(0)
     c.setMinimumHeight(30)
     c.setStyleSheet(_combo_style())
@@ -221,7 +222,7 @@ def divider() -> QFrame:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Card — flat surface, subtle border (color reserved for real signals)
+# Card - flat surface, subtle border (color reserved for real signals)
 # ═══════════════════════════════════════════════════════════════════
 
 class Card(QFrame):
@@ -266,7 +267,7 @@ class Card(QFrame):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Collapsible section — click header to expand/collapse, no animation
+# Collapsible section - click header to expand/collapse, no animation
 # (per design brief: clear and instant beats flashy motion)
 # ═══════════════════════════════════════════════════════════════════
 
@@ -412,14 +413,14 @@ def load_combo_group(gk_default=0.0, qk_default=0.0):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Results panel — replaces QTableWidget with a lighter, on-brand
+# Results panel - replaces QTableWidget with a lighter, on-brand
 # label/value/status layout (your data isn't spreadsheet data, so it
 # shouldn't carry a spreadsheet widget's weight or default chrome).
 # ═══════════════════════════════════════════════════════════════════
 
 def make_table(headers: list, rows: list) -> QWidget:
     """Kept the same name/signature as before so existing pages need
-    zero changes — but now builds a lightweight custom panel instead
+    zero changes - but now builds a lightweight custom panel instead
     of QTableWidget, which is faster to render and easier to theme
     consistently with the rest of the app."""
     panel = QFrame()
@@ -467,7 +468,7 @@ def make_table(headers: list, rows: list) -> QWidget:
                 cell_l.addWidget(val)
                 row_l.addWidget(cell, stretch)
             else:
-                lbl = QLabel(str(val) if val != "" else "—")
+                lbl = QLabel(str(val) if val != "" else "-")
                 lbl.setAlignment(align | Qt.AlignVCenter)
                 weight = "font-weight: 600;" if c == 0 else ""
                 color = TEXT_PRIMARY if c == 0 else TEXT_SECONDARY

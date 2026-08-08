@@ -1,4 +1,4 @@
-"""Formatted text report builder for RCD2000 — MISHA-style output.
+"""Formatted text report builder for RCD2000 - MISHA-style output.
 
 Matches the original FORTRAN RCD2000 output format:
   - 80-character width
@@ -52,7 +52,14 @@ class Report:
 
     def job_header(self, job_ref: str = "", date: str = "",
                    designer: str = "", checker: str = ""):
-        """Job reference, date, designer, checker block."""
+        """Job reference, date, designer, checker block.
+
+        Skips entirely when no values are supplied: the GUI writes the
+        real header block once per export, so pages must not emit an
+        empty skeleton on top of it.
+        """
+        if not any((job_ref, date, designer, checker)):
+            return
         self._job_line("Job  Ref:", job_ref, "Date   :", date)
         self._job_line("Designed:", designer, "Checked:", checker)
         self.blank(1)
@@ -219,7 +226,7 @@ class Report:
         self.blank(1)
         job = module_name or "structural element"
         self.lines.append(f"{' ' * 5}Well done! You've designed a {job} to BS 8110.")
-        self.lines.append(f"{' ' * 5}Built with RCD2000 — github.com/Al-hussein31/rcd2000")
+        self.lines.append(f"{' ' * 5}Built with RCD2000 - github.com/Al-hussein31/rcd2000")
         self.blank(2)
 
     # ── Units block (continuous beam) ────────────────────────────
@@ -298,7 +305,7 @@ def _escape_html(text: str) -> str:
 
 def format_slab(p, r, job: str = "", date: str = "",
                 designer: str = "") -> str:
-    """Formatted report for a slab result — matches MISHA1/MISHA2."""
+    """Formatted report for a slab result - matches MISHA1/MISHA2."""
     types = {1: "Cantilever Slab", 2: "Simply Supported",
              3: "Continuous (One-Way)", 4: "Two Way Case"}
     ptype = types.get(r.panel_type, "Unknown")
@@ -313,7 +320,7 @@ def format_slab(p, r, job: str = "", date: str = "",
     rep.blank(2)
 
     if r.panel_type == 2:
-        # Simply supported — matches MISHA1
+        # Simply supported - matches MISHA1
         rep.label_val("Span  Length", p.span * 1000, "mm", label_width=20)
         rep.label_val("Span  UDL", p.udl, "kN/m", label_width=20)
         rep.label_val("No. of Point Loads", p.npl, "", label_width=20)
@@ -328,7 +335,7 @@ def format_slab(p, r, job: str = "", date: str = "",
         rep.blank(1)
 
     elif r.panel_type == 4:
-        # Two-way — matches MISHA2
+        # Two-way - matches MISHA2
         rep.label_val("lx", p.span * 1000, "mm", label_width=8, value_width=8)
         rep.label_val("ly", p.ly * 1000, "mm", label_width=8, value_width=8)
         rep.label_val("ly/lx", p.ly / p.span if p.span else 0, "", label_width=8, value_width=8)
@@ -471,7 +478,7 @@ def format_beam(bi, r, job: str = "", date: str = "",
         indent=5,
     )
 
-    # A. MOMENTS — Span reinforcement
+    # A. MOMENTS - Span reinforcement
     rep.section("A", "MOMENTS")
     rep.sub_section("SPAN REINFORCEMENTS")
     rep.table_with_sub(
@@ -636,6 +643,6 @@ def format_continuous_beam(cb_input, r, job: str = "",
 
     rep.blank(1)
     rep.lines.append(f"{' ' * 5}Well done! You've analysed a continuous beam to BS 8110.")
-    rep.lines.append(f"{' ' * 5}Built with RCD2000 — github.com/Al-hussein31/rcd2000")
+    rep.lines.append(f"{' ' * 5}Built with RCD2000 - github.com/Al-hussein31/rcd2000")
     rep.blank(2)
     return rep.build()

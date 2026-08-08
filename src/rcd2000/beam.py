@@ -352,7 +352,7 @@ class BeamDesigner:
                     supports=support_results,
                     heck=1,
                 )
-            # Fallback: all spans broke (over-reinforced) — return with heck=0
+            # Fallback: all spans broke (over-reinforced) - return with heck=0
             return BeamResult(
                 beam_id=b.beam_id,
                 spans=span_results,

@@ -39,12 +39,12 @@ class BeamPage(DesignFormPage):
         self._auto_clear_invalid(self.beam_fyv)
 
         c2 = Card("Section Geometry")
-        # AUDIT: bf (flange width) range 100–2000 mm allows bf < b (web width),
-        # which is physically invalid for BS 8110 — the engine doesn't guard
+        # AUDIT: bf (flange width) range 100-2000 mm allows bf < b (web width),
+        # which is physically invalid for BS 8110 - the engine doesn't guard
         # against this. Consider enforcing bf >= b at design time.
         self.b_b = spinbox(100, 2000, 25, 225, 0)
         self.b_bf = spinbox(100, 2000, 25, 225, 0)
-        # AUDIT: h range 100–2000 mm allows h < b+100 (minimum effective depth),
+        # AUDIT: h range 100-2000 mm allows h < b+100 (minimum effective depth),
         # which would cause steel_beam to fail or produce nonsensical results.
         self.b_h = spinbox(100, 2000, 25, 450, 0)
         self.b_hf = spinbox(0, 500, 10, 0, 0)

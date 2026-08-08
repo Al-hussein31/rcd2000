@@ -1,12 +1,33 @@
-"""Tests for draft autosave, disk persistence, and startup recovery."""
+"""Tests for the new Job model, disk persistence, and workbench integration.
+
+The old draft/history persistence (sidebar drafts) is gone; jobs are now
+the unit of persistence: a job header plus any number of design items,
+stored per-job as JSON files in the AppData location.
+"""
 
 import json
 import os
 import pytest
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QStandardPaths
 
-import rcd2000.gui.app as app_mod
-from rcd2000.gui.app import MainWindow, MODULES
+import rcd2000.gui.job as job_mod
+from rcd2000.gui.job import Job, DesignItem, JobStore, make_slug
+from rcd2000.gui.workbench import Workbench
+
+SAMPLE_HEADER = {
+    "company": "ACME Ltd.",
+    "job_ref": "FG-2026-001",
+    "engineer": "A. Oyenuga",
+    "date": "Fri. 07/08/26.",
+    "output_file": "",
+    "fcu": 30,
+    "fy": 460,
+    "fyv": 250,
+    "soil_pressure": 150.0,
+    "max_steel_pct": 6.0,
+    "dh": 0.95,
+}
 
 
 @pytest.fixture(scope="module")
@@ -15,173 +36,166 @@ def app():
 
 
 @pytest.fixture
-def window(app, monkeypatch, tmp_path):
-    """Create a MainWindow with a redirected state file."""
-    fake_path = str(tmp_path / "rcd2000_state.json")
-    monkeypatch.setattr(app_mod, "_persist_path", lambda: fake_path)
-    w = MainWindow()
-    w._test_state_path = fake_path
-    yield w
-    w.close()
+def jobs_dir(monkeypatch, tmp_path):
+    """Redirect the job store into a temp dir for the test."""
+    fake_dir = str(tmp_path / "jobs")
+    os.makedirs(fake_dir, exist_ok=True)
+    monkeypatch.setattr(job_mod, "_jobs_dir", lambda: fake_dir)
+    return fake_dir
 
 
-class TestDraftAutosave:
-    def test_draft_saved_on_page_switch(self, window):
-        page = window.pages[0]
-        page.col_type.setCurrentIndex(2)
-        page.load.setValue(2500)
-        state = page.get_state()
-
-        window.sidebar_list.setCurrentRow(1)
-
-        assert "Column Design" in window._drafts
-        assert window._drafts["Column Design"] == state
-
-    def test_draft_restored_on_page_return(self, window):
-        page0 = window.pages[0]
-        page0.col_type.setCurrentIndex(2)
-        page0.load.setValue(2500)
-        state = page0.get_state()
-
-        window.sidebar_list.setCurrentRow(1)
-        window.sidebar_list.setCurrentRow(0)
-
-        assert page0.get_state() == state
-
-    def test_draft_survives_across_instances(self, window, monkeypatch, tmp_path):
-        page = window.pages[0]
-        page.col_type.setCurrentIndex(2)
-        page.shape.setCurrentIndex(1)
-        page.load.setValue(2500)
-        state = page.get_state()
-
-        window._save_draft(0)
-        window._write_state()
-
-        fake_path = str(tmp_path / "rcd2000_state.json")
-        monkeypatch.setattr(app_mod, "_persist_path", lambda: fake_path)
-        window2 = MainWindow()
-        page2 = window2.pages[0]
-        assert page2.get_state() == state
+def make_job(**kw) -> Job:
+    base = dict(slug="test-job", name="Test Job", header=dict(SAMPLE_HEADER))
+    base.update(kw)
+    return Job(**base)
 
 
-class TestDiskPersistence:
-    def test_history_serialized_to_disk(self, window):
-        page = window.pages[0]
-        page.col_type.setCurrentIndex(2)
-        page.load.setValue(2500)
-        page.moment_x.setValue(150)  # biaxial needs at least one moment
-        page._on_calculate()
+# ── Model ─────────────────────────────────────────────────────────────
 
-        window._write_state()
+class TestJobModel:
+    def test_add_item_assigns_labels(self):
+        job = make_job()
+        c1 = job.add_item("column")
+        c2 = job.add_item("column")
+        b1 = job.add_item("beam")
+        s1 = job.add_item("slab")
+        assert (c1.label, c2.label, b1.label, s1.label) == ("C1", "C2", "B1", "S1")
 
-        fake_path = window._test_state_path
-        with open(fake_path) as f:
-            disk = json.load(f)
+    def test_next_label_reuses_gaps(self):
+        job = make_job()
+        job.add_item("column")
+        job.add_item("column")
+        job.items.pop(0)
+        assert job.next_label("column") == "C3"
 
-        assert len(disk["history"]) == 1
-        assert disk["history"][0]["module"] == "Column Design"
-        assert "input" in disk["history"][0]
-        assert "result" in disk["history"][0]
-        # ColumnInput.col_type = currentIndex() + 1 (normalized by calc engine)
-        assert disk["history"][0]["input"]["col_type"] == 3
+    def test_remove_item(self):
+        job = make_job()
+        it = job.add_item("column")
+        assert len(job.items) == 1
+        job.remove_item(it.uid)
+        assert job.items == []
 
-    def test_corrupt_file_handled_gracefully(self, window, monkeypatch, tmp_path):
-        fake_path = str(tmp_path / "rcd2000_state.json")
-        monkeypatch.setattr(app_mod, "_persist_path", lambda: fake_path)
-        with open(fake_path, "w") as f:
+    def test_items_of_and_item_lookup(self):
+        job = make_job()
+        c = job.add_item("column")
+        job.add_item("beam")
+        assert job.items_of("column") == [c]
+        assert job.item(c.uid) is c
+        assert job.item("nope") is None
+
+    def test_to_dict_from_dict_roundtrip(self):
+        job = make_job()
+        c = job.add_item("column")
+        c.state = {"col_type": 2, "load": 2500}
+        job.active_type = "beam"
+        again = Job.from_dict(job.to_dict())
+        assert again.slug == job.slug
+        assert again.name == job.name
+        assert again.header == job.header
+        assert again.active_type == "beam"
+        assert len(again.items) == 1
+        assert again.items[0].uid == c.uid
+        assert again.items[0].state == c.state
+
+    def test_make_slug_sanitises(self):
+        assert make_slug("My  Big  Job!")[:7] == "my-big-"
+
+
+# ── Store ─────────────────────────────────────────────────────────────
+
+class TestJobStore:
+    def test_save_load_roundtrip(self, jobs_dir):
+        job = make_job()
+        c = job.add_item("column")
+        c.state = {"col_type": 1, "load": 1200.0}
+        path = JobStore.save(job)
+        assert os.path.exists(path)
+
+        loaded = JobStore.load(job.slug)
+        assert loaded is not None
+        assert loaded.header["job_ref"] == "FG-2026-001"
+        assert loaded.items[0].state == {"col_type": 1, "load": 1200.0}
+
+    def test_load_missing_returns_none(self, jobs_dir):
+        assert JobStore.load("does-not-exist") is None
+
+    def test_corrupt_file_handled_gracefully(self, jobs_dir):
+        path = JobStore.path_for("broken")
+        with open(path, "w") as f:
             f.write('{"this is not valid json"')
+        assert JobStore.load("broken") is None
 
-        window2 = MainWindow()
-        assert window2._drafts == {}
-        assert window2._history == []
+    def test_delete(self, jobs_dir):
+        job = make_job()
+        JobStore.save(job)
+        assert JobStore.load(job.slug) is not None
+        JobStore.delete(job.slug)
+        assert JobStore.load(job.slug) is None
 
-    def test_last_page_restored(self, window):
-        # Switch to SlabPage (index 2) so _last_active_page gets updated
-        window.sidebar_list.setCurrentRow(2)
-        page = window.pages[2]
-        page.s_depth.setValue(200)
-        window._save_draft(2)
-        window._write_state()
-
-        fake_path = window._test_state_path
-        with open(fake_path) as f:
-            disk = json.load(f)
-        assert disk["last_page"] == 2
-
-        window2 = MainWindow()
-        assert window2._last_active_page == 2
-        page2 = window2.pages[2]
-        assert page2.get_state() == page.get_state()
+    def test_list_jobs_sorted_by_updated(self, jobs_dir):
+        a = make_job(slug="aaa", name="A", updated=100.0)
+        b = make_job(slug="bbb", name="B", updated=200.0)
+        JobStore.save(a)
+        JobStore.save(b)
+        slugs = [j.slug for j in JobStore.list_jobs()]
+        assert slugs == ["bbb", "aaa"]
 
 
-class TestDynamicGrids:
-    def test_beam_member_grid_round_trip(self, window):
-        beam = window.pages[1]
-        beam.n_members.setValue(3)
-        for w in beam._member_widgets:
-            w[1].setValue(7.5)
-            w[2].setValue(300)
-            w[3].setValue(15)
-            w[4].setValue(8)
-            w[5].setValue(3.0)
+# ── Workbench integration ─────────────────────────────────────────────
 
-        state = beam.get_state()
-        assert len(state["members"]) == 3
+class TestWorkbenchPersistence:
+    def test_workbench_syncs_panel_state_into_job(self, app):
+        job = make_job()
+        wb = Workbench(job)
+        wb.add_item("column")
+        panel = wb._panels[wb.job.items[0].uid]
+        # The column page exposes typical widgets
+        page = panel.page
+        page.load.setValue(2500)
+        page.col_type.setCurrentIndex(2)
+        wb._on_state_changed(panel)
+        assert wb.job.items[0].state.get("load") == 2500
 
-        window._save_draft(1)
-        window.sidebar_list.setCurrentRow(0)
-        window.sidebar_list.setCurrentRow(1)
+    def test_restored_job_rebuilds_panels_with_state(self, app):
+        job = make_job()
+        c = job.add_item("column")
+        c.state = {"col_type": 1, "load": 1750.0}
+        wb = Workbench(job)
+        panel = wb._panels[c.uid]
+        assert panel.page.get_state().get("load") == 1750.0
 
-        assert beam.get_state() == state
+    def test_render_all_reports_contain_header_block(self, app, tmp_path):
+        job = make_job()
+        job.header["output_file"] = str(tmp_path / "report.txt")
+        job.add_item("column")
+        job.add_item("beam")
+        wb = Workbench(job)
+        wb._export_all()
+        text = (tmp_path / "report.txt").read_text()
+        assert "ACME Ltd." in text
+        assert "FG-2026-001" in text
+        assert "A. Oyenuga" in text
 
-    def test_slab_span_grid_round_trip(self, window):
-        slab = window.pages[2]
-        slab.cont_nspan.setValue(4)
-        for w in slab._cont_span_widgets:
-            w[0].setValue(5.0)
-            w[1].setValue(15.0)
 
-        state = slab.get_state()
-        assert len(state["cont_spans"]) == 4
-
-        window._save_draft(2)
-        window.sidebar_list.setCurrentRow(0)
-        window.sidebar_list.setCurrentRow(2)
-
-        assert slab.get_state() == state
-
-    def test_continuous_beam_member_grid_round_trip(self, window):
-        cb = window.pages[5]
-        cb.cb_nm.setValue(2)
-        for w in cb._cb_member_widgets:
-            w[1].setValue(6.0)
-            w[2].setValue(0.005)
-            w[3].setValue(1.2)
-            w[4].setValue(18.0)
-            w[5].setValue(12.0)
-            w[6].setValue(6.0)
-            w[7].setValue(3.0)
-
-        state = cb.get_state()
-        assert len(state["members"]) == 2
-
-        window._save_draft(5)
-        window.sidebar_list.setCurrentRow(0)
-        window.sidebar_list.setCurrentRow(5)
-
-        assert cb.get_state() == state
-
+# ── Forward compatibility ─────────────────────────────────────────────
 
 class TestForwardCompatibility:
-    def test_extra_keys_ignored(self, window):
-        page = window.pages[0]
-        state = page.get_state()
-        state["_nonexistent_key"] = 42
-        page.set_state(state)
+    def test_extra_keys_ignored_in_item_dict(self):
+        data = {
+            "slug": "x",
+            "name": "X",
+            "header": {},
+            "items": [
+                {"uid": "u1", "type_key": "column", "label": "C1",
+                 "state": {}, "extra_future_key": 1},
+            ],
+        }
+        job = Job.from_dict(data)
+        assert len(job.items) == 1
+        assert job.items[0].label == "C1"
 
-    def test_missing_keys_ignored(self, window):
-        page = window.pages[0]
-        state = page.get_state()
-        del state["load"]
-        page.set_state(state)
+    def test_missing_fields_get_defaults(self):
+        job = Job.from_dict({"slug": "x"})
+        assert job.name == "Untitled Job"
+        assert job.header == {}
+        assert job.items == []

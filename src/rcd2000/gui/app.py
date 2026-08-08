@@ -1,21 +1,25 @@
-"""Main window and application entry point."""
+"""Main window and application entry point.
+
+Flow:  Home → New Job (header dialog) → Workbench → Home
+        Home → Recent Job → Workbench (resume)
+
+The window is a thin shell: it shows the home page or the workbench in
+a root QStackedWidget, wires the job header dialog, and autosaves the
+active job to the job store.
+"""
 
 import sys
 import os
-import json
+import time
 import logging
-from types import SimpleNamespace
-from dataclasses import asdict, is_dataclass
 from importlib.resources import files
 
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QListWidget, QListWidgetItem, QStackedWidget, QLabel, QScrollArea,
-    QStatusBar, QSplashScreen, QDialog, QMessageBox, QToolButton, QSizePolicy,
-    QLineEdit,
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QStackedWidget,
+    QStatusBar, QSplashScreen, QDialog, QLabel, QToolButton, QHBoxLayout,
 )
-from PySide6.QtCore import Qt, QTimer, QSize, QStandardPaths
-from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence, QColor, QFont
+from PySide6.QtCore import Qt, QTimer, QSize
+from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence, QColor
 
 try:
     import qtawesome as qta
@@ -25,52 +29,15 @@ except ImportError:
 
 from rcd2000 import __version__
 from rcd2000.gui.theme import (
-    BG_DARK, BG_MID, BG_LIGHT, SIDEBAR_BG, ACCENT, ACCENT_SOFT, TEXT_PRIMARY,
-    TEXT_SECONDARY, BORDER, TEXT_MUTED, BG_CARD, FONT_SIZE, SPACE, RADIUS_SM, RADIUS_MD,
+    BG_DARK, BG_MID, BG_LIGHT, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY,
+    TEXT_MUTED, BORDER, FONT_SIZE, SPACE, RADIUS_SM,
 )
-from rcd2000.gui.widgets import CollapsibleSection
-from rcd2000.gui.pages import (
-    ColumnPage, BeamPage, SlabPage, StairPage, BasePage, ContinuousBeamPage,
-)
-
-SIDEBAR_EXPANDED = 220
-SIDEBAR_COLLAPSED = 64
-
-MODULES = [
-    ("Column Design", ColumnPage, "c", "fa5s.ruler-vertical", "\u25b2"),
-    ("Beam Design", BeamPage, "b", "fa5s.ruler-horizontal", "\u2501"),
-    ("Slab Design", SlabPage, "s", "fa5s.th-large", "\u25a6"),
-    ("Stair Design", StairPage, "t", "fa5s.grip-lines", "\u2571"),
-    ("Foundation Design", BasePage, "f", "fa5s.university", "\u25a4"),
-    ("Continuous Beam", ContinuousBeamPage, "n", "fa5s.link", "\u2261"),
-]
-
-SHORTCUT_KEYS = {
-    Qt.Key_1: 0, Qt.Key_2: 1, Qt.Key_3: 2,
-    Qt.Key_4: 3, Qt.Key_5: 4, Qt.Key_6: 5,
-}
-
-_PERSIST_FILE = "rcd2000_state.json"
-
-
-def _ns_from_dict(data):
-    """Recursively convert a dict (as loaded from the JSON state file)
-    into a namespace tree so pages can use attribute access on results."""
-    if isinstance(data, dict):
-        return SimpleNamespace(**{k: _ns_from_dict(v) for k, v in data.items()})
-    if isinstance(data, list):
-        return [_ns_from_dict(v) for v in data]
-    return data
-
-
-def _persist_path() -> str:
-    """Return the platform-appropriate path for the state JSON file."""
-    base = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
-    if not base:
-        base = os.path.expanduser("~")
-    full = os.path.join(base, "RCD2000")
-    os.makedirs(full, exist_ok=True)
-    return os.path.join(full, _PERSIST_FILE)
+from rcd2000.gui.job import Job, JobStore, make_slug
+from rcd2000.gui.home_page import HomePage
+from rcd2000.gui.history_page import HistoryPage
+from rcd2000.gui.settings_page import SettingsPage
+from rcd2000.gui.job_header_dialog import JobHeaderDialog
+from rcd2000.gui.workbench import Workbench
 
 
 def _find_icon(name: str) -> str:
@@ -107,7 +74,7 @@ class AboutDialog(QDialog):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        ver = QLabel(f"Version {__version__}")
+        ver = QLabel(f"Version {__version__} - Multi-Design Workbench")
         ver.setAlignment(Qt.AlignCenter)
         ver.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 13px; background: transparent;")
         layout.addWidget(ver)
@@ -115,6 +82,9 @@ class AboutDialog(QDialog):
         desc = QLabel(
             "Reinforced Concrete Design to BS 8110:1997\n"
             "Python port of Oyenuga's RCD2000 FORTRAN programs.\n\n"
+            "Work on any number of designs - columns, beams, slabs, stairs,\n"
+            "foundations and continuous beams - under one job header,\n"
+            "with up to four on screen at a time.\n\n"
             "Engine: Clapeyron three-moment equation, strain compatibility\n"
             "interaction curves, and BS 8110 moment/shear coefficients."
         )
@@ -143,35 +113,21 @@ class AboutDialog(QDialog):
         super().keyPressEvent(event)
 
 
-class HistoryList(QListWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setStyleSheet(
-            f"QListWidget {{ background: transparent; border: none;"
-            f"  font-size: {FONT_SIZE['xs']}px; color: {TEXT_SECONDARY}; }}"
-            f"QListWidget::item {{ padding: 7px 16px; border-radius: {RADIUS_SM}px; }}"
-            f"QListWidget::item:hover {{ background: {BG_LIGHT}; color: {TEXT_PRIMARY}; }}"
-        )
-
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle(f"RCD2000 v{__version__} - BS 8110 Design")
-        self.setMinimumSize(1000, 720)
-        self._history = []
-        self._drafts: dict[str, dict] = {}
-        self._dirty_modules: set[str] = set()
-        self._last_active_page: int | None = None
+        self.setMinimumSize(1100, 760)
+        self._current_job: Job | None = None
+        self._workbench = None
         self._persist_timer: QTimer | None = None
-        self._sidebar_expanded = True
+        self._track_timer: QTimer | None = None
         self._setup_icon()
         self._setup_stylesheet()
         self._setup_ui()
         self._setup_shortcuts()
-        self._last_active_page = 0
-        self._load_state()
-        self._refresh_sidebar_labels()
+
+    # ── plumbing ────────────────────────────────────────────────────
 
     def _setup_icon(self):
         icon_path = _find_icon("logo.png")
@@ -191,7 +147,6 @@ class MainWindow(QMainWindow):
                         padding: 4px 8px; border-radius: {RADIUS_SM}px; }}
         """)
 
-    # ── UI construction ──────────────────────────────────────────
     def _setup_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
@@ -210,14 +165,26 @@ class MainWindow(QMainWindow):
         )
         outer.addWidget(self._status_banner)
 
-        body = QWidget()
-        body_layout = QHBoxLayout(body)
-        body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.setSpacing(0)
+        self._root = QStackedWidget()
+        self.home = HomePage()
+        self.home.new_job_requested.connect(self._new_job)
+        self.home.continue_requested.connect(self._show_history)
+        self.home.settings_requested.connect(self._show_settings)
+        self._root.addWidget(self.home)
 
-        body_layout.addWidget(self._build_sidebar())
-        body_layout.addWidget(self._build_pages(), 1)
-        outer.addWidget(body, 1)
+        self.history = HistoryPage()
+        self.history.back_requested.connect(self._go_home)
+        self.history.open_job_requested.connect(self._open_job)
+        self.history.status_message.connect(self.show_message)
+        self._root.addWidget(self.history)
+
+        self.settings_page = SettingsPage()
+        self.settings_page.back_requested.connect(self._go_home)
+        self.settings_page.profile_changed.connect(self.home.refresh_welcome)
+        self.settings_page.status_message.connect(self.show_message)
+        self._root.addWidget(self.settings_page)
+
+        outer.addWidget(self._root, 1)
 
         self.status = QStatusBar()
         self.status.setStyleSheet(
@@ -226,9 +193,6 @@ class MainWindow(QMainWindow):
         )
         self.setStatusBar(self.status)
         self.status.showMessage("Ready")
-
-        self.sidebar_list.currentRowChanged.connect(self._on_page_switched)
-        self.stack.currentChanged.connect(self._on_stack_changed)
 
     def _build_header(self):
         header = QWidget()
@@ -250,11 +214,15 @@ class MainWindow(QMainWindow):
 
         title_block = QVBoxLayout()
         title_block.setSpacing(0)
-        title_label = QLabel("RCD2000")
-        title_label.setStyleSheet(f"color: {TEXT_PRIMARY}; font-size: 16px; font-weight: 700; background: transparent;")
+        self._title_label = QLabel("RCD2000")
+        self._title_label.setStyleSheet(
+            f"color: {TEXT_PRIMARY}; font-size: 16px; font-weight: 700; background: transparent;"
+        )
         self._header_subtitle = QLabel("Reinforced Concrete Design · BS 8110")
-        self._header_subtitle.setStyleSheet(f"color: {TEXT_SECONDARY}; font-size: 11px; background: transparent;")
-        title_block.addWidget(title_label)
+        self._header_subtitle.setStyleSheet(
+            f"color: {TEXT_SECONDARY}; font-size: 11px; background: transparent;"
+        )
+        title_block.addWidget(self._title_label)
         title_block.addWidget(self._header_subtitle)
         h.addLayout(title_block)
         h.addStretch()
@@ -266,140 +234,17 @@ class MainWindow(QMainWindow):
         else:
             help_btn.setText("?")
         help_btn.setCursor(Qt.PointingHandCursor)
-        help_btn.setToolTip("Shortcuts:  Ctrl+1..6 switch module   ·   Ctrl+I about   ·   Ctrl+H toggle history")
+        help_btn.setToolTip(
+            "Shortcuts:  Ctrl+N new job · Ctrl+J edit job header · "
+            "Ctrl+H home · Ctrl+I about"
+        )
         help_btn.setStyleSheet(
             "QToolButton { background: transparent; border: none; padding: 4px; }"
             f"QToolButton:hover {{ background: {BG_LIGHT}; border-radius: {RADIUS_SM}px; }}"
         )
+        help_btn.clicked.connect(self._show_about)
         h.addWidget(help_btn)
         return header
-
-    def _build_sidebar(self):
-        self.sidebar = QWidget()
-        self.sidebar.setFixedWidth(SIDEBAR_EXPANDED)
-        self.sidebar.setStyleSheet(f"background: {SIDEBAR_BG}; border-right: 1px solid {BORDER};")
-        sb = QVBoxLayout(self.sidebar)
-        sb.setContentsMargins(0, SPACE[3], 0, SPACE[3])
-        sb.setSpacing(SPACE[1])
-
-        # Collapse toggle
-        toggle_row = QHBoxLayout()
-        toggle_row.setContentsMargins(SPACE[3], 0, SPACE[3], SPACE[2])
-        self._sidebar_title = QLabel("DESIGN MODULES")
-        self._sidebar_title.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px; font-weight: 700;"
-            f" letter-spacing: 0.8px; background: transparent;"
-        )
-        toggle_row.addWidget(self._sidebar_title)
-        toggle_row.addStretch()
-
-        self.collapse_btn = QToolButton()
-        collapse_icon = _qta_icon("fa5s.angle-double-left", TEXT_MUTED)
-        if collapse_icon:
-            self.collapse_btn.setIcon(collapse_icon)
-        else:
-            self.collapse_btn.setText("«")
-        self.collapse_btn.setCursor(Qt.PointingHandCursor)
-        self.collapse_btn.setToolTip("Collapse sidebar")
-        self.collapse_btn.setStyleSheet(
-            "QToolButton { background: transparent; border: none; padding: 2px; }"
-            f"QToolButton:hover {{ background: {BG_LIGHT}; border-radius: {RADIUS_SM}px; }}"
-        )
-        self.collapse_btn.clicked.connect(self._toggle_sidebar)
-        toggle_row.addWidget(self.collapse_btn)
-        sb.addLayout(toggle_row)
-
-        self.sidebar_list = QListWidget()
-        self.sidebar_list.setIconSize(QSize(16, 16))
-        self.sidebar_list.setStyleSheet(f"""
-            QListWidget {{ background: transparent; border: none; font-size: {FONT_SIZE['base']}px; }}
-            QListWidget::item {{ padding: 10px 16px; color: {TEXT_SECONDARY};
-                                border-left: 3px solid transparent; margin: 1px 6px; border-radius: {RADIUS_SM}px; }}
-            QListWidget::item:hover {{ background: {BG_LIGHT}; color: {TEXT_PRIMARY}; }}
-            QListWidget::item:selected {{ background: {ACCENT_SOFT}; color: {ACCENT};
-                                          border-left: 3px solid {ACCENT}; }}
-        """)
-        for name, _, key, qta_name, glyph in MODULES:
-            qicon = _qta_icon(qta_name, TEXT_SECONDARY)
-            item = QListWidgetItem(f"  {name}")
-            if qicon:
-                item.setIcon(qicon)
-            else:
-                item.setText(f"  {glyph}  {name}")
-            self.sidebar_list.addItem(item)
-        self.sidebar_list.setCurrentRow(0)
-        sb.addWidget(self.sidebar_list)
-
-        # Collapsible "Recent Calculations" section
-        self.history_list = HistoryList()
-        self.history_list.itemClicked.connect(self._history_clicked)
-        self.history_placeholder = QLabel("  No calculations yet")
-        self.history_placeholder.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px;"
-            f" padding: 8px 16px; background: transparent;"
-        )
-        history_container = QWidget()
-        history_container.setStyleSheet("background: transparent;")
-        hc_layout = QVBoxLayout(history_container)
-        hc_layout.setContentsMargins(0, 0, 0, 0)
-        hc_layout.setSpacing(0)
-        hc_layout.addWidget(self.history_list)
-        hc_layout.addWidget(self.history_placeholder)
-        self.history_section = CollapsibleSection(
-            "RECENT CALCULATIONS", history_container, expanded=True,
-        )
-        sb.addSpacing(SPACE[3])
-        sb.addWidget(self.history_section, 1)
-
-        return self.sidebar
-
-    def _build_pages(self):
-        pages_container = QWidget()
-        pages_container.setStyleSheet(f"background: {BG_DARK};")
-        pages_layout = QVBoxLayout(pages_container)
-        pages_layout.setContentsMargins(0, 0, 0, 0)
-        pages_layout.setSpacing(0)
-
-        self.stack = QStackedWidget()
-        self.pages = []
-        for _, page_class, *_rest in MODULES:
-            page = page_class()
-            page._history_cb = self._add_history
-            page._status_cb = self.show_status_banner
-            scroll = QScrollArea()
-            scroll.setWidget(page)
-            scroll.setWidgetResizable(True)
-            scroll.setStyleSheet(f"QScrollArea {{ background: {BG_DARK}; border: none; }}")
-            self.stack.addWidget(scroll)
-            self.pages.append(page)
-
-        pages_layout.addWidget(self.stack)
-        return pages_container
-
-    # ── Sidebar collapse (instant — no animation, per design brief) ─
-    def _toggle_sidebar(self):
-        self._sidebar_expanded = not self._sidebar_expanded
-        if self._sidebar_expanded:
-            self.sidebar.setFixedWidth(SIDEBAR_EXPANDED)
-            self._sidebar_title.setVisible(True)
-            self.history_section.setVisible(True)
-            self.history_placeholder.setVisible(self.history_list.count() == 0)
-        else:
-            self.sidebar.setFixedWidth(SIDEBAR_COLLAPSED)
-            self._sidebar_title.setVisible(False)
-            self.history_section.setVisible(False)
-        self._refresh_sidebar_labels()
-        new_icon = _qta_icon(
-            "fa5s.angle-double-left" if self._sidebar_expanded else "fa5s.angle-double-right",
-            TEXT_MUTED,
-        )
-        if new_icon:
-            self.collapse_btn.setIcon(new_icon)
-        else:
-            self.collapse_btn.setText("«" if self._sidebar_expanded else "»")
-        self.collapse_btn.setToolTip(
-            "Collapse sidebar" if self._sidebar_expanded else "Expand sidebar"
-        )
 
     def _setup_shortcuts(self):
         about_action = QAction("About", self)
@@ -407,208 +252,164 @@ class MainWindow(QMainWindow):
         about_action.triggered.connect(self._show_about)
         self.addAction(about_action)
 
-        hide_action = QAction("Toggle History", self)
-        hide_action.setShortcut(QKeySequence("Ctrl+H"))
-        hide_action.triggered.connect(self._toggle_history)
-        self.addAction(hide_action)
+        new_action = QAction("New Job", self)
+        new_action.setShortcut(QKeySequence("Ctrl+N"))
+        new_action.triggered.connect(self._new_job)
+        self.addAction(new_action)
 
-        collapse_action = QAction("Toggle Sidebar", self)
-        collapse_action.setShortcut(QKeySequence("Ctrl+B"))
-        collapse_action.triggered.connect(self._toggle_sidebar)
-        self.addAction(collapse_action)
+        continue_action = QAction("Continue", self)
+        continue_action.setShortcut(QKeySequence("Ctrl+C"))
+        continue_action.triggered.connect(self._show_history)
+        self.addAction(continue_action)
 
-        switcher_action = QAction("Quick Switch Module", self)
-        switcher_action.setShortcut(QKeySequence("Ctrl+K"))
-        switcher_action.triggered.connect(self._show_quick_switcher)
-        self.addAction(switcher_action)
+        home_action = QAction("Home", self)
+        home_action.setShortcut(QKeySequence("Ctrl+H"))
+        home_action.triggered.connect(self._go_home)
+        self.addAction(home_action)
 
-    def keyPressEvent(self, event):
-        if event.key() in SHORTCUT_KEYS and event.modifiers() & Qt.ControlModifier:
-            idx = SHORTCUT_KEYS[event.key()]
-            if idx < len(MODULES):
-                self.sidebar_list.setCurrentRow(idx)
-                self.status.showMessage(f"Switched to {MODULES[idx][0]}")
-        super().keyPressEvent(event)
+        settings_action = QAction("Settings", self)
+        settings_action.setShortcut(QKeySequence("Ctrl+S"))
+        settings_action.triggered.connect(self._show_settings)
+        self.addAction(settings_action)
 
-    # ── Draft autosave ────────────────────────────────────────────────
+        # Esc exits focus mode when inside the workbench
+        esc_action = QAction("Exit Focus", self)
+        esc_action.setShortcut(QKeySequence("Esc"))
+        esc_action.triggered.connect(self._exit_focus_if_focused)
+        self.addAction(esc_action)
 
-    def _on_page_switched(self, new_idx: int):
-        """Save the old page's draft and restore the new page's draft."""
-        old_idx = self._last_active_page
-        if old_idx is not None and old_idx != new_idx:
-            self._save_draft(old_idx)
-        self.stack.setCurrentIndex(new_idx)
-        self._restore_draft(new_idx)
-        self._last_active_page = new_idx
-        self._header_subtitle.setText(f"{MODULES[new_idx][0]} · BS 8110")
+    # ── job lifecycle ───────────────────────────────────────────────
 
-    def _on_stack_changed(self, idx: int):
-        """Sync sidebar selection when stack changes programmatically."""
-        if self.sidebar_list.currentRow() != idx:
-            self.sidebar_list.setCurrentRow(idx)
-
-    def _save_draft(self, idx: int):
-        """Capture the current page's state into self._drafts."""
-        if idx < 0 or idx >= len(self.pages):
+    def _new_job(self):
+        header = JobHeaderDialog.ask(self)
+        if header is None:
             return
-        page = self.pages[idx]
-        name = MODULES[idx][0]
-        try:
-            state = page.get_state()
-            self._drafts[name] = state
-            # Mark as having unsaved draft if any non-default values exist
-            if any(v not in (0, 0.0, "", 0.0) for v in state.values() if not isinstance(v, (list, dict))):
-                self._dirty_modules.add(name)
-                self._refresh_sidebar_labels()
-        except Exception:
-            logging.error(f"Failed to capture draft for {name}", exc_info=True)
+        n_items = (header.get("job_ref") or "Untitled Job").strip() or "Untitled Job"
+        job = Job(slug=make_slug(n_items), name=n_items, header=header)
+        self._open_workbench(job)
+
+    def _open_job(self, slug: str):
+        job = JobStore.load(slug)
+        if job is None:
+            self.show_status_banner("Could not load that job - file may be missing.", True)
+            self.history.refresh()
+            return
+        self._open_workbench(job)
+
+    def _open_workbench(self, job: Job):
+        self._save_current_job()
+        self._current_job = job
+        job.last_opened = time.time()
+        self._replace_workbench(job)
+        self._root.setCurrentWidget(self._workbench)
+        self._header_subtitle.setText(f"{job.name} · BS 8110")
+        self.status.showMessage(f"Working on: {job.name}")
+        self._start_time_tracking()
         self._schedule_persist()
 
-    def _restore_draft(self, idx: int):
-        """Restore a page's draft from self._drafts, if one exists."""
-        if idx < 0 or idx >= len(self.pages):
+    def _replace_workbench(self, job):
+        """Rebuild the workbench for a job without leaking old connections."""
+        if self._workbench is not None:
+            self._root.removeWidget(self._workbench)
+            self._workbench.deleteLater()
+            self._workbench = None
+        from rcd2000.gui.workbench import Workbench
+        self._workbench = Workbench(job)
+        self._workbench.back_requested.connect(self._go_home)
+        self._workbench.edit_job_requested.connect(self._edit_job_header)
+        self._workbench.job_changed.connect(self._schedule_persist)
+        self._workbench.status_message.connect(self.show_message)
+        self._root.addWidget(self._workbench)
+
+    def _edit_job_header(self):
+        if self._current_job is None:
             return
-        page = self.pages[idx]
-        name = MODULES[idx][0]
-        state = self._drafts.get(name)
-        if state is None:
+        header = JobHeaderDialog.ask(self, existing=self._current_job.header)
+        if header is None:
             return
-        try:
-            page.set_state(state)
-            self._clear_invalid_flags(page)
-        except Exception:
-            logging.error(f"Failed to restore draft for {name}", exc_info=True)
+        self._current_job.header = header
+        if not self._current_job.name:
+            self._current_job.name = header.get("job_ref") or "Untitled Job"
+        # push new materials into existing panels
+        for panel in self._workbench._panels.values():
+            panel.apply_header_defaults(header)
+        self._workbench.refresh_all()
+        self._header_subtitle.setText(f"{self._current_job.name} · BS 8110")
+        self.show_message("Job header updated - will appear on all reports.", False)
+        self._schedule_persist()
 
-    def _clear_invalid_flags(self, page):
-        """Clear any 'invalid' property flags on spinboxes after restore."""
-        from rcd2000.gui.widgets import mark_invalid
-        for attr_name in dir(page):
-            widget = getattr(page, attr_name, None)
-            if hasattr(widget, "setProperty"):
-                try:
-                    mark_invalid(widget, False)
-                except Exception:
-                    pass
+    def _go_home(self):
+        self._stop_time_tracking()
+        self._save_current_job()
+        self._current_job = None
+        self._root.setCurrentWidget(self.home)
+        self.home.refresh_welcome()
+        self._header_subtitle.setText("Reinforced Concrete Design · BS 8110")
+        self.status.showMessage("Ready")
 
-    # ── History persistence ──────────────────────────────────────────
+    def _show_history(self):
+        self._save_current_job()
+        self.history.refresh()
+        self._root.setCurrentWidget(self.history)
+        self._header_subtitle.setText("Your Jobs · BS 8110")
+        self.status.showMessage("History")
 
-    def _history_to_serializable(self):
-        """Convert history entries to JSON-serializable dicts."""
-        out = []
-        for entry in self._history:
-            module_name, inp, result = entry[:3]
-            state_dict = entry[3] if len(entry) > 3 else None
-            rec = {"module": module_name}
-            if is_dataclass(inp):
-                rec["input"] = asdict(inp)
-            if is_dataclass(result):
-                rec["result"] = asdict(result)
-            if state_dict:
-                rec["state"] = state_dict
-            out.append(rec)
-        return out
+    def _show_settings(self):
+        self.settings_page.load_profile()
+        self._root.setCurrentWidget(self.settings_page)
+        self._header_subtitle.setText("Settings · BS 8110")
+        self.status.showMessage("Settings")
 
-    def _history_from_serializable(self, data):
-        """Rebuild history entries from JSON-serializable dicts.
+    def _exit_focus_if_focused(self):
+        if self._workbench is not None and self._workbench._focused is not None:
+            self._workbench.exit_focus()
 
-        Uses the raw dicts (not dataclass instances) so that the history
-        display still works without needing to reconstruct the dataclasses.
-        """
-        self._history = []
-        self.history_list.clear()
-        self._dirty_modules.clear()
-        self._refresh_sidebar_labels()
-        from datetime import datetime
-        for rec in data:
-            module_name = rec.get("module", "Unknown")
-            ts = rec.get("timestamp", "??")
-            state_dict = rec.get("state")
-            inp_dict = rec.get("input")
-            result_dict = rec.get("result")
-            # Try to use summarize() for a descriptive label
-            summary = ""
-            inp_for_summary = result_dict or inp_dict or {}
-            for i, mod in enumerate(MODULES):
-                if mod[0] == module_name:
-                    try:
-                        summary = self.pages[i].summarize(inp_for_summary)
-                    except Exception:
-                        summary = ""
-                    break
-            if summary:
-                display = f"{module_name} · {summary} · {ts}"
-            else:
-                display = f"{module_name}  ·  {ts}"
-            self._history.append((module_name, inp_dict, result_dict, state_dict))
-            self.history_list.insertItem(0, display)
-            while self.history_list.count() > 20:
-                self.history_list.takeItem(self.history_list.count() - 1)
-        self.history_placeholder.setVisible(len(data) == 0)
+    # ── persistence ─────────────────────────────────────────────────
 
-    # ── Disk persistence ──────────────────────────────────────────────
+    _TRACK_INTERVAL = 30  # seconds of work time credited per tick
+
+    def _start_time_tracking(self):
+        """Accumulate active work time while the workbench is open."""
+        if self._track_timer is None:
+            self._track_timer = QTimer(self)
+            self._track_timer.setInterval(self._TRACK_INTERVAL * 1000)
+            self._track_timer.timeout.connect(self._tick_work_time)
+        self._track_timer.start()
+
+    def _stop_time_tracking(self):
+        if self._track_timer is not None:
+            self._track_timer.stop()
+
+    def _tick_work_time(self):
+        if self._current_job is None:
+            return
+        self._current_job.add_time(self._TRACK_INTERVAL)
+        self._schedule_persist()
 
     def _schedule_persist(self):
-        """Debounced write: restart the timer for 2 s."""
         if self._persist_timer is None:
             self._persist_timer = QTimer(self)
             self._persist_timer.setSingleShot(True)
-            self._persist_timer.timeout.connect(self._write_state)
+            self._persist_timer.timeout.connect(self._save_current_job)
         self._persist_timer.start(2000)
 
-    def _write_state(self):
-        """Write drafts + history to the JSON state file."""
-        try:
-            path = _persist_path()
-            from datetime import datetime
-            history_serializable = []
-            for entry in self._history:
-                module_name, inp, result = entry[:3]
-                state_dict = entry[3] if len(entry) > 3 else None
-                rec = {"module": module_name, "timestamp": datetime.now().strftime("%H:%M:%S")}
-                if is_dataclass(inp):
-                    rec["input"] = asdict(inp)
-                if is_dataclass(result):
-                    rec["result"] = asdict(result)
-                if state_dict:
-                    rec["state"] = state_dict
-                history_serializable.append(rec)
-            payload = {
-                "drafts": self._drafts,
-                "history": history_serializable,
-                "last_page": self._last_active_page,
-            }
-            with open(path, "w") as f:
-                json.dump(payload, f, indent=2)
-        except Exception:
-            logging.error("Failed to write state file", exc_info=True)
-
-    def _load_state(self):
-        """Load drafts + history from the JSON state file on startup."""
-        path = _persist_path()
-        if not os.path.exists(path):
+    def _save_current_job(self):
+        if self._current_job is None or self._workbench is None:
             return
+        # sync panel state back into items
+        for uid, panel in self._workbench._panels.items():
+            item = self._current_job.item(uid)
+            if item is not None:
+                item.label = panel.label
+                item.state = panel.get_state()
         try:
-            with open(path) as f:
-                payload = json.load(f)
-            self._drafts = payload.get("drafts", {})
-            last_page = payload.get("last_page")
-            self._history_from_serializable(payload.get("history", []))
-            # Restore the last-active page's draft
-            if last_page is not None and 0 <= last_page < len(self.pages):
-                self._restore_draft(last_page)
-                self._last_active_page = last_page
-        except (json.JSONDecodeError, KeyError, TypeError):
-            logging.error("State file corrupt — starting fresh", exc_info=True)
-            self._drafts = {}
-            self._history = []
+            JobStore.save(self._current_job)
+        except Exception:
+            logging.error("Failed to save job", exc_info=True)
 
-    def closeEvent(self, event):
-        """Persist state on close."""
-        self._write_state()
-        super().closeEvent(event)
+    # ── misc ────────────────────────────────────────────────────────
 
-    def show_status_banner(self, message: str, is_error: bool = False):
-        """Show a temporary status banner above the page content."""
+    def show_message(self, message: str, is_error: bool = False):
         self._status_banner.setText(f"  {message}  ")
         if is_error:
             self._status_banner.setStyleSheet(
@@ -623,164 +424,17 @@ class MainWindow(QMainWindow):
         self._status_banner.setVisible(True)
         QTimer.singleShot(4000, lambda: self._status_banner.setVisible(False))
 
-    def _add_history(self, module_name: str, inp, result):
-        from datetime import datetime
-        # Map short module_name (e.g. "Column") to display name (e.g. "Column Design")
-        display_name = module_name
-        page = None
-        for mod in MODULES:
-            if mod[1].module_name == module_name:
-                display_name = mod[0]
-                break
-        # Capture the current widget state for exact history restore
-        state_dict = None
-        for i, mod in enumerate(MODULES):
-            if mod[0] == display_name:
-                try:
-                    state_dict = self.pages[i].get_state()
-                except Exception:
-                    pass
-                break
-        ts = datetime.now().strftime("%H:%M")
-        # Build one-line summary via the page's summarize() method
-        summary = ""
-        for i, mod in enumerate(MODULES):
-            if mod[0] == display_name:
-                try:
-                    summary = self.pages[i].summarize(inp)
-                except Exception:
-                    summary = ""
-                break
-        label = f"{display_name} · {summary} · {ts}" if summary else f"{display_name}  ·  {ts}"
-        self._history.append((display_name, inp, result, state_dict))
-        self.history_list.insertItem(0, label)
-        self.history_placeholder.setVisible(False)
-        while self.history_list.count() > 20:
-            self.history_list.takeItem(self.history_list.count() - 1)
-        self._dirty_modules.discard(display_name)
-        self._refresh_sidebar_labels()
-        self.status.showMessage(f"{display_name} designed - {ts}")
-        self._schedule_persist()
-
-    def _history_clicked(self, item):
-        # Save current page draft before switching
-        if self._last_active_page is not None:
-            self._save_draft(self._last_active_page)
-        idx = self.history_list.row(item)
-        entry = self._history[idx] if idx < len(self._history) else None
-        if entry:
-            module_name, inp, result, state_dict = entry
-            for i, mod in enumerate(MODULES):
-                if mod[0] == module_name:
-                    # Pop draft so _restore_draft won't reapply it on nav
-                    self._drafts.pop(module_name, None)
-                    # Switch page (triggers _on_page_switched → _restore_draft,
-                    # which will skip because draft is gone)
-                    self.sidebar_list.setCurrentRow(i)
-                    # Restore exact history state
-                    page = self.pages[i]
-                    try:
-                        page._history_viewed = True
-                        if state_dict:
-                            # Full widget state available: re-run the design so
-                            # the page has fresh dataclass results (and saving
-                            # the report afterwards works).
-                            page.set_state(state_dict)
-                            page._suppress_history = True
-                            try:
-                                page._on_calculate()
-                            finally:
-                                page._suppress_history = False
-                        else:
-                            # Legacy entry without saved widget state.
-                            # Show the stored result when we have one.
-                            if isinstance(result, dict):
-                                result = _ns_from_dict(result)
-                            page._show_result(result)
-                    except Exception as exc:
-                        logging.error(
-                            f"Failed to restore history for {module_name}", exc_info=True
-                        )
-                    self.status.showMessage(f"Recalled {module_name} from history")
-                    break
-
-    def _show_quick_switcher(self):
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Quick Switch Module")
-        dlg.setFixedSize(360, 280)
-        dlg.setStyleSheet(f"background: {BG_MID}; color: {TEXT_PRIMARY};")
-        layout = QVBoxLayout(dlg)
-        layout.setSpacing(SPACE[2])
-
-        search = QLineEdit()
-        search.setPlaceholderText("Type to filter…")
-        search.setStyleSheet(
-            f"background: {BG_LIGHT}; color: {TEXT_PRIMARY};"
-            f" border: 1px solid {BORDER}; border-radius: {RADIUS_SM}px;"
-            f" padding: 8px 12px; font-size: {FONT_SIZE['base']}px;"
-        )
-        layout.addWidget(search)
-
-        lst = QListWidget()
-        lst.setStyleSheet(
-            f"QListWidget {{ background: transparent; border: none;"
-            f"  font-size: {FONT_SIZE['base']}px; }}"
-            f"QListWidget::item {{ padding: 8px 12px; color: {TEXT_SECONDARY};"
-            f"  border-radius: {RADIUS_SM}px; }}"
-            f"QListWidget::item:hover {{ background: {BG_LIGHT}; color: {TEXT_PRIMARY}; }}"
-            f"QListWidget::item:selected {{ background: {ACCENT_SOFT}; color: {ACCENT}; }}"
-        )
-        for name, *_ in MODULES:
-            lst.addItem(f"  {name}")
-        lst.setCurrentRow(0)
-        layout.addWidget(lst)
-
-        hint = QLabel("Esc to close  ·  Enter to switch")
-        hint.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px; background: transparent;"
-        )
-        hint.setAlignment(Qt.AlignRight)
-        layout.addWidget(hint)
-
-        def _filter(text):
-            for i in range(lst.count()):
-                item = lst.item(i)
-                match = text.lower() in item.text().lower()
-                item.setHidden(not match)
-            for i in range(lst.count()):
-                if not lst.item(i).isHidden():
-                    lst.setCurrentRow(i)
-                    break
-
-        search.textChanged.connect(_filter)
-        search.returnPressed.connect(
-            lambda: dlg.accept() if lst.currentItem() and not lst.currentItem().isHidden() else None
-        )
-        lst.itemDoubleClicked.connect(lambda: dlg.accept())
-
-        search.setFocus()
-        if dlg.exec() == QDialog.Accepted:
-            idx = lst.currentRow()
-            if 0 <= idx < len(MODULES) and not lst.currentItem().isHidden():
-                self.sidebar_list.setCurrentRow(idx)
-                self.status.showMessage(f"Switched to {MODULES[idx][0]}")
-
-    def _refresh_sidebar_labels(self):
-        for idx in range(len(MODULES)):
-            name = MODULES[idx][0]
-            item = self.sidebar_list.item(idx)
-            if self._sidebar_expanded:
-                prefix = "• " if name in self._dirty_modules else "  "
-                item.setText(f"{prefix}{name}")
-            else:
-                item.setText("")
-
-    def _toggle_history(self):
-        self.history_section.set_expanded(not self.history_section._expanded)
+    def show_status_banner(self, message: str, is_error: bool = False):
+        """Alias kept for page status callbacks."""
+        self.show_message(message, is_error)
 
     def _show_about(self):
-        dlg = AboutDialog(self)
-        dlg.exec()
+        AboutDialog(self).exec()
+
+    def closeEvent(self, event):
+        self._stop_time_tracking()
+        self._save_current_job()
+        super().closeEvent(event)
 
 
 def splash_screen(app):
