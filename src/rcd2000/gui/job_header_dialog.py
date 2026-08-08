@@ -108,7 +108,11 @@ class JobHeaderDialog(QDialog):
         layout.addWidget(c2)
 
         # ── Concrete & steel stresses ──────────────────────────────
-        c3 = Card("CONCRETE & STEEL STRESSES")
+        # Required inputs: the original book programs read these with
+        # READ(1,*) and no defaults - a design cannot proceed without
+        # them.  We preset sensible values but block creation if the
+        # user clears any of them.
+        c3 = Card("CONCRETE & STEEL STRESSES*")
         self.fcu = fcu_combo()
         self.fy = fy_combo()
         self.fyv = combo(["250", "410", "460"])
@@ -116,12 +120,13 @@ class JobHeaderDialog(QDialog):
         for cb in (self.fcu, self.fy, self.fyv):
             cb.setEditable(True)
             cb.setInsertPolicy(QComboBox.NoInsert)
+            cb.currentTextChanged.connect(self._validate)
         self.soil_pressure = spinbox(0, 999999999, 5, 150, 1, " kN/m²")
         self.max_steel_pct = spinbox(0, 999999999, 0.25, 6.0, 2, " %")
         self.dh = spinbox(0, 999999999, 0.05, 0.95, 2)
-        c3.add_row("fcu (N/mm²):", self.fcu)
-        c3.add_row("fy (N/mm²):", self.fy)
-        c3.add_row("fyv - stirrup (N/mm²):", self.fyv)
+        c3.add_row("fcu (N/mm²):*", self.fcu)
+        c3.add_row("fy (N/mm²):*", self.fy)
+        c3.add_row("fyv - stirrup (N/mm²):*", self.fyv)
         c3.add_row("Allowable soil pressure (bases):", self.soil_pressure)
         c3.add_row("Max. steel % (columns):", self.max_steel_pct)
         c3.add_row("D/H ratio (columns):", self.dh)
@@ -168,9 +173,16 @@ class JobHeaderDialog(QDialog):
         return base
 
     def _validate(self):
-        """Required: company + job reference. Disable Yes until filled."""
-        ok = bool(self.company.text().strip() and self.job_ref.text().strip())
-        self.ok_btn.setEnabled(ok)
+        """Required: company + job reference + material stresses (the
+        book's programs never default these).  Disable Yes until filled."""
+        company_ok = bool(self.company.text().strip())
+        ref_ok = bool(self.job_ref.text().strip())
+        stresses_ok = (
+            self._combo_num_ok(self.fcu)
+            and self._combo_num_ok(self.fy)
+            and self._combo_num_ok(self.fyv)
+        )
+        self.ok_btn.setEnabled(company_ok and ref_ok and stresses_ok)
         for w, req in ((self.company, True), (self.job_ref, True)):
             border = f"1px solid {ACCENT}" if req and not w.text().strip() else f"1px solid {BORDER}"
             w.setStyleSheet(
@@ -180,8 +192,21 @@ class JobHeaderDialog(QDialog):
                 f"QLineEdit:focus {{ border: 1px solid {ACCENT}; }}"
             )
 
+    @staticmethod
+    def _combo_num_ok(cb) -> bool:
+        text = cb.currentText().strip()
+        if not text:
+            return False
+        try:
+            return float(text) > 0
+        except ValueError:
+            return False
+
     def _on_ok(self):
         if not (self.company.text().strip() and self.job_ref.text().strip()):
+            return
+        if not (self._combo_num_ok(self.fcu) and self._combo_num_ok(self.fy)
+                and self._combo_num_ok(self.fyv)):
             return
         self.accept()
 

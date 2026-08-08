@@ -170,11 +170,37 @@ class TestWorkbenchPersistence:
         job.add_item("column")
         job.add_item("beam")
         wb = Workbench(job)
+        # Designs must be run before export - undesigned items are skipped
+        for panel in wb._panels.values():
+            panel.page._on_calculate()
         wb._export_all()
         text = (tmp_path / "report.txt").read_text()
         assert "ACME Ltd." in text
         assert "FG-2026-001" in text
         assert "A. Oyenuga" in text
+
+    def test_export_skips_undesigned_items(self, app, tmp_path):
+        job = make_job()
+        job.header["output_file"] = str(tmp_path / "report.txt")
+        job.add_item("column")      # will be designed
+        job.add_item("beam")        # will NOT be designed
+        wb = Workbench(job)
+        for uid, panel in wb._panels.items():
+            if panel.type_key == "column":
+                panel.page._on_calculate()
+        wb._export_all()
+        text = (tmp_path / "report.txt").read_text()
+        # only the designed column appears
+        assert "COLUMN ANALYSIS" in text
+        assert "BEAM ANALYSIS" not in text
+
+    def test_export_with_nothing_designed_writes_no_file(self, app, tmp_path):
+        job = make_job()
+        job.header["output_file"] = str(tmp_path / "report.txt")
+        job.add_item("column")
+        wb = Workbench(job)
+        wb._export_all()
+        assert not (tmp_path / "report.txt").exists()
 
 
 # ── Forward compatibility ─────────────────────────────────────────────

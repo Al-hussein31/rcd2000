@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from rcd2000.gui.theme import (
-    BG_DARK, BG_MID, BG_LIGHT, BG_CARD, ACCENT, TEXT_PRIMARY,
+    BG_LIGHT, ACCENT, TEXT_PRIMARY,
     TEXT_SECONDARY, TEXT_MUTED, BORDER, FONT_SIZE, SPACE, RADIUS_MD,
 )
 from rcd2000.gui.settings import UserProfile, SettingsStore
@@ -91,6 +91,7 @@ class SettingsPage(QWidget):
         self.prefix_in = QLineEdit()
         self.outdir_in = QLineEdit()
         self.datefmt_in = QLineEdit()
+        self.city_in = QLineEdit()
         for w, lbl, ph in [
             (self.full_name, "Full name", "e.g. Eng. Ade Oyenuga"),
             (self.company_in, "Company", "e.g. ACME Engineering Ltd."),
@@ -98,6 +99,7 @@ class SettingsPage(QWidget):
             (self.prefix_in, "Job Ref Prefix", "e.g. FG-2026 (first part of JOB REF)"),
             (self.outdir_in, "Default Output Folder", "e.g. /Users/you/Documents/designs (optional)"),
             (self.datefmt_in, "Date Format", "%a. %d/%m/%y."),
+            (self.city_in, "City (for home greeting weather)", "e.g. Lagos (optional)"),
         ]:
             lab = QLabel(lbl)
             lab.setStyleSheet(
@@ -145,6 +147,7 @@ class SettingsPage(QWidget):
         self.prefix_in.setText(p.job_ref_prefix)
         self.outdir_in.setText(p.default_output_dir)
         self.datefmt_in.setText(p.date_format)
+        self.city_in.setText(p.city)
 
     def _save(self):
         profile = UserProfile(
@@ -154,6 +157,7 @@ class SettingsPage(QWidget):
             job_ref_prefix=self.prefix_in.text().strip(),
             default_output_dir=self.outdir_in.text().strip(),
             date_format=self.datefmt_in.text().strip() or "%a. %d/%m/%y.",
+            city=self.city_in.text().strip(),
         )
         SettingsStore.save(profile)
         self.profile_changed.emit()

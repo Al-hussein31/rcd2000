@@ -33,6 +33,7 @@ from rcd2000.gui.theme import (
     TEXT_MUTED, BORDER, FONT_SIZE, SPACE, RADIUS_SM,
 )
 from rcd2000.gui.job import Job, JobStore, make_slug
+from rcd2000.gui.settings import SettingsStore
 from rcd2000.gui.home_page import HomePage
 from rcd2000.gui.history_page import HistoryPage
 from rcd2000.gui.settings_page import SettingsPage
@@ -126,6 +127,7 @@ class MainWindow(QMainWindow):
         self._setup_stylesheet()
         self._setup_ui()
         self._setup_shortcuts()
+        self._maybe_show_first_run()
 
     # ── plumbing ────────────────────────────────────────────────────
 
@@ -180,7 +182,7 @@ class MainWindow(QMainWindow):
 
         self.settings_page = SettingsPage()
         self.settings_page.back_requested.connect(self._go_home)
-        self.settings_page.profile_changed.connect(self.home.refresh_welcome)
+        self.settings_page.profile_changed.connect(self._on_profile_changed)
         self.settings_page.status_message.connect(self.show_message)
         self._root.addWidget(self.settings_page)
 
@@ -277,6 +279,21 @@ class MainWindow(QMainWindow):
         esc_action.setShortcut(QKeySequence("Esc"))
         esc_action.triggered.connect(self._exit_focus_if_focused)
         self.addAction(esc_action)
+
+    def _maybe_show_first_run(self):
+        """First run: take the user straight to Settings so the profile
+        exists before any job is created (job headers prefill from it)."""
+        profile = SettingsStore.load()
+        if not profile.is_complete():
+            self.settings_page.load_profile()
+            self._root.setCurrentWidget(self.settings_page)
+            self._header_subtitle.setText("Welcome - Set Up Your Profile · BS 8110")
+            self.status.showMessage(
+                "Tell us who you are - it pre-fills every new job header."
+            )
+
+    def _on_profile_changed(self):
+        self.home.refresh_welcome()
 
     # ── job lifecycle ───────────────────────────────────────────────
 

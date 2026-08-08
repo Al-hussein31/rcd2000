@@ -34,6 +34,7 @@ class UserProfile:
     job_ref_prefix: str = ""
     default_output_dir: str = ""
     date_format: str = "%a. %d/%m/%y."
+    city: str = ""
 
     def is_complete(self) -> bool:
         return bool(self.full_name or self.company or self.engineer)

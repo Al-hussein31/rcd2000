@@ -1,8 +1,15 @@
 """History page - a full page (not a modal) listing saved jobs.
 
-Real-time search, per-row actions (open / edit / delete), checkboxes
-for multi-delete, columns (name, reference, last opened, time worked,
-note), pagination, and a verification modal before deletion.
+Designed to be genuinely useful:
+
+  · Stats bar: how many jobs, designs and hours are tracked
+  · Live search across name, reference, company and note
+  · Click ANY row to open that job (double-click too)
+  · Type chips show which designs each job contains
+  · Checkbox multi-select + verified multi-delete
+  · Per-row Open / Edit note / Delete actions
+  · Pagination so the list never gets overwhelming
+  · Friendly empty state that guides you to create a job
 """
 
 from datetime import datetime
@@ -10,18 +17,45 @@ from datetime import datetime
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QToolButton, QTableWidget, QTableWidgetItem, QHeaderView, QDialog,
-    QMessageBox, QCheckBox,
+    QMessageBox, QCheckBox, QFrame,
 )
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 
 from rcd2000.gui.theme import (
-    BG_DARK, BG_MID, BG_CARD, BG_LIGHT, ACCENT, ACCENT_SOFT, ACCENT_SOFT_BORDER,
+    BG_MID, BG_CARD, BG_LIGHT, ACCENT, ACCENT_SOFT, ACCENT_SOFT_BORDER,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BORDER, FONT_SIZE, SPACE,
     RADIUS_SM, RADIUS_MD,
 )
-from rcd2000.gui.job import JobStore
+from rcd2000.gui.modules import MODULE_BY_KEY
+from rcd2000.gui.job import Job, JobStore
 
 PAGE_SIZE = 8
+
+
+class TypeChip(QLabel):
+    """Small colored chip showing one design type (e.g. "Beam")."""
+
+    _COLORS = {
+        "column": (ACCENT, ACCENT_SOFT, ACCENT_SOFT_BORDER),
+        "beam": ("#4FC3F7", "#0E2A3A", "#1E5577"),
+        "slab": ("#81C784", "#12351F", "#256B3A"),
+        "stair": ("#FFB74D", "#3A2A10", "#6B4A1E"),
+        "base": ("#E57373", "#3A1212", "#6B2222"),
+        "cont_beam": ("#BA68C8", "#2A1235", "#4E2160"),
+    }
+
+    def __init__(self, type_key: str, parent=None):
+        super().__init__(parent)
+        entry = MODULE_BY_KEY.get(type_key)
+        name = entry[0].title() if entry else type_key.replace("_", " ").title()
+        fg, bg, bd = self._COLORS.get(type_key, (TEXT_SECONDARY, BG_LIGHT, BORDER))
+        self.setText(name)
+        self.setStyleSheet(
+            f"color: {fg}; background: {bg}; border: 1px solid {bd};"
+            f" border-radius: 9px; padding: 2px 10px; font-size: {FONT_SIZE['xs']}px;"
+            f" font-weight: 600;"
+        )
 
 
 class HistoryPage(QWidget):
@@ -29,15 +63,18 @@ class HistoryPage(QWidget):
 
     open_job_requested = Signal(str)          # slug
     back_requested = Signal()
+    new_job_requested = Signal()
     status_message = Signal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._jobs = []          # currently listed (post-search)
+        self._all_jobs: list[Job] = []   # full unfiltered list
+        self._jobs: list[Job] = []       # currently listed (post-search)
         self._page = 0
         self._row_slugs: list = []
         self._row_checkboxes: list = []
         self._build_ui()
+        self.refresh()
 
     # ── UI ──────────────────────────────────────────────────────────
 
@@ -48,44 +85,60 @@ class HistoryPage(QWidget):
 
         # Header row
         top = QHBoxLayout()
+        title_block = QVBoxLayout()
+        title_block.setSpacing(1)
         title = QLabel("YOUR JOBS")
         title.setStyleSheet(
-            f"color: {TEXT_PRIMARY}; font-size: 22px; font-weight: 700; background: transparent;"
+            f"color: {TEXT_PRIMARY}; font-size: 24px; font-weight: 700; background: transparent;"
         )
+        self._subtitle = QLabel("")
+        self._subtitle.setStyleSheet(
+            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['sm']}px; background: transparent;"
+        )
+        title_block.addWidget(title)
+        title_block.addWidget(self._subtitle)
+        top.addLayout(title_block)
+        top.addStretch()
         back = QPushButton("‹ Home")
         back.setCursor(Qt.PointingHandCursor)
         back.setStyleSheet(self._ghost_style())
         back.clicked.connect(self.back_requested.emit)
-        top.addWidget(title)
-        top.addStretch()
         top.addWidget(back)
         outer.addLayout(top)
 
+        # Stats bar
+        self._stats_row = QHBoxLayout()
+        self._stats_row.setSpacing(SPACE[2])
+        outer.addLayout(self._stats_row)
+
         # Search bar
         self.search_edit = QLineEdit()
-        self.search_edit.setPlaceholderText("Search jobs by name, reference, or note…")
+        self.search_edit.setPlaceholderText("Search jobs by name, reference, company or note…")
         self.search_edit.setClearButtonEnabled(True)
         self.search_edit.textChanged.connect(self._apply_filter)
         self.search_edit.setStyleSheet(
             f"QLineEdit {{ background: {BG_CARD}; color: {TEXT_PRIMARY};"
             f" border: 1px solid {BORDER}; border-radius: {RADIUS_MD}px;"
-            f" padding: 10px 14px; font-size: {FONT_SIZE['base']}px; }}"
+            f" padding: 11px 14px; font-size: {FONT_SIZE['base']}px; }}"
             f"QLineEdit:focus {{ border: 1px solid {ACCENT}; }}"
         )
         outer.addWidget(self.search_edit)
 
         # Table
-        self.table = QTableWidget(0, 6)
+        self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
-            ["", "Job / Reference", "Opened", "Time worked", "Note", "Actions"]
+            ["", "Job", "Designs", "Last opened", "Time", "Note", "Actions"]
         )
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.table.setSelectionMode(QTableWidget.NoSelection)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setShowGrid(False)
+        self.table.setFocusPolicy(Qt.NoFocus)
+        self.table.setMouseTracking(True)
+        self.table.setAlternatingRowColors(False)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         header = self.table.horizontalHeader()
         header.setStyleSheet(
             f"QHeaderView::section {{ background: {BG_MID}; color: {TEXT_MUTED};"
@@ -98,8 +151,58 @@ class HistoryPage(QWidget):
             f" gridline-color: transparent; }}"
             f"QTableWidget::item {{ color: {TEXT_PRIMARY}; padding: 10px 8px;"
             f" border-bottom: 1px solid {BG_LIGHT}; }}"
+            f"QTableWidget::item:selected {{ background: {ACCENT_SOFT}; color: {TEXT_PRIMARY}; }}"
+            f"QTableWidget::item:hover {{ background: {BG_LIGHT}; }}"
         )
+        # Row clicks open the job (columns 0 and 6 hold widgets, so those
+        # clicks are handled by the widgets themselves)
+        self.table.cellClicked.connect(self._on_cell_clicked)
+        self.table.cellDoubleClicked.connect(self._on_cell_double_clicked)
         outer.addWidget(self.table, 1)
+
+        # Empty state (stacked over the table area)
+        self._empty_state = QFrame()
+        self._empty_state.setStyleSheet(
+            f"background: {BG_CARD}; border: 1px solid {BORDER};"
+            f" border-radius: {RADIUS_MD}px;"
+        )
+        es = QVBoxLayout(self._empty_state)
+        es.setContentsMargins(SPACE[5], SPACE[6], SPACE[5], SPACE[6])
+        es.setSpacing(SPACE[3])
+        es.addStretch(1)
+        ghost = QLabel("\u25C8")
+        ghost.setAlignment(Qt.AlignCenter)
+        ghost.setStyleSheet(
+            f"color: {TEXT_MUTED}; font-size: 42px; background: transparent;"
+        )
+        es.addWidget(ghost)
+        empty_title = QLabel("No jobs yet")
+        empty_title.setAlignment(Qt.AlignCenter)
+        empty_title.setStyleSheet(
+            f"color: {TEXT_PRIMARY}; font-size: 20px; font-weight: 700; background: transparent;"
+        )
+        es.addWidget(empty_title)
+        empty_sub = QLabel(
+            "Every concrete design project you start will appear here.\n"
+            "Create your first job to get going."
+        )
+        empty_sub.setAlignment(Qt.AlignCenter)
+        empty_sub.setStyleSheet(
+            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['base']}px; background: transparent;"
+        )
+        es.addWidget(empty_sub)
+        empty_btn = QPushButton("＋  NEW JOB")
+        empty_btn.setCursor(Qt.PointingHandCursor)
+        empty_btn.setMinimumHeight(44)
+        empty_btn.setStyleSheet(
+            f"QPushButton {{ background: {ACCENT}; color: #17140F; font-weight: 700;"
+            f" border: none; border-radius: {RADIUS_MD}px; padding: 10px 28px; }}"
+            f"QPushButton:hover {{ background: #E6A13F; }}"
+        )
+        empty_btn.clicked.connect(self.new_job_requested.emit)
+        es.addWidget(empty_btn, 0, Qt.AlignCenter)
+        es.addStretch(2)
+        outer.addWidget(self._empty_state, 1)
 
         # Pagination
         page_row = QHBoxLayout()
@@ -158,11 +261,45 @@ class HistoryPage(QWidget):
             f"QPushButton:hover {{ border-color: {ACCENT}; color: {ACCENT}; }}"
         )
 
+    @staticmethod
+    def _stat_chip(value: str, unit: str) -> QLabel:
+        chip = QLabel(f"{value} {unit}")
+        chip.setStyleSheet(
+            f"background: {BG_CARD}; color: {TEXT_SECONDARY}; border: 1px solid {BORDER};"
+            f" border-radius: {RADIUS_MD}px; padding: 6px 14px;"
+            f" font-size: {FONT_SIZE['sm']}px;"
+        )
+        return chip
+
     # ── data ────────────────────────────────────────────────────────
 
     def refresh(self):
-        self._jobs = list(sorted(JobStore.list_jobs(), key=lambda j: j.updated, reverse=True))
+        self._all_jobs = sorted(JobStore.list_jobs(), key=lambda j: j.updated, reverse=True)
+        self._render_stats()
         self._apply_filter()
+
+    def _render_stats(self):
+        # Clear previous stat chips
+        while self._stats_row.count():
+            item = self._stats_row.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+        jobs = self._all_jobs
+        n_designs = sum(len(j.items) for j in jobs)
+        n_secs = sum(j.time_spent for j in jobs)
+        h, rem = divmod(int(n_secs), 3600)
+        m = rem // 60
+        time_txt = f"{h}h {m}m" if h else f"{m}m"
+        self._stats_row.addWidget(self._stat_chip(str(len(jobs)), "job" if len(jobs) == 1 else "jobs"))
+        self._stats_row.addWidget(self._stat_chip(str(n_designs), "design" if n_designs == 1 else "designs"))
+        self._stats_row.addWidget(self._stat_chip(time_txt if n_secs else "0m", "tracked"))
+        self._stats_row.addStretch()
+        self._subtitle.setText(
+            f"{len(jobs)} project{'s' if len(jobs) != 1 else ''} · "
+            f"{n_designs} design{'s' if n_designs != 1 else ''} · "
+            f"{time_txt} tracked"
+        )
 
     def _apply_filter(self):
         q = self.search_edit.text().strip().lower() if self.search_edit else ""
@@ -172,11 +309,12 @@ class HistoryPage(QWidget):
                     job.name, job.note,
                     job.header.get("job_ref", ""),
                     job.header.get("company", ""),
+                    job.header.get("engineer", ""),
                 ]).lower()
                 return q in hay
-            self._jobs = [j for j in JobStore.list_jobs() if match(j)]
+            self._jobs = [j for j in self._all_jobs if match(j)]
         else:
-            self._jobs = sorted(JobStore.list_jobs(), key=lambda j: j.updated, reverse=True)
+            self._jobs = list(self._all_jobs)
         self._page = 0
         self._render_page()
 
@@ -186,6 +324,10 @@ class HistoryPage(QWidget):
         self._page = max(0, min(self._page, pages - 1))
         start = self._page * PAGE_SIZE
         slice_ = self._jobs[start:start + PAGE_SIZE]
+
+        has_jobs = bool(self._all_jobs)
+        self.table.setVisible(has_jobs)
+        self._empty_state.setVisible(not has_jobs)
 
         self.table.setRowCount(0)
         self.table.setRowCount(len(slice_))
@@ -211,31 +353,61 @@ class HistoryPage(QWidget):
             self._row_checkboxes.append(cb_box)
             self.table.setCellWidget(row, 0, cb)
 
-            # name / ref
-            name_item = QTableWidgetItem(f"{job.name}")
-            name_item.setData(Qt.UserRole + 1, job.slug)
-            ref = job.header.get("job_ref", "") or "-"
-            sub = f"\nJOB REF: {ref}" if ref != "-" else ""
+            # job: name + ref/company subline
+            name_item = QTableWidgetItem()
+            ref = job.header.get("job_ref", "") or ""
+            co = job.header.get("company", "") or ""
+            sub_parts = [p for p in (ref, co) if p]
+            sub = f"  {sub_parts[0]}" if sub_parts else ""
+            if len(sub_parts) > 1:
+                sub += f"  ·  {sub_parts[1]}"
             name_item.setText(job.name + sub)
-            name_item.setForeground(Qt.GlobalColor.white)
+            name_item.setForeground(QColor(TEXT_PRIMARY))
+            name_item.setData(Qt.UserRole + 1, job.slug)
+            if sub:
+                name_item.setToolTip(sub.strip())
             self.table.setItem(row, 1, name_item)
 
-            # opened
+            # designs: type chips
+            chips_w = QWidget()
+            chips_l = QHBoxLayout(chips_w)
+            chips_l.setContentsMargins(8, 8, 8, 8)
+            chips_l.setSpacing(4)
+            types = sorted({it.type_key for it in job.items})
+            if types:
+                for t in types[:3]:
+                    chips_l.addWidget(TypeChip(t))
+                if len(types) > 3:
+                    more = QLabel(f"+{len(types) - 3}")
+                    more.setStyleSheet(
+                        f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px; background: transparent;"
+                    )
+                    chips_l.addWidget(more)
+            else:
+                none_lbl = QLabel("no designs yet")
+                none_lbl.setStyleSheet(
+                    f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px; background: transparent;"
+                )
+                chips_l.addWidget(none_lbl)
+            chips_l.addStretch()
+            self.table.setCellWidget(row, 2, chips_w)
+
+            # last opened
             when = datetime.fromtimestamp(job.last_opened or job.updated).strftime("%d %b %y  %H:%M")
             opened_item = QTableWidgetItem(when)
-            opened_item.setForeground(Qt.GlobalColor.lightGray)
-            self.table.setItem(row, 2, opened_item)
+            opened_item.setForeground(QColor(TEXT_SECONDARY))
+            self.table.setItem(row, 3, opened_item)
 
-            # types + time
-            types = ", ".join(sorted({it.type_key for it in job.items})) or "no designs"
-            types_item = QTableWidgetItem(f"{types}\nworked {job.duration_text()}")
-            types_item.setForeground(Qt.GlobalColor.lightGray)
-            self.table.setItem(row, 3, types_item)
+            # time worked
+            time_item = QTableWidgetItem(job.duration_text() or "0m")
+            time_item.setForeground(QColor(TEXT_SECONDARY))
+            time_item.setTextAlignment(Qt.AlignCenter)
+            self.table.setItem(row, 4, time_item)
 
             # note
             note_item = QTableWidgetItem(job.note or "")
-            note_item.setForeground(Qt.GlobalColor.lightGray)
-            self.table.setItem(row, 4, note_item)
+            note_item.setForeground(QColor(TEXT_SECONDARY))
+            self.table.setItem(row, 5, note_item)
 
             # action buttons
             act = QWidget()
@@ -265,15 +437,31 @@ class HistoryPage(QWidget):
             ah.addWidget(edit_b)
             ah.addWidget(del_b)
             ah.addStretch()
-            self.table.setCellWidget(row, 5, act)
+            self.table.setCellWidget(row, 6, act)
 
         self.table.setColumnWidth(0, 44)
-        self.table.setColumnWidth(3, 190)
-        self.table.setColumnWidth(5, 210)
+        self.table.setColumnWidth(2, 220)
+        self.table.setColumnWidth(3, 140)
+        self.table.setColumnWidth(4, 80)
+        self.table.setColumnWidth(6, 200)
         self.page_lbl.setText(f"{self._page + 1} / {pages}")
         self.prev_btn.setEnabled(self._page > 0)
         self.next_btn.setEnabled(self._page < pages - 1)
         self.sel_lbl.setText(f"{self._selected_count()} selected")
+
+    # ── row clicks → open job ───────────────────────────────────────
+
+    def _on_cell_clicked(self, row: int, col: int):
+        """Single click on a data column opens the job."""
+        if col in (1, 2, 3, 4, 5):
+            self._open_row(row)
+
+    def _on_cell_double_clicked(self, row: int, col: int):
+        self._open_row(row)
+
+    def _open_row(self, row: int):
+        if 0 <= row < len(self._row_slugs):
+            self.open_job_requested.emit(self._row_slugs[row])
 
     # ── helpers ────────────────────────────────────────────────────
 
@@ -300,9 +488,9 @@ class HistoryPage(QWidget):
     def _delete_selected(self):
         slugs = self._selected_slugs()
         if slugs:
-            self._delete_confirm(slugs)
+            self._confirm_delete(slugs)
 
-    def _delete_confirm(self, slugs: list):
+    def _confirm_delete(self, slugs: list):
         n = len(slugs)
         box = QMessageBox(self)
         box.setWindowTitle("Delete jobs")
@@ -324,7 +512,7 @@ class HistoryPage(QWidget):
             self.refresh()
 
     def delete_slug(self, slug: str):
-        self._delete_confirm([slug])
+        self._confirm_delete([slug])
 
     def _edit_note(self, slug: str):
         job = JobStore.load(slug)

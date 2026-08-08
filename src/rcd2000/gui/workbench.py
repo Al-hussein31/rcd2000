@@ -587,7 +587,9 @@ class Workbench(QWidget):
             pass  # visual state only - buttons already reflect via view
 
     def _export_all(self):
-        """Write every item's report (with header block) to the output file."""
+        """Write every *designed* item's report (with header block) to the
+        output file.  Items that have never been run are skipped - an
+        export with nothing designed is an error, not a silent save."""
         out = self.job.header.get("output_file", "").strip()
         if not out:
             self._emit_status("Set an Output File Name in Edit Job first.", True)
@@ -595,20 +597,40 @@ class Workbench(QWidget):
         if not self.job.items:
             self._emit_status("Create a design first, then Export All.", True)
             return
-        sections = []
+
+        designed = []
+        skipped = 0
         for item in self.job.items:
             panel = self._panels.get(item.uid)
             if panel is None:
+                skipped += 1
                 continue
+            if panel.is_designed():
+                designed.append(panel)
+            else:
+                skipped += 1
+
+        if not designed:
+            self._emit_status(
+                "Nothing to save - run at least one design first "
+                "(use the Design/Calculate button).", True
+            )
+            return
+
+        sections = []
+        for panel in designed:
             sections.append(panel.report_text(self.job.header))
             sections.append("\n" + "=" * 46 + "\n")
         try:
             with open(out, "w") as f:
                 f.write("\n".join(sections))
-            self._emit_status(
-                f"Reports written to {out} ({len(self.job.items)} design"
-                f"{'s' if len(self.job.items) != 1 else ''})", False
+            msg = (
+                f"Reports written to {out} ({len(designed)} design"
+                f"{'s' if len(designed) != 1 else ''})"
             )
+            if skipped:
+                msg += f" - {skipped} not designed, skipped."
+            self._emit_status(msg, False)
         except Exception as exc:
             self._emit_status(f"Export failed: {exc}", True)
 

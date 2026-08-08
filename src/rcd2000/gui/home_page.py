@@ -6,10 +6,13 @@ A clean launch surface with two paths only:
   · CONTINUE    → full History page (not a modal): search, recent
                   jobs, edit / delete, multi-delete, pagination
 
-Shows a personal welcome using the engineer's name from Settings.
+The two actions sit side by side and the whole block is centred in the
+page.  CONTINUE is hidden until there is at least one saved job, and the
+greeting is personalised with the time of day, the engineer's name from
+Settings, and (when a city is configured and the network is up) the
+current weather via Open-Meteo.
 """
 
-import os
 from datetime import datetime
 
 from PySide6.QtWidgets import (
@@ -19,11 +22,22 @@ from PySide6.QtCore import Qt, Signal
 
 from rcd2000 import __version__
 from rcd2000.gui.theme import (
-    BG_DARK, BG_MID, BG_LIGHT, BG_CARD, ACCENT, ACCENT_SOFT,
+    BG_LIGHT, BG_CARD, ACCENT,
     TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, BORDER, FONT_SIZE, SPACE,
     RADIUS_MD,
 )
 from rcd2000.gui.settings import SettingsStore
+from rcd2000.gui.job import JobStore
+
+
+def time_greeting(hour: int) -> str:
+    if hour < 5:
+        return "Working late"
+    if hour < 12:
+        return "Good morning"
+    if hour < 17:
+        return "Good afternoon"
+    return "Good evening"
 
 
 class HomePage(QWidget):
@@ -36,13 +50,20 @@ class HomePage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._build_ui()
+        self._weather = None
 
     # ── UI ──────────────────────────────────────────────────────────
 
     def _build_ui(self):
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(SPACE[7], SPACE[6], SPACE[7], SPACE[7])
-        outer.setSpacing(SPACE[4])
+        outer.setContentsMargins(SPACE[7], 0, SPACE[7], 0)
+        outer.setSpacing(0)
+
+        # Vertical centring: the content block floats mid-page.
+        outer.addStretch(1)
+
+        content = QVBoxLayout()
+        content.setSpacing(SPACE[4])
 
         # Brand mark
         brand = QVBoxLayout()
@@ -60,17 +81,17 @@ class HomePage(QWidget):
         )
         brand.addWidget(logo)
         brand.addWidget(tag)
-        outer.addLayout(brand)
-        outer.addSpacing(SPACE[6])
+        content.addLayout(brand)
+        content.addSpacing(SPACE[6])
 
-        # Welcome line (personal)
+        # Welcome line (personal + time of day + weather)
         self._welcome = QLabel()
         self._welcome.setAlignment(Qt.AlignCenter)
         self._welcome.setWordWrap(True)
         self._welcome.setStyleSheet(
             f"color: {TEXT_PRIMARY}; font-size: 22px; font-weight: 600; background: transparent;"
         )
-        outer.addWidget(self._welcome)
+        content.addWidget(self._welcome)
 
         self._welcome_sub = QLabel()
         self._welcome_sub.setAlignment(Qt.AlignCenter)
@@ -78,41 +99,41 @@ class HomePage(QWidget):
         self._welcome_sub.setStyleSheet(
             f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['base']}px; background: transparent;"
         )
-        outer.addWidget(self._welcome_sub)
-        outer.addSpacing(SPACE[5])
+        content.addWidget(self._welcome_sub)
+        content.addSpacing(SPACE[5])
 
-        # The two actions - big and clean
-        new_btn = QPushButton("＋  NEW JOB")
-        new_btn.setCursor(Qt.PointingHandCursor)
-        new_btn.setMinimumHeight(58)
-        new_btn.setMinimumWidth(340)
-        new_btn.setStyleSheet(
+        # The two actions - side by side, big and clean
+        self.new_btn = QPushButton("＋  NEW JOB")
+        self.new_btn.setCursor(Qt.PointingHandCursor)
+        self.new_btn.setMinimumHeight(58)
+        self.new_btn.setMinimumWidth(240)
+        self.new_btn.setStyleSheet(
             f"QPushButton {{ background: {ACCENT}; color: #17140F; font-size: 18px;"
             f" font-weight: 700; border: none; border-radius: {RADIUS_MD}px;"
             f" padding: 12px 36px; }}"
             f"QPushButton:hover {{ background: #E6A13F; }}"
             f"QPushButton:pressed {{ background: #B8751F; }}"
         )
-        new_btn.clicked.connect(self.new_job_requested.emit)
+        self.new_btn.clicked.connect(self.new_job_requested.emit)
 
-        continue_btn = QPushButton("CONTINUE")
-        continue_btn.setCursor(Qt.PointingHandCursor)
-        continue_btn.setMinimumHeight(58)
-        continue_btn.setMinimumWidth(340)
-        continue_btn.setStyleSheet(
+        self.continue_btn = QPushButton("CONTINUE")
+        self.continue_btn.setCursor(Qt.PointingHandCursor)
+        self.continue_btn.setMinimumHeight(58)
+        self.continue_btn.setMinimumWidth(240)
+        self.continue_btn.setStyleSheet(
             f"QPushButton {{ background: {BG_CARD}; color: {TEXT_PRIMARY};"
             f" font-size: 18px; font-weight: 600; border: 1px solid {BORDER};"
             f" border-radius: {RADIUS_MD}px; padding: 12px 36px; }}"
             f"QPushButton:hover {{ border-color: {ACCENT}; color: {ACCENT};"
             f" background: {BG_LIGHT}; }}"
         )
-        continue_btn.clicked.connect(self.continue_requested.emit)
+        self.continue_btn.clicked.connect(self.continue_requested.emit)
 
-        actions = QVBoxLayout()
+        actions = QHBoxLayout()
         actions.setSpacing(SPACE[3])
-        actions.addWidget(new_btn, alignment=Qt.AlignCenter)
-        actions.addWidget(continue_btn, alignment=Qt.AlignCenter)
-        outer.addLayout(actions)
+        actions.addWidget(self.new_btn, alignment=Qt.AlignCenter)
+        actions.addWidget(self.continue_btn, alignment=Qt.AlignCenter)
+        content.addLayout(actions)
 
         # Keyboard hint
         hint = QLabel("New Job:   Ctrl+N        Continue:   Ctrl+C     Home:   Ctrl+H")
@@ -121,10 +142,11 @@ class HomePage(QWidget):
             f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px; background: transparent;"
             f" letter-spacing: 0.4px;"
         )
-        outer.addWidget(hint)
-        outer.addStretch(1)
+        content.addWidget(hint)
 
-        # Settings link at bottom
+        content.addStretch(1)
+
+        # Settings link at bottom of the content block
         bottom = QHBoxLayout()
         bottom.addStretch()
         settings_btn = QToolButton()
@@ -141,35 +163,58 @@ class HomePage(QWidget):
         ver.setStyleSheet(f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px; background: transparent;")
         bottom.addWidget(settings_btn)
         bottom.addWidget(ver)
-        outer.addLayout(bottom)
+        content.addLayout(bottom)
+
+        outer.addLayout(content)
+        outer.addStretch(1)
 
         self.refresh_welcome()
 
     # ── welcome ────────────────────────────────────────────────────
 
     def refresh_welcome(self):
+        self._refresh_actions_visibility()
         now = datetime.now()
-        hour = now.hour
-        if hour < 12:
-            tod = "Good morning"
-        elif hour < 17:
-            tod = "Good afternoon"
-        else:
-            tod = "Good evening"
+        tod = time_greeting(now.hour)
 
         profile = SettingsStore.load()
-        if profile.full_name.strip():
-            greeting = f"Welcome back, {profile.full_name.strip()}!"
+        name = profile.full_name.strip()
+        greeting = f"{tod}, {name}!" if name else f"{tod}!"
+
+        # Weather is optional and non-blocking: configured city + network
+        if profile.city.strip():
+            weather = self._get_weather(profile.city.strip())
+            if weather:
+                cond = weather.get("condition", "")
+                loc = weather.get("city", profile.city).title()
+                extra = f" · {weather['temp_c']}°C"
+                if cond:
+                    extra += f", {cond}"
+                greeting = f"{greeting[:-1]}  -  {loc}{extra}!"
+
+        has_jobs = bool(JobStore.list_jobs())
+        if name:
             sub = (
-                f"{tod}. Set up a new concrete design job, or continue "
-                "one of your existing projects."
+                "Set up a new concrete design job, or continue one of your "
+                "existing projects."
             )
         else:
-            greeting = "Welcome to RCD 2000"
             sub = (
                 "Start a new concrete design job, or continue an existing "
                 "project. Tip: fill your profile in Settings for faster "
                 "job creation."
             )
+        if not has_jobs:
+            sub = "Set up your first concrete design job to get going."
         self._welcome.setText(greeting)
         self._welcome_sub.setText(sub)
+
+    def _get_weather(self, city: str):
+        """Fetch weather once per home visit; degrade silently offline."""
+        from rcd2000.gui import weather as weather_mod
+        return weather_mod.fetch_weather(city)
+
+    def _refresh_actions_visibility(self):
+        """Hide CONTINUE until there is at least one saved job."""
+        has_jobs = bool(JobStore.list_jobs())
+        self.continue_btn.setVisible(has_jobs)
