@@ -465,6 +465,7 @@ class HistoryPage(QWidget):
             _oi = get_icon("fa5s.folder-open", TEXT_SECONDARY, 13)
             if _oi is not None:
                 open_b.setIcon(_oi)
+            open_b.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
             open_b.setCursor(Qt.PointingHandCursor)
             open_b.clicked.connect(lambda _=False, s=job.slug: self.open_job_requested.emit(s))
             edit_b = QToolButton()
@@ -472,6 +473,7 @@ class HistoryPage(QWidget):
             _ei = get_icon("fa5s.edit", TEXT_SECONDARY, 13)
             if _ei is not None:
                 edit_b.setIcon(_ei)
+            edit_b.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
             edit_b.setCursor(Qt.PointingHandCursor)
             edit_b.clicked.connect(lambda _=False, s=job.slug: self._edit_note(s))
             del_b = QToolButton()
@@ -479,6 +481,7 @@ class HistoryPage(QWidget):
             _di = get_icon("fa5s.trash-alt", TEXT_SECONDARY, 13)
             if _di is not None:
                 del_b.setIcon(_di)
+            del_b.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
             del_b.setCursor(Qt.PointingHandCursor)
             del_b.clicked.connect(lambda _=False, s=job.slug: self._confirm_delete([s]))
             for b in (open_b, edit_b, del_b):
