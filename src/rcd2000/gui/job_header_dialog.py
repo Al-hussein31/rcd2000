@@ -16,6 +16,7 @@ programs) and the closing confirmation:
 
 import os
 from datetime import datetime
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QFileDialog,
@@ -25,7 +26,7 @@ from PySide6.QtCore import Qt
 
 from rcd2000.gui.theme import (
     BG_MID, BG_LIGHT, BG_CARD, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY,
-    TEXT_MUTED, BORDER, FONT_SIZE, SPACE, RADIUS_MD,
+    TEXT_MUTED, BORDER, ERROR, FONT_SIZE, SPACE, RADIUS_MD,
 )
 from rcd2000.gui.widgets import (
     button, label, Card, fcu_combo, fy_combo, combo, spinbox, icon,
@@ -38,6 +39,25 @@ _DEFAULT_DATE = lambda: datetime.now().strftime("%a. %d/%m/%y.")
 
 def _today() -> str:
     return _DEFAULT_DATE()
+
+
+def check_output_path(text: str) -> tuple[bool, str]:
+    """Validate a typed output file path.
+
+    Returns ``(ok, message)``.  Empty text is valid (the field is
+    optional - export simply warns).  A non-empty path is valid when
+    its parent directory exists and is writable.
+    """
+    t = (text or "").strip()
+    if not t:
+        return True, ""
+    p = Path(os.path.expanduser(t))
+    parent = p.parent
+    if not parent.exists() or not parent.is_dir():
+        return False, f"Folder does not exist: {parent}"
+    if not os.access(parent, os.W_OK):
+        return False, f"Folder is not writable: {parent}"
+    return True, ""
 
 
 class JobHeaderDialog(QDialog):
@@ -111,10 +131,18 @@ class JobHeaderDialog(QDialog):
         file_row.addWidget(self.output_file, 1)
         file_row.addWidget(browse)
         c2.add_layout(file_row)
+        self._output_error = label("", secondary=True, size=11)
+        self._output_error.setWordWrap(True)
+        self._output_error.setStyleSheet(
+            f"color: {ERROR}; background: transparent;"
+        )
+        self._output_error.hide()
+        c2.add_row("", self._output_error)
         c2.add_row("", label(
             "Reports are written here when you export the job.",
             secondary=True, size=11,
         ))
+        self.output_file.editingFinished.connect(self._validate_output_path)
         layout.addWidget(c2)
 
         # ── Concrete & steel stresses ──────────────────────────────
@@ -223,13 +251,27 @@ class JobHeaderDialog(QDialog):
     # ── helpers ────────────────────────────────────────────────────
 
     @staticmethod
-    def _input_style() -> str:
+    def _input_style(invalid: bool = False) -> str:
+        border = ERROR if invalid else BORDER
         return (
             f"QLineEdit {{ background: {BG_LIGHT}; color: {TEXT_PRIMARY};"
-            f" border: 1px solid {BORDER}; border-radius: {RADIUS_MD}px;"
+            f" border: 1px solid {border}; border-radius: {RADIUS_MD}px;"
             f" padding: 7px 10px; font-size: {FONT_SIZE['base']}px; }}"
             f"QLineEdit:focus {{ border: 1px solid {ACCENT}; }}"
         )
+
+    def _validate_output_path(self):
+        """Inline validation on blur: red border + message for a typed
+        path whose folder is missing or not writable.  Empty is fine -
+        the field is optional and export warns instead."""
+        ok, message = check_output_path(self.output_file.text())
+        if not ok:
+            self.output_file.setStyleSheet(self._input_style(invalid=True))
+            self._output_error.setText(message)
+            self._output_error.show()
+        else:
+            self.output_file.setStyleSheet(self._input_style())
+            self._output_error.hide()
 
     def _browse_output(self):
         start = self.output_file.text().strip()

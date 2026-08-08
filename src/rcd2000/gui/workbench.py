@@ -17,6 +17,8 @@ shows its item count, and the mini-navbar lists the designs of the
 active type with a "+" button to add new work for that design.
 """
 
+import os
+
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QToolButton,
     QStackedWidget, QGridLayout, QFrame, QSizePolicy, QMessageBox,
@@ -623,6 +625,21 @@ class Workbench(QWidget):
         out = self.job.header.get("output_file", "").strip()
         if not out:
             self._emit_status("Set an Output File Name in Edit Job first.", True)
+            return
+        # Guard before writing: a typed (not Browse'd) path may point at
+        # a folder that does not exist or cannot be written to.
+        parent = os.path.dirname(os.path.abspath(os.path.expanduser(out)))
+        if not os.path.isdir(parent):
+            self._emit_status(
+                f"Output folder does not exist: {parent} - "
+                "use Edit Job to fix the path.", True
+            )
+            return
+        if not os.access(parent, os.W_OK):
+            self._emit_status(
+                f"Output folder is not writable: {parent} - "
+                "use Edit Job to fix the path.", True
+            )
             return
         if not self.job.items:
             self._emit_status("Create a design first, then Export All.", True)
