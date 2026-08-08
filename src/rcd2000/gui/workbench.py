@@ -68,6 +68,13 @@ class ResponsiveGrid(QWidget):
     def _relayout(self):
         if not self._panels:
             return
+        # Reset lingering row geometry from earlier layout passes. A grid
+        # built before the widget had its real size (constructor restore)
+        # may leave empty rows with stretch=1, which splits the height
+        # 50/50 and halves every panel.
+        for r in range(self._grid.rowCount()):
+            self._grid.setRowStretch(r, 0)
+            self._grid.setRowMinimumHeight(r, 0)
         cols = 1 if self.width() < SINGLE_COL_WIDTH else 2
         rows = (len(self._panels) + cols - 1) // cols
         for i, panel in enumerate(self._panels):

@@ -138,6 +138,10 @@ class HistoryPage(QWidget):
             ["", "Job", "Designs", "Last opened", "Time", "Note", "Actions"]
         )
         self.table.verticalHeader().setVisible(False)
+        # Row height must come from the section size, NOT from item padding:
+        # Qt insets cell-widget geometry by the item's padding, crushing
+        # widget-bearing cells (checkbox / chips / action buttons) to ~8px.
+        self.table.verticalHeader().setDefaultSectionSize(48)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -157,7 +161,7 @@ class HistoryPage(QWidget):
             f"QTableWidget {{ background: {BG_CARD}; border: 1px solid {BORDER};"
             f" border-radius: {RADIUS_MD}px; font-size: {FONT_SIZE['base']}px;"
             f" gridline-color: transparent; }}"
-            f"QTableWidget::item {{ color: {TEXT_PRIMARY}; padding: 10px 8px;"
+            f"QTableWidget::item {{ color: {TEXT_PRIMARY};"
             f" border-bottom: 1px solid {BG_LIGHT}; }}"
             f"QTableWidget::item:selected {{ background: {ACCENT_SOFT}; color: {TEXT_PRIMARY}; }}"
             f"QTableWidget::item:hover {{ background: {BG_LIGHT}; }}"
