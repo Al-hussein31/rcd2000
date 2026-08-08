@@ -28,7 +28,7 @@ from rcd2000.gui.theme import (
     TEXT_MUTED, BORDER, FONT_SIZE, SPACE, RADIUS_MD,
 )
 from rcd2000.gui.widgets import (
-    button, label, Card, fcu_combo, fy_combo, combo, spinbox,
+    button, label, Card, fcu_combo, fy_combo, combo, spinbox, icon,
 )
 from rcd2000.gui.settings import SettingsStore, UserProfile
 
@@ -86,7 +86,17 @@ class JobHeaderDialog(QDialog):
         self.note = QLineEdit(prefill.get("note", ""))
         self.note.setPlaceholderText("e.g. Block A - ground floor columns")
         self.note.setStyleSheet(self._input_style())
-        c1b.add_row("", self.note)
+        note_row = QHBoxLayout()
+        note_row.setSpacing(SPACE[3])
+        note_icon = QLabel()
+        _ni = icon("fa5s.sticky-note", TEXT_SECONDARY, 16)
+        if _ni is not None:
+            note_icon.setPixmap(_ni.pixmap(16, 16))
+        note_icon.setStyleSheet("background: transparent;")
+        note_icon.setAlignment(Qt.AlignCenter)
+        note_row.addWidget(note_icon, 0, Qt.AlignCenter)
+        note_row.addWidget(self.note, 1)
+        c1b.add_layout(note_row)
         layout.addWidget(c1b)
 
         # ── Output file ────────────────────────────────────────────
