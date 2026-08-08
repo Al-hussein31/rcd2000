@@ -177,6 +177,7 @@ class MainWindow(QMainWindow):
         self.history = HistoryPage()
         self.history.back_requested.connect(self._go_home)
         self.history.open_job_requested.connect(self._open_job)
+        self.history.new_job_requested.connect(self._new_job)
         self.history.status_message.connect(self.show_message)
         self._root.addWidget(self.history)
 

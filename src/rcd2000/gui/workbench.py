@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QToolButton,
     QStackedWidget, QGridLayout, QFrame, QSizePolicy, QMessageBox,
 )
+from PySide6.QtGui import QShortcut, QKeySequence
 from PySide6.QtCore import Qt, QTimer, Signal
 
 from rcd2000.gui.theme import (
@@ -119,6 +120,15 @@ class Workbench(QWidget):
         self._type_buttons: dict[str, QPushButton] = {}
         self._header_rows: list[QWidget] = []       # collapsed in focus mode
         self._header_expanded = True
+        # In focus mode the header rows collapse to a slim hover strip;
+        # a timer checks whether the cursor is over the strip so the
+        # headers re-appear on hover and collapse again when it leaves.
+        self._hover_timer = QTimer(self)
+        self._hover_timer.setInterval(120)
+        self._hover_timer.timeout.connect(self._poll_header_hover)
+        # ESC always exits focus mode (works even when a form field has focus)
+        self._esc = QShortcut(QKeySequence(Qt.Key_Escape), self)
+        self._esc.activated.connect(self.exit_focus)
         self._build_ui()
         self._restore_items()
         self.refresh_all()
@@ -135,10 +145,27 @@ class Workbench(QWidget):
         job_bar = self._build_job_bar()
         type_bar = self._build_type_navbar()
         mini_bar = self._build_mini_navbar()
-        outer.addWidget(job_bar)
-        outer.addWidget(type_bar)
-        outer.addWidget(mini_bar)
         self._header_rows = [mini_bar, type_bar, job_bar]
+
+        # Header zone: wraps the nav rows plus a slim hover strip. In focus
+        # mode the rows collapse away and only the strip remains; hovering
+        # the strip (or the expanded rows) keeps the headers visible, and
+        # moving the mouse away collapses them again.
+        self._header_zone = QWidget()
+        self._header_zone.setObjectName("headerZone")
+        self._header_zone.setStyleSheet(f"background: {BG_MID};")
+        hz = QVBoxLayout(self._header_zone)
+        hz.setContentsMargins(0, 0, 0, 0)
+        hz.setSpacing(0)
+        self._hover_strip = QWidget()
+        self._hover_strip.setFixedHeight(12)
+        self._hover_strip.setStyleSheet(
+            f"background: {BG_MID}; border-bottom: 1px solid {BORDER};"
+        )
+        hz.addWidget(self._hover_strip)
+        for row in self._header_rows:
+            hz.addWidget(row)
+        outer.addWidget(self._header_zone)
 
         # Body: grid view ↔ focus view (empty state lives in grid view)
         self._body = QStackedWidget()
@@ -455,6 +482,7 @@ class Workbench(QWidget):
         self._body.setCurrentWidget(self._focus_view)
         self._set_header_collapsed(True)
         self._refresh_focus_buttons()
+        self._hover_timer.start()
 
     def exit_focus(self):
         if self._focused is None:
@@ -465,37 +493,32 @@ class Workbench(QWidget):
         panel.setParent(None)
         self._body.setCurrentWidget(self._grid_page)
         self._set_header_collapsed(False)
+        self._hover_timer.stop()
         self.refresh_all()
         self._refresh_focus_buttons()
 
     def _set_header_collapsed(self, collapsed: bool):
         """Collapse the job/type/mini nav rows in focus mode.
 
-        When collapsed, the focused panel gets the full area. Scrolling the
-        focused panel's content back to the top re-expands the header rows
-        (the panel scrolls inside its own QScrollArea, so we listen to its
-        vertical scrollbar to decide when the header should come back).
+        When collapsed, only the slim hover strip remains at the top.
+        Hovering the strip re-expands the header rows; moving the mouse
+        away collapses them again so the focused panel keeps the full
+        area. Polled via _poll_header_hover (120 ms) using underMouse(),
+        which is True when the cursor is over the zone or any child.
         """
         if collapsed == (not self._header_expanded):
             return  # already in the requested state
         self._header_expanded = not collapsed
+        self._hover_strip.setVisible(not collapsed)
         for row in self._header_rows:
             row.setVisible(not collapsed)
-        # while collapsed, scrolling to the top expands the header again
-        if self._focused is not None:
-            sb = self._focused.scroll_area.verticalScrollBar()
-            try:
-                sb.valueChanged.disconnect(self._on_focus_scroll)
-            except (RuntimeError, TypeError):
-                pass
-            if collapsed:
-                sb.valueChanged.connect(self._on_focus_scroll)
 
-    def _on_focus_scroll(self, value: int):
+    def _poll_header_hover(self):
         if self._focused is None:
             return
-        # scroll reached the top → expand the header; scrolled down → collapse
-        self._set_header_collapsed(value > 0)
+        # underMouse() covers the zone and all its children, so the
+        # headers stay up while the cursor is anywhere over them.
+        self._set_header_collapsed(not self._header_zone.underMouse())
 
     # ════════════════════════════════════════════════════════════════
     # Refresh
