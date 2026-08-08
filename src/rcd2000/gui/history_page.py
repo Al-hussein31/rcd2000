@@ -29,6 +29,7 @@ from rcd2000.gui.theme import (
 )
 from rcd2000.gui.modules import MODULE_BY_KEY
 from rcd2000.gui.job import Job, JobStore
+from rcd2000.gui.widgets import icon as get_icon
 
 PAGE_SIZE = 8
 
@@ -49,8 +50,9 @@ class TypeChip(QLabel):
         super().__init__(parent)
         entry = MODULE_BY_KEY.get(type_key)
         name = entry[0].title() if entry else type_key.replace("_", " ").title()
+        glyph = entry[3] if entry else ""
         fg, bg, bd = self._COLORS.get(type_key, (TEXT_SECONDARY, BG_LIGHT, BORDER))
-        self.setText(name)
+        self.setText(f"{glyph}  {name}" if glyph else name)
         self.setStyleSheet(
             f"color: {fg}; background: {bg}; border: 1px solid {bd};"
             f" border-radius: 9px; padding: 2px 10px; font-size: {FONT_SIZE['xs']}px;"
@@ -99,9 +101,12 @@ class HistoryPage(QWidget):
         title_block.addWidget(self._subtitle)
         top.addLayout(title_block)
         top.addStretch()
-        back = QPushButton("‹ Home")
+        back = QPushButton(" Home")
         back.setCursor(Qt.PointingHandCursor)
         back.setStyleSheet(self._ghost_style())
+        _bi = get_icon("fa5s.arrow-left", TEXT_PRIMARY, 14)
+        if _bi is not None:
+            back.setIcon(_bi)
         back.clicked.connect(self.back_requested.emit)
         top.addWidget(back)
         outer.addLayout(top)
@@ -115,6 +120,9 @@ class HistoryPage(QWidget):
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("Search jobs by name, reference, company or note…")
         self.search_edit.setClearButtonEnabled(True)
+        _si = get_icon("fa5s.search", TEXT_MUTED, 15)
+        if _si is not None:
+            self.search_edit.addAction(_si, QLineEdit.LeadingPosition)
         self.search_edit.textChanged.connect(self._apply_filter)
         self.search_edit.setStyleSheet(
             f"QLineEdit {{ background: {BG_CARD}; color: {TEXT_PRIMARY};"
@@ -170,12 +178,18 @@ class HistoryPage(QWidget):
         es.setContentsMargins(SPACE[5], SPACE[6], SPACE[5], SPACE[6])
         es.setSpacing(SPACE[3])
         es.addStretch(1)
-        ghost = QLabel("\u25C8")
+        ghost = QLabel()
         ghost.setAlignment(Qt.AlignCenter)
-        ghost.setStyleSheet(
-            f"color: {TEXT_MUTED}; font-size: 42px; background: transparent;"
-        )
-        es.addWidget(ghost)
+        ghost.setFixedSize(64, 64)
+        _g = get_icon("fa5s.clipboard-list", TEXT_MUTED, 42)
+        if _g is not None:
+            ghost.setPixmap(_g.pixmap(48, 48))
+        else:
+            ghost.setText("\u25C8")
+            ghost.setStyleSheet(
+                f"color: {TEXT_MUTED}; font-size: 42px; background: transparent;"
+            )
+        es.addWidget(ghost, 0, Qt.AlignCenter)
         empty_title = QLabel("No jobs yet")
         empty_title.setAlignment(Qt.AlignCenter)
         empty_title.setStyleSheet(
@@ -191,9 +205,12 @@ class HistoryPage(QWidget):
             f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['base']}px; background: transparent;"
         )
         es.addWidget(empty_sub)
-        empty_btn = QPushButton("＋  NEW JOB")
+        empty_btn = QPushButton("  NEW JOB")
         empty_btn.setCursor(Qt.PointingHandCursor)
         empty_btn.setMinimumHeight(44)
+        _pi = get_icon("fa5s.plus", "#17140F", 14)
+        if _pi is not None:
+            empty_btn.setIcon(_pi)
         empty_btn.setStyleSheet(
             f"QPushButton {{ background: {ACCENT}; color: #17140F; font-weight: 700;"
             f" border: none; border-radius: {RADIUS_MD}px; padding: 10px 28px; }}"
@@ -207,7 +224,11 @@ class HistoryPage(QWidget):
         # Pagination
         page_row = QHBoxLayout()
         self.prev_btn = QToolButton()
-        self.prev_btn.setText("‹")
+        _pli = get_icon("fa5s.chevron-left", TEXT_PRIMARY, 14)
+        if _pli is not None:
+            self.prev_btn.setIcon(_pli)
+        else:
+            self.prev_btn.setText("‹")
         self.prev_btn.setCursor(Qt.PointingHandCursor)
         self.prev_btn.clicked.connect(lambda: self._goto(self._page - 1))
         self.page_lbl = QLabel("1 / 1")
@@ -215,7 +236,11 @@ class HistoryPage(QWidget):
             f"color: {TEXT_SECONDARY}; font-size: {FONT_SIZE['sm']}px; background: transparent;"
         )
         self.next_btn = QToolButton()
-        self.next_btn.setText("›")
+        _ni = get_icon("fa5s.chevron-right", TEXT_PRIMARY, 14)
+        if _ni is not None:
+            self.next_btn.setIcon(_ni)
+        else:
+            self.next_btn.setText("›")
         self.next_btn.setCursor(Qt.PointingHandCursor)
         self.next_btn.clicked.connect(lambda: self._goto(self._page + 1))
         for b in (self.prev_btn, self.next_btn):
@@ -244,6 +269,12 @@ class HistoryPage(QWidget):
         for b in (open_btn, del_sel_btn):
             b.setCursor(Qt.PointingHandCursor)
             b.setStyleSheet(self._ghost_style())
+        _oi2 = get_icon("fa5s.folder-open", TEXT_PRIMARY, 13)
+        if _oi2 is not None:
+            open_btn.setIcon(_oi2)
+        _di2 = get_icon("fa5s.trash-alt", TEXT_PRIMARY, 13)
+        if _di2 is not None:
+            del_sel_btn.setIcon(_di2)
         open_btn.clicked.connect(self._open_selected)
         del_sel_btn.clicked.connect(self._delete_selected)
         actions.addWidget(self.sel_lbl)
@@ -262,13 +293,28 @@ class HistoryPage(QWidget):
         )
 
     @staticmethod
-    def _stat_chip(value: str, unit: str) -> QLabel:
-        chip = QLabel(f"{value} {unit}")
+    def _stat_chip(value: str, unit: str, icon_name: str = "") -> QWidget:
+        chip = QWidget()
         chip.setStyleSheet(
-            f"background: {BG_CARD}; color: {TEXT_SECONDARY}; border: 1px solid {BORDER};"
-            f" border-radius: {RADIUS_MD}px; padding: 6px 14px;"
+            f"background: {BG_CARD}; border: 1px solid {BORDER};"
+            f" border-radius: {RADIUS_MD}px;"
+        )
+        h = QHBoxLayout(chip)
+        h.setContentsMargins(12, 6, 14, 6)
+        h.setSpacing(7)
+        if icon_name:
+            _ic = get_icon(icon_name, TEXT_MUTED, 14)
+            if _ic is not None:
+                ic_lbl = QLabel()
+                ic_lbl.setPixmap(_ic.pixmap(14, 14))
+                ic_lbl.setStyleSheet("background: transparent;")
+                h.addWidget(ic_lbl)
+        txt = QLabel(f"{value} {unit}")
+        txt.setStyleSheet(
+            f"background: transparent; color: {TEXT_SECONDARY};"
             f" font-size: {FONT_SIZE['sm']}px;"
         )
+        h.addWidget(txt)
         return chip
 
     # ── data ────────────────────────────────────────────────────────
@@ -291,9 +337,9 @@ class HistoryPage(QWidget):
         h, rem = divmod(int(n_secs), 3600)
         m = rem // 60
         time_txt = f"{h}h {m}m" if h else f"{m}m"
-        self._stats_row.addWidget(self._stat_chip(str(len(jobs)), "job" if len(jobs) == 1 else "jobs"))
-        self._stats_row.addWidget(self._stat_chip(str(n_designs), "design" if n_designs == 1 else "designs"))
-        self._stats_row.addWidget(self._stat_chip(time_txt if n_secs else "0m", "tracked"))
+        self._stats_row.addWidget(self._stat_chip(str(len(jobs)), "job" if len(jobs) == 1 else "jobs", "fa5s.folder-open"))
+        self._stats_row.addWidget(self._stat_chip(str(n_designs), "design" if n_designs == 1 else "designs", "fa5s.drafting-compass"))
+        self._stats_row.addWidget(self._stat_chip(time_txt if n_secs else "0m", "tracked", "fa5s.clock"))
         self._stats_row.addStretch()
         self._subtitle.setText(
             f"{len(jobs)} project{'s' if len(jobs) != 1 else ''} · "
@@ -416,14 +462,23 @@ class HistoryPage(QWidget):
             ah.setSpacing(6)
             open_b = QToolButton()
             open_b.setText("Open")
+            _oi = get_icon("fa5s.folder-open", TEXT_SECONDARY, 13)
+            if _oi is not None:
+                open_b.setIcon(_oi)
             open_b.setCursor(Qt.PointingHandCursor)
             open_b.clicked.connect(lambda _=False, s=job.slug: self.open_job_requested.emit(s))
             edit_b = QToolButton()
             edit_b.setText("Edit")
+            _ei = get_icon("fa5s.edit", TEXT_SECONDARY, 13)
+            if _ei is not None:
+                edit_b.setIcon(_ei)
             edit_b.setCursor(Qt.PointingHandCursor)
             edit_b.clicked.connect(lambda _=False, s=job.slug: self._edit_note(s))
             del_b = QToolButton()
             del_b.setText("Delete")
+            _di = get_icon("fa5s.trash-alt", TEXT_SECONDARY, 13)
+            if _di is not None:
+                del_b.setIcon(_di)
             del_b.setCursor(Qt.PointingHandCursor)
             del_b.clicked.connect(lambda _=False, s=job.slug: self._confirm_delete([s]))
             for b in (open_b, edit_b, del_b):

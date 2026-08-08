@@ -108,6 +108,7 @@ class Workbench(QWidget):
         self._panels: dict[str, DesignPanel] = {}   # uid → panel
         self._page = 0
         self._focused: DesignPanel | None = None
+        self._focus_scroll_connected = False
         self._chip_buttons: list[QPushButton] = []
         self._type_buttons: dict[str, QPushButton] = {}
         self._header_rows: list[QWidget] = []       # collapsed in focus mode
@@ -409,15 +410,25 @@ class Workbench(QWidget):
         )
         if reply != QMessageBox.Yes:
             return
+        was_focused = self._focused is panel
         self.job.remove_item(panel.uid)
         self._panels.pop(panel.uid, None)
         panel.deleteLater()
-        if self._focused is panel:
+        if was_focused:
+            # Removed the focused panel: leave focus mode so the grid view
+            # (and its remaining panels) become visible again.
             self._focused = None
+            self._body.setCurrentWidget(self._grid_page)
+            self._set_header_collapsed(False)
         self.refresh_all()
         self.job_changed.emit()
 
     def add_item(self, type_key: str):
+        # Adding while in focus mode: leave focus first.  Otherwise
+        # refresh_grid() below would reparent the focused panel back into
+        # the (hidden) grid page, leaving the focus view blank.
+        if self._focused is not None:
+            self.exit_focus()
         item = self.job.add_item(type_key)
         self.job.active_type = type_key
         panel = self._make_panel(item)
@@ -477,12 +488,15 @@ class Workbench(QWidget):
         # while collapsed, scrolling to the top expands the header again
         if self._focused is not None:
             sb = self._focused.scroll_area.verticalScrollBar()
-            try:
-                sb.valueChanged.disconnect(self._on_focus_scroll)
-            except (RuntimeError, TypeError):
-                pass
-            if collapsed:
+            if collapsed and not self._focus_scroll_connected:
                 sb.valueChanged.connect(self._on_focus_scroll)
+                self._focus_scroll_connected = True
+            elif not collapsed and self._focus_scroll_connected:
+                try:
+                    sb.valueChanged.disconnect(self._on_focus_scroll)
+                except (RuntimeError, TypeError):
+                    pass
+                self._focus_scroll_connected = False
 
     def _on_focus_scroll(self, value: int):
         if self._focused is None:
@@ -546,6 +560,10 @@ class Workbench(QWidget):
         start = self._page * PAGE_SIZE
         visible = self.job.items[start:start + PAGE_SIZE]
         panels = [self._panels[it.uid] for it in visible if it.uid in self._panels]
+        if self._focused is not None:
+            # Focus mode owns the focused panel in the focus container -
+            # never hand it back to the grid.
+            panels = [p for p in panels if p is not self._focused]
         self._grid_view.set_panels(panels)
         self._empty_state.setVisible(total == 0)
         self._grid_view.setVisible(total > 0)

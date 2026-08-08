@@ -92,23 +92,32 @@ class SettingsPage(QWidget):
         self.outdir_in = QLineEdit()
         self.datefmt_in = QLineEdit()
         self.city_in = QLineEdit()
-        for w, lbl, ph in [
-            (self.full_name, "Full name", "e.g. Eng. Ade Oyenuga"),
-            (self.company_in, "Company", "e.g. ACME Engineering Ltd."),
-            (self.engineer_in, "Design Engineer", "e.g. A. Oyenuga (used as Designed by)"),
-            (self.prefix_in, "Job Ref Prefix", "e.g. FG-2026 (first part of JOB REF)"),
-            (self.outdir_in, "Default Output Folder", "e.g. /Users/you/Documents/designs (optional)"),
-            (self.datefmt_in, "Date Format", "%a. %d/%m/%y."),
-            (self.city_in, "City (for home greeting weather)", "e.g. Lagos (optional)"),
+        #: (widget, label, placeholder, required)
+        for w, lbl, ph, required in [
+            (self.full_name, "Full name", "e.g. Eng. Ade Oyenuga", True),
+            (self.company_in, "Company", "e.g. ACME Engineering Ltd. (optional)", False),
+            (self.engineer_in, "Design Engineer", "e.g. A. Oyenuga (used as Designed by)", True),
+            (self.prefix_in, "Job Ref Prefix", "e.g. FG-2026 (first part of JOB REF)", False),
+            (self.outdir_in, "Default Output Folder", "e.g. /Users/you/Documents/designs (optional)", False),
+            (self.datefmt_in, "Date Format", "%a. %d/%m/%y.", False),
+            (self.city_in, "City (for home greeting weather)", "e.g. Lagos (optional)", False),
         ]:
-            lab = QLabel(lbl)
+            label_txt = lbl + "  *" if required else lbl
+            lab = QLabel(label_txt)
             lab.setStyleSheet(
                 f"color: {TEXT_SECONDARY}; font-size: {FONT_SIZE['sm']}px; background: transparent;"
             )
             w.setPlaceholderText(ph)
             w.setStyleSheet(self._input_style())
+            w.textChanged.connect(self._update_save_state)
             card_lay.addWidget(lab)
             card_lay.addWidget(w)
+
+        req_hint = QLabel("Fields marked * are required. Company is optional.")
+        req_hint.setStyleSheet(
+            f"color: {TEXT_MUTED}; font-size: {FONT_SIZE['xs']}px; background: transparent;"
+        )
+        card_lay.addWidget(req_hint)
 
         date_hint = QLabel(
             "Date format uses Python strftime codes: %a weekday, %d day, "
@@ -138,6 +147,24 @@ class SettingsPage(QWidget):
         outer.addLayout(row)
 
         self.load_profile()
+        self._update_save_state()
+
+    def _required_ok(self) -> bool:
+        return bool(
+            self.full_name.text().strip() and self.engineer_in.text().strip()
+        )
+
+    def _update_save_state(self):
+        ok = self._required_ok()
+        self.save_btn.setEnabled(ok)
+        self.save_btn.setToolTip("" if ok else "Full name and Design Engineer are required.")
+        self.save_btn.setStyleSheet(
+            f"QPushButton {{ background: {ACCENT}; color: #17140F; font-weight: 700;"
+            f" font-size: 15px; border: none; border-radius: {RADIUS_MD}px;"
+            f" padding: 10px 30px; }}"
+            f"QPushButton:hover {{ background: #E6A13F; }}"
+            f"QPushButton:disabled {{ background: #5A4A33; color: #8A7A5F; }}"
+        )
 
     def load_profile(self):
         p = SettingsStore.load()
@@ -150,6 +177,9 @@ class SettingsPage(QWidget):
         self.city_in.setText(p.city)
 
     def _save(self):
+        if not self._required_ok():
+            self.status_message.emit("Full name and Design Engineer are required.", True)
+            return
         profile = UserProfile(
             full_name=self.full_name.text().strip(),
             company=self.company_in.text().strip(),

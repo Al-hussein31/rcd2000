@@ -37,7 +37,11 @@ class UserProfile:
     city: str = ""
 
     def is_complete(self) -> bool:
-        return bool(self.full_name or self.company or self.engineer)
+        # Full name + Design Engineer are the profile's required identity:
+        # they feed the home greeting and the report "Designed by" line.
+        # Company is deliberately NOT required - the engineer may work for
+        # another company than the one on the job.
+        return bool(self.full_name.strip() and self.engineer.strip())
 
 
 class SettingsStore:
