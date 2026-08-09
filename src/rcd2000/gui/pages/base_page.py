@@ -1,8 +1,12 @@
 """Foundation design form page."""
 
-from rcd2000.base import BaseDesigner, BaseInput
+from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton
+
+from rcd2000.base import BaseDesigner, BaseInput, ColumnOnBase
 from rcd2000.report import format_base
-from rcd2000.gui.theme import fmt, fmt2
+from rcd2000.gui.theme import (
+    TEXT_SECONDARY, ACCENT, ACCENT_HOVER, ACCENT_PRESS, RADIUS_MD, fmt, fmt2,
+)
 from rcd2000.gui.widgets import (
     spinbox, combo, label, Card, badge, fcu_combo, fy_combo, load_combo_group,
 )
@@ -11,6 +15,10 @@ from rcd2000.gui.pages.form_page import DesignFormPage
 
 class BasePage(DesignFormPage):
     module_name = "Base"
+
+    def __init__(self):
+        self._col_widgets = []
+        super().__init__()
 
     def build_inputs(self, layout):
         c1 = Card("Base Type & Materials")
@@ -90,22 +98,136 @@ class BasePage(DesignFormPage):
         self._auto_clear_invalid(self.gk)
         self._auto_clear_invalid(self.qk)
 
+        # Combined-footing column entry (book: NC + per-column loads/positions)
+        c3 = Card("Combined Footing Columns")
+        self.combined_card = c3
+        # Reset dynamic rows so repeated _build_ui calls stay idempotent
+        self._col_widgets = []
+        self.col_grid = QGridLayout()
+        self.col_grid.setSpacing(6)
+        c3.add_layout(self.col_grid)
+        self.add_col_btn = QPushButton("+ Add Column")
+        self.add_col_btn.setStyleSheet(
+            f"QPushButton {{ background: {ACCENT}; color: #17140F; font-weight: bold;"
+            f" border: none; border-radius: {RADIUS_MD}px; padding: 6px 14px; }}"
+            f"QPushButton:hover {{ background: {ACCENT_HOVER}; }}"
+            f"QPushButton:pressed {{ background: {ACCENT_PRESS}; }}"
+        )
+        self.add_col_btn.setToolTip(
+            "Add a column to the combined footing. Distance is measured in "
+            "metres from a common reference; the base is centred on the "
+            "resultant of the column loads."
+        )
+        c3.add_widget(self.add_col_btn)
+        layout.addWidget(c3)
+        self.add_col_btn.clicked.connect(self._add_col_row)
+        self._add_col_row()
+        self._add_col_row()
+        self.base_type.currentIndexChanged.connect(self._sync_combined_visibility)
+        self._sync_combined_visibility()
+
+    def _rebuild_col_grid(self):
+        """Re-draw the per-column grid from _col_widgets (row 0 = headers)."""
+        while self.col_grid.count():
+            item = self.col_grid.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+        headers = ["", "Load", "Dist", "Shape", "A1", "A2", "Dia", "Dowel", ""]
+        for col, h in enumerate(headers):
+            self.col_grid.addWidget(label(h, secondary=True, size=11), 0, col)
+        for i, w in enumerate(self._col_widgets):
+            row = i + 1
+            for col, widget in enumerate(w):
+                self.col_grid.addWidget(widget, row, col)
+            # Rebind the remove button to the CURRENT index (rows shift on delete)
+            rm = w[8]
+            if rm.receivers("clicked()") > 0:
+                rm.clicked.disconnect()
+            rm.clicked.connect(lambda _=False, i=i: self._remove_col_row(i))
+
+    def _add_col_row(self):
+        row = len(self._col_widgets) + 1
+        lbl = QLabel(f"C{row}")
+        lbl.setStyleSheet(
+            f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; "
+            f"background: transparent;"
+        )
+        load = spinbox(0, 999999999, 5, 0, 1, " kN")
+        load.setToolTip("Column axial load (kN) acting on the footing")
+        dist = spinbox(0, 999999999, 0.5, 0, 2, " m")
+        dist.setToolTip("Distance (m) of this column from the reference line")
+        shape = combo(["Rect", "Circ"])
+        a1 = spinbox(0, 999999999, 25, 300, 0)
+        a2 = spinbox(0, 999999999, 25, 300, 0)
+        dia = spinbox(0, 999999999, 25, 300, 0)
+        dowel = spinbox(0, 999999999, 2, 12, 0)
+        dowel.setToolTip("Dowel/starter bar diameter (mm) for this column")
+        rm = QPushButton("✕")
+        rm.setStyleSheet(
+            f"color: {TEXT_SECONDARY}; background: transparent; "
+            f"border: none; font-weight: bold;"
+        )
+        rm.setToolTip("Remove this column")
+        rm.setFixedWidth(30)
+        for w in (load, dist, a1, a2, dia, dowel):
+            self._auto_clear_invalid(w)
+        self._col_widgets.append((lbl, load, dist, shape, a1, a2, dia, dowel, rm))
+        self._rebuild_col_grid()
+
+    def _remove_col_row(self, idx):
+        if 0 <= idx < len(self._col_widgets):
+            self._col_widgets.pop(idx)
+            self._rebuild_col_grid()
+
+    def _sync_combined_visibility(self):
+        """Show the column grid only for Combined; disable isolated inputs."""
+        is_combined = self.base_type.currentIndex() == 2
+        self.combined_card.setVisible(is_combined)
+        for w in (self.col_shape, self.base_load, self.base_a1, self.base_a2,
+                  self.base_dia, self.base_dowel, self.base_l1):
+            w.setEnabled(not is_combined)
+
     def calculate(self):
         btype = self.base_type.currentIndex() + 1
         fcu = int(self.base_fcu.currentText())
         fy = int(self.base_fy.currentText())
 
-        inp = BaseInput(
-            base_id="F1",
-            base_type=btype,
-            col_type=1 if self.col_shape.currentIndex() == 0 else 2,
-            load=self.base_load.value(),
-            pb=self.base_pb.value(), fcu=fcu, fy=fy,
-            a1=self.base_a1.value(), a2=self.base_a2.value(),
-            dia=self.base_dia.value(), dowel_dia=self.base_dowel.value(),
-            h=self.base_h.value(),
-            l1=self.base_l1.value(), l2=self.base_l2.value(),
-        )
+        if btype == 3:
+            columns = [
+                ColumnOnBase(
+                    load=w[1].value(),
+                    dist=w[2].value(),
+                    shape=1 if w[3].currentIndex() == 0 else 2,
+                    a1=w[4].value(),
+                    a2=w[5].value(),
+                    dia=w[6].value(),
+                    dowel_dia=w[7].value(),
+                )
+                for w in self._col_widgets
+            ]
+            inp = BaseInput(
+                base_id="F1",
+                base_type=3,
+                col_type=1,
+                load=0.0,
+                pb=self.base_pb.value(), fcu=fcu, fy=fy,
+                h=self.base_h.value(),
+                l1=0.0, l2=self.base_l2.value(),
+                n_columns=len(columns), columns=columns,
+            )
+        else:
+            inp = BaseInput(
+                base_id="F1",
+                base_type=btype,
+                col_type=1 if self.col_shape.currentIndex() == 0 else 2,
+                load=self.base_load.value(),
+                pb=self.base_pb.value(), fcu=fcu, fy=fy,
+                a1=self.base_a1.value(), a2=self.base_a2.value(),
+                dia=self.base_dia.value(), dowel_dia=self.base_dowel.value(),
+                h=self.base_h.value(),
+                l1=self.base_l1.value(), l2=self.base_l2.value(),
+            )
         designer = BaseDesigner(
             pb=self.base_pb.value(), fcu=fcu, fy=fy,
         )
@@ -114,6 +236,30 @@ class BasePage(DesignFormPage):
 
     def validate(self) -> list[str]:
         errors = []
+        if self.base_type.currentIndex() == 2:
+            if len(self._col_widgets) < 2:
+                errors.append("Combined footing requires at least 2 columns")
+            for i, w in enumerate(self._col_widgets):
+                if w[1].value() <= 0:
+                    errors.append(f"Column C{i + 1} load must be > 0")
+                    self._mark_invalid(w[1])
+                if w[2].value() < 0:
+                    errors.append(f"Column C{i + 1} distance must be ≥ 0")
+                    self._mark_invalid(w[2])
+                if w[3].currentIndex() == 0:
+                    if w[4].value() < 100 or w[5].value() < 100:
+                        errors.append(
+                            f"Column C{i + 1} dimensions must be at least 100 mm each")
+                        self._mark_invalid(w[4])
+                        self._mark_invalid(w[5])
+                else:
+                    if w[6].value() < 100:
+                        errors.append(f"Column C{i + 1} diameter must be at least 100 mm")
+                        self._mark_invalid(w[6])
+            if self.base_l2.value() <= 0:
+                errors.append("Base width L2 must be > 0")
+                self._mark_invalid(self.base_l2)
+            return errors
         if self.base_load.value() <= 0:
             errors.append("Axial load must be > 0")
             self._mark_invalid(self.base_load)
@@ -146,10 +292,17 @@ class BasePage(DesignFormPage):
         names = ["Square", "Rectangular", "Combined"]
         try:
             btype = inp.base_type if hasattr(inp, "base_type") else inp.get("base_type", 1)
+            if btype == 3:
+                cols = getattr(inp, "columns", None) or []
+                total = sum(c.load for c in cols)
+                return f"Combined, {len(cols)} cols, {total:.0f}kN"
             load = inp.load if hasattr(inp, "load") else inp.get("load", 0)
             name = names[btype - 1] if 1 <= btype <= 3 else f"Type {btype}"
             return f"{name}, {load:.0f}kN"
         except Exception:
+            if self.base_type.currentIndex() == 2:
+                total = sum(w[1].value() for w in self._col_widgets)
+                return f"Combined, {len(self._col_widgets)} cols, {total:.0f}kN"
             return f"{names[self.base_type.currentIndex()]}, {self.base_load.value():.0f}kN"
 
     def format_report(self, inp, result):
@@ -175,7 +328,28 @@ class BasePage(DesignFormPage):
              badge(r.local_bond <= r.perm_bond)],
             ["Permissible Bond (N/mm²)", fmt2(r.perm_bond), ""],
         ]
+        if self.base_type.currentIndex() == 2:
+            for k, m in enumerate(r.support_moments):
+                rows.append([f"Support M{k + 1} (kN·m)", fmt2(m), ""])
+                rows.append([f"Support Steel S{k + 1} (mm²)", fmt(r.support_steels[k]), ""])
+            for k, m in enumerate(r.span_moments):
+                rows.append([f"Span M{k + 1} (kN·m)", fmt2(m), ""])
+                rows.append([f"Span Steel {k + 1} (mm²)", fmt(r.span_steels[k]), ""])
         return rows
+
+    def _combined_cols_state(self) -> list:
+        return [
+            {
+                "load": w[1].value(),
+                "dist": w[2].value(),
+                "shape": w[3].currentIndex(),
+                "a1": w[4].value(),
+                "a2": w[5].value(),
+                "dia": w[6].value(),
+                "dowel": w[7].value(),
+            }
+            for w in self._col_widgets
+        ]
 
     def get_state(self) -> dict:
         return {
@@ -194,6 +368,7 @@ class BasePage(DesignFormPage):
             "base_dowel": self.base_dowel.value(),
             "gk": self.gk.value(),
             "qk": self.qk.value(),
+            "combined_columns": self._combined_cols_state(),
         }
 
     def set_state(self, state: dict) -> None:
@@ -227,3 +402,16 @@ class BasePage(DesignFormPage):
             self.gk.setValue(state["gk"])
         if "qk" in state:
             self.qk.setValue(state["qk"])
+        if "combined_columns" in state:
+            self._col_widgets.clear()
+            self._rebuild_col_grid()
+            for c in state["combined_columns"]:
+                self._add_col_row()
+                w = self._col_widgets[-1]
+                w[1].setValue(c.get("load", 0))
+                w[2].setValue(c.get("dist", 0))
+                w[3].setCurrentIndex(c.get("shape", 0))
+                w[4].setValue(c.get("a1", 0))
+                w[5].setValue(c.get("a2", 0))
+                w[6].setValue(c.get("dia", 0))
+                w[7].setValue(c.get("dowel", 0))

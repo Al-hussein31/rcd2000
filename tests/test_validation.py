@@ -10,7 +10,7 @@ from rcd2000.utils import (steel_slab, steel_area, gauss, permlb, perms,
 from rcd2000.materials import Concrete, Steel
 from rcd2000.column import ColumnDesigner, ColumnInput
 from rcd2000.continuous_beam import ContinuousBeamAnalyzer, ContinuousBeamInput, ContinuousBeamMember
-from rcd2000.base import BaseDesigner, BaseInput
+from rcd2000.base import BaseDesigner, BaseInput, ColumnOnBase
 from rcd2000.beam import BeamDesigner, BeamInput
 from rcd2000.slab import SlabDesigner, SlabPanelInput
 from rcd2000.stair import StairDesigner, StairInput
@@ -257,6 +257,78 @@ class TestBase:
                                   load=2000, dia=400, h=300)])[0]
         assert br.shear_stress <= br.perm_shear
         assert br.punching_shear <= br.perm_shear
+
+    def test_combined_symmetric_no_unit_bug(self):
+        """Equal loads at dist 0 and 4 m: base centers on the resultant
+        (xbar=2) so both overhang moments are equal. The old /1000 unit
+        bug made ml != mr (and the old centering gave l1 = 8.05)."""
+        bd = BaseDesigner(pb=150, fcu=25, fy=460)
+        br = bd.design([BaseInput(
+            base_id="F5", base_type=3, col_type=1, load=0.0,
+            pb=150, fcu=25, fy=460, h=200, l1=0.0, l2=2.0,
+            n_columns=2,
+            columns=[
+                ColumnOnBase(load=100, dist=0.0, shape=1, a1=300, a2=300),
+                ColumnOnBase(load=100, dist=4.0, shape=1, a1=300, a2=300),
+            ],
+        )])[0]
+        l1 = br.l1 / 1000.0          # 4.05 (6 -> rounded up one 50mm step)
+        ohl = l1 / 2.0 - (2.0 - 0.0)
+        ohr = l1 / 2.0 - (4.0 - 2.0)
+        check("combined: left overhang", ohl, ohr)
+        check("combined: ml", ohl ** 2 * br.fnet / 2.0, br.support_moments[0])
+        check("combined: mr", ohr ** 2 * br.fnet / 2.0, br.support_moments[1])
+
+    def test_combined_resultant_centering(self):
+        """Unequal loads 100@0 / 300@4: xbar=3 -> l1=6.05 centred on the
+        resultant; left overhang 0.025 m, right overhang 2.025 m."""
+        bd = BaseDesigner(pb=150, fcu=25, fy=460)
+        br = bd.design([BaseInput(
+            base_id="F6", base_type=3, col_type=1, load=0.0,
+            pb=150, fcu=25, fy=460, h=200, l1=0.0, l2=2.0,
+            n_columns=2,
+            columns=[
+                ColumnOnBase(load=100, dist=0.0, shape=1, a1=300, a2=300),
+                ColumnOnBase(load=300, dist=4.0, shape=1, a1=300, a2=300),
+            ],
+        )])[0]
+        l1 = br.l1 / 1000.0          # 6.05 (6 rounded up)
+        ohl = l1 / 2.0 - (3.0 - 0.0)
+        ohr = l1 / 2.0 - (4.0 - 3.0)
+        assert ohl == pytest.approx(0.025, abs=1e-9)
+        assert ohr == pytest.approx(2.025, abs=1e-9)
+        check("combined: ml", ohl ** 2 * br.fnet / 2.0, br.support_moments[0])
+        check("combined: mr", ohr ** 2 * br.fnet / 2.0, br.support_moments[1])
+        # Span moment = free moment - (ml+mr)/2
+        check("combined: span moment",
+              br.fnet * 4.0 ** 2 / 8.0
+              - (br.support_moments[0] + br.support_moments[1]) / 2.0,
+              br.span_moments[0])
+
+    def test_combined_three_columns(self):
+        """3 equal columns at 0/4/8 m: interior support moment from the
+        Clapeyron equation with ml = mr (nn==1 matrix path)."""
+        bd = BaseDesigner(pb=150, fcu=25, fy=460)
+        br = bd.design([BaseInput(
+            base_id="F7", base_type=3, col_type=1, load=0.0,
+            pb=150, fcu=25, fy=460, h=200, l1=0.0, l2=2.0,
+            n_columns=3,
+            columns=[
+                ColumnOnBase(load=100, dist=0.0, shape=1, a1=300, a2=300),
+                ColumnOnBase(load=100, dist=4.0, shape=1, a1=300, a2=300),
+                ColumnOnBase(load=100, dist=8.0, shape=1, a1=300, a2=300),
+            ],
+        )])[0]
+        fnet = br.fnet
+        ml, mr = br.support_moments[0], br.support_moments[2]
+        # 2(L0+L1)M1 = (fnet/4)(L0^3+L1^3) - ml*L0 - mr*L1, L0=L1=4
+        m1_exp = ((fnet / 4.0) * (4.0 ** 3 + 4.0 ** 3) - ml * 4.0 - mr * 4.0) / (2.0 * 8.0)
+        check("combined 3-col: interior M1", m1_exp, br.support_moments[1])
+        for k in range(2):
+            check(f"combined 3-col: span {k} moment",
+                  fnet * 4.0 ** 2 / 8.0
+                  - (br.support_moments[k] + br.support_moments[k + 1]) / 2.0,
+                  br.span_moments[k])
 
 
 # ============================================================

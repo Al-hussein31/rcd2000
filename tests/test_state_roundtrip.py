@@ -96,7 +96,7 @@ def _set_non_default(page):
         page.qk.setValue(3.0)
 
     elif isinstance(page, BasePage):
-        page.base_type.setCurrentIndex(1)
+        page.base_type.setCurrentIndex(2)   # Combined
         page.col_shape.setCurrentIndex(0)
         page._set_combo_int(page.base_fcu, 35)
         page._set_combo_int(page.base_fy, 460)
@@ -111,6 +111,15 @@ def _set_non_default(page):
         page.base_dowel.setValue(20)
         page.gk.setValue(10.0)
         page.qk.setValue(5.0)
+        # Combined-footing columns
+        for i, w in enumerate(page._col_widgets):
+            w[1].setValue(400 + i * 100)   # load
+            w[2].setValue(i * 4.0)         # dist
+            w[3].setCurrentIndex(i % 2)    # shape
+            w[4].setValue(350 + i)         # a1
+            w[5].setValue(250 + i)         # a2
+            w[6].setValue(400 + i)         # dia
+            w[7].setValue(16 + i)          # dowel
 
     elif isinstance(page, ContinuousBeamPage):
         page.cb_ns.setValue(4)

@@ -265,9 +265,13 @@ class BaseDesigner:
             b.l2 = 2.0  # assume 2m width
         l1_needed = ar / b.l2
 
-        # Extend L1 so centroid is centered
-        x_last = max(c.dist for c in cols) if cols else 0.0
-        l1 = max(l1_needed, x_last * 2.0)
+        # Center L1 on the load resultant (xbar) so the soil pressure is
+        # uniform. Column distances are in metres from a common reference;
+        # the footing must cover the outermost columns on both sides of the
+        # resultant while satisfying the area requirement.
+        x_min = min(c.dist for c in cols)
+        x_max = max(c.dist for c in cols)
+        l1 = max(l1_needed, 2.0 * (xbar - x_min), 2.0 * (x_max - xbar))
         l1 = (int(l1 / 0.05) + 1) * 0.05
         l2 = b.l2
 
@@ -295,8 +299,10 @@ class BaseDesigner:
         shl = [fnet * sp / 2.0 for sp in span]
         shr = [fnet * sp / 2.0 for sp in span]
 
-        ohl = l1 / 2.0 - cols[0].dist / 1000.0  # overhang left
-        ohr = l1 / 2.0 - (l1 - cols[-1].dist / 1000.0)  # overhang right
+        # Overhang projections from the resultant-centred footing edges to
+        # the outermost column centres (dist in metres - no /1000 unit bug)
+        ohl = l1 / 2.0 - (xbar - x_min)  # overhang left (m)
+        ohr = l1 / 2.0 - (x_max - xbar)  # overhang right (m)
         ml = (ohl ** 2.0) * fnet / 2.0
         mr = (ohr ** 2.0) * fnet / 2.0
 
@@ -309,23 +315,30 @@ class BaseDesigner:
             mat = [[0.0] * nn for _ in range(nn)]
             rhs = [0.0] * nn
 
-            mat[0][0] = 2.0 * (span[0] + span[1])
-            mat[0][1] = span[1]
-            rhs[0] = (fnet / 4.0) * (span[0] ** 3.0 + span[1] ** 3.0)
-            rhs[0] -= ml * span[0]
+            if nn == 1:
+                # Exactly 3 columns / 2 spans: one interior support.
+                # 2(L0+L1)·M1 = (fnet/4)(L0^3+L1^3) - ml·L0 - mr·L1
+                mat[0][0] = 2.0 * (span[0] + span[1])
+                rhs[0] = (fnet / 4.0) * (span[0] ** 3.0 + span[1] ** 3.0)
+                rhs[0] -= ml * span[0]
+                rhs[0] -= mr * span[1]
+            else:
+                mat[0][0] = 2.0 * (span[0] + span[1])
+                mat[0][1] = span[1]
+                rhs[0] = (fnet / 4.0) * (span[0] ** 3.0 + span[1] ** 3.0)
+                rhs[0] -= ml * span[0]
 
-            if nn > 1:
                 mat[nn - 1][nn - 2] = span[nm - 2]
                 mat[nn - 1][nn - 1] = 2.0 * (span[nm - 2] + span[nm - 1])
                 rhs[nn - 1] = (fnet / 4.0) * (span[nm - 2] ** 3.0 + span[nm - 1] ** 3.0)
                 rhs[nn - 1] -= mr * span[nm - 1]
 
-            if nn > 2:
-                for k in range(1, nn - 1):
-                    mat[k][k - 1] = span[k]
-                    mat[k][k] = 2.0 * (span[k] + span[k + 1])
-                    mat[k][k + 1] = span[k + 1]
-                    rhs[k] = (fnet / 4.0) * (span[k] ** 3.0 + span[k + 1] ** 3.0)
+                if nn > 2:
+                    for k in range(1, nn - 1):
+                        mat[k][k - 1] = span[k]
+                        mat[k][k] = 2.0 * (span[k] + span[k + 1])
+                        mat[k][k + 1] = span[k + 1]
+                        rhs[k] = (fnet / 4.0) * (span[k] ** 3.0 + span[k + 1] ** 3.0)
 
             xmt = gauss(mat, rhs, nn, nn)
             for i in range(nn):
