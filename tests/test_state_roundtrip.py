@@ -43,6 +43,10 @@ def _set_non_default(page):
         page.n_members.setValue(2)
         page.ty1.setCurrentIndex(1)
         page.ty2.setCurrentIndex(0)
+        page.cant_load_1.setValue(25.0)
+        page.cant_moment_1.setValue(30.0)
+        page.cant_load_2.setValue(15.0)
+        page.cant_moment_2.setValue(20.0)
         page.gk.setValue(15.5)
         page.qk.setValue(8.2)
         # Member grid
@@ -52,6 +56,8 @@ def _set_non_default(page):
             w[3].setValue(10)     # wt
             w[4].setValue(5)      # wb
             w[5].setValue(2.0)    # ab
+            w[6].setValue(30)     # pl
+            w[7].setValue(3.0)    # ap
 
     elif isinstance(page, SlabPage):
         page.slab_type.setCurrentIndex(2)

@@ -290,6 +290,55 @@ class TestBeam:
         check("BEAM 2-span span1 M", 101.25, round(r.spans[0].moment, 2))
         check("BEAM 2-span span2 M", 101.25, round(r.spans[1].moment, 2))
 
+    def test_cantilever_load_adds_to_reaction(self):
+        # Book: REACTN(I) += CANTW(I) at the end supports.
+        bd_beam = BeamDesigner(fcu=25, fy=460, fyv=460)
+        bi = BeamInput(
+            beam_id="B3", n_members=1, n_supports=2,
+            b=300, bf=300, h=600, hf=0,
+            fcu=25, fy=460, fyv=460,
+            member_lengths=[6.0], member_udl=[45.0],
+            ty1=0, ty2=0,
+            cant_load_1=50.0, cant_load_2=0.0,
+        )
+        r = bd_beam.design([bi])[0]
+        # Without cantilever: 135 kN each end. Left reaction must be 185.
+        check("BEAM cantilever load R_left", 185.0, round(r.supports[0].reaction, 1))
+        check("BEAM cantilever load R_right", 135.0, round(r.supports[1].reaction, 1))
+
+    def test_cantilever_moment_adds_to_end_support_moment(self):
+        # Book: CMT1 applies at the end support (fixed-end boundary moment).
+        bd_beam = BeamDesigner(fcu=25, fy=460, fyv=460)
+        bi = BeamInput(
+            beam_id="B4", n_members=1, n_supports=2,
+            b=300, bf=300, h=600, hf=0,
+            fcu=25, fy=460, fyv=460,
+            member_lengths=[6.0], member_udl=[45.0],
+            ty1=0, ty2=0,
+            cant_moment_1=40.0, cant_moment_2=0.0,
+        )
+        r = bd_beam.design([bi])[0]
+        # End support moment must include the cantilever moment.
+        check("BEAM cantilever moment M_left", 40.0, round(r.supports[0].moment, 1))
+        # Span moment shifts down by CMT/2 (chord effect): 202.5 - 20 = 182.5
+        check("BEAM cantilever moment span M", 182.5, round(r.spans[0].moment, 1))
+
+    def test_cantilever_load_designs_end_span_links(self):
+        # Book: VC = CLD1 for the cantilever end shear check.
+        bd_beam = BeamDesigner(fcu=25, fy=460, fyv=460)
+        bi = BeamInput(
+            beam_id="B5", n_members=1, n_supports=2,
+            b=300, bf=300, h=600, hf=0,
+            fcu=25, fy=460, fyv=460,
+            member_lengths=[6.0], member_udl=[45.0],
+            ty1=0, ty2=0,
+            cant_load_1=500.0,  # far exceeds span shear - links must handle it
+        )
+        r = bd_beam.design([bi])[0]
+        # Link spacing at the cantilever end must be tighter than at the far end
+        # (larger shear -> smaller spacing), and finite.
+        assert 0 < r.spans[0].sv_left < r.spans[0].sv_right
+
 
 # ============================================================
 # 6. SLAB DESIGN

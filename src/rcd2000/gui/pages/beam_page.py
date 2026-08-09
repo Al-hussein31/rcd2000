@@ -74,6 +74,25 @@ class BeamPage(DesignFormPage):
         self._auto_clear_invalid(self.ty1)
         self._auto_clear_invalid(self.ty2)
 
+        c3b = Card("End Cantilevers")
+        self.cant_load_1 = spinbox(0, 999999999, 5, 0, 1, " kN")
+        self.cant_moment_1 = spinbox(0, 999999999, 5, 0, 1, " kN·m")
+        self.cant_load_2 = spinbox(0, 999999999, 5, 0, 1, " kN")
+        self.cant_moment_2 = spinbox(0, 999999999, 5, 0, 1, " kN·m")
+        self.cant_load_1.setToolTip("Load on the left end cantilever (book CLD1)")
+        self.cant_moment_1.setToolTip("Moment applied at the left end support (book CMT1)")
+        self.cant_load_2.setToolTip("Load on the right end cantilever (book CLD2)")
+        self.cant_moment_2.setToolTip("Moment applied at the right end support (book CMT2)")
+        c3b.add_row("Left cantilever load:", self.cant_load_1)
+        c3b.add_row("Left cantilever moment:", self.cant_moment_1)
+        c3b.add_row("Right cantilever load:", self.cant_load_2)
+        c3b.add_row("Right cantilever moment:", self.cant_moment_2)
+        layout.addWidget(c3b)
+        self._auto_clear_invalid(self.cant_load_1)
+        self._auto_clear_invalid(self.cant_moment_1)
+        self._auto_clear_invalid(self.cant_load_2)
+        self._auto_clear_invalid(self.cant_moment_2)
+
         self.diagram = SpanDiagram()
         self.diagram.setVisible(False)
         layout.addWidget(self.diagram)
@@ -108,23 +127,32 @@ class BeamPage(DesignFormPage):
             wt = spinbox(0, 999999999, 5, 0, 1)
             wb = spinbox(0, 999999999, 5, 0, 1)
             ab = spinbox(0, 999999999, 0.5, 0, 2)
+            pl = spinbox(0, 999999999, 5, 0, 1, " kN")
+            ap = spinbox(0, 999999999, 0.5, 0, 2, " m")
             wt.setToolTip("Triangularly distributed load magnitude (kN/m), peak at left support")
             wb.setToolTip("Trapezoidally distributed load magnitude (kN/m), varies along member")
             ab.setToolTip("Distance (m) from left support to load application point")
+            pl.setToolTip("Point load on this member (book P) - enter 0 for none")
+            ap.setToolTip("Distance (m) of the point load from the left support (book AP)")
             self._auto_clear_invalid(length)
             self._auto_clear_invalid(udl)
             self._auto_clear_invalid(wt)
             self._auto_clear_invalid(wb)
             self._auto_clear_invalid(ab)
+            self._auto_clear_invalid(pl)
+            self._auto_clear_invalid(ap)
             self.member_grid.addWidget(lbl, row, 0)
             self.member_grid.addWidget(length, row, 1)
             self.member_grid.addWidget(udl, row, 2)
             self.member_grid.addWidget(wt, row, 3)
             self.member_grid.addWidget(wb, row, 4)
             self.member_grid.addWidget(ab, row, 5)
-            self._member_widgets.append((lbl, length, udl, wt, wb, ab))
+            self.member_grid.addWidget(pl, row, 6)
+            self.member_grid.addWidget(ap, row, 7)
+            self._member_widgets.append((lbl, length, udl, wt, wb, ab, pl, ap))
 
-        headers = ["", "Length", "UDL", "Tri (wt)", "Trap (wb)", "Dist (ab)"]
+        headers = ["", "Length", "UDL", "Tri (wt)", "Trap (wb)", "Dist (ab)",
+                   "P (kN)", "a (m)"]
         for col, h in enumerate(headers):
             self.member_grid.addWidget(
                 label(h, secondary=True, size=11), 0, col
@@ -158,8 +186,17 @@ class BeamPage(DesignFormPage):
             member_wt=[w[3].value() for w in self._member_widgets],
             member_wb=[w[4].value() for w in self._member_widgets],
             member_ab=[w[5].value() for w in self._member_widgets],
+            member_npl=[1 if w[6].value() > 0 else 0 for w in self._member_widgets],
+            member_pl=[
+                [(w[6].value(), w[7].value())] if w[6].value() > 0 else []
+                for w in self._member_widgets
+            ],
             ty1=self.ty1.currentIndex(),
             ty2=self.ty2.currentIndex(),
+            cant_load_1=self.cant_load_1.value(),
+            cant_moment_1=self.cant_moment_1.value(),
+            cant_load_2=self.cant_load_2.value(),
+            cant_moment_2=self.cant_moment_2.value(),
         )
         designer = BeamDesigner(fcu=fcu, fy=fy, fyv=fyv)
         result = designer.design([inp])[0]
@@ -178,6 +215,11 @@ class BeamPage(DesignFormPage):
             if w[1].value() <= 0:
                 errors.append(f"Member {i+1} length must be > 0")
                 self._mark_invalid(w[1])
+            if w[6].value() > 0 and not (0 < w[7].value() <= w[1].value()):
+                errors.append(
+                    f"Member {i+1} point load distance must be within the member span"
+                )
+                self._mark_invalid(w[7])
         return errors
 
     def summarize(self, inp) -> str:
@@ -215,6 +257,10 @@ class BeamPage(DesignFormPage):
             "n_members": self.n_members.value(),
             "ty1": self.ty1.currentIndex(),
             "ty2": self.ty2.currentIndex(),
+            "cant_load_1": self.cant_load_1.value(),
+            "cant_moment_1": self.cant_moment_1.value(),
+            "cant_load_2": self.cant_load_2.value(),
+            "cant_moment_2": self.cant_moment_2.value(),
             "gk": self.gk.value(),
             "qk": self.qk.value(),
             "members": [
@@ -224,6 +270,8 @@ class BeamPage(DesignFormPage):
                     "wt": w[3].value(),
                     "wb": w[4].value(),
                     "ab": w[5].value(),
+                    "pl": w[6].value(),
+                    "ap": w[7].value(),
                 }
                 for w in self._member_widgets
             ],
@@ -252,6 +300,14 @@ class BeamPage(DesignFormPage):
             self.ty1.setCurrentIndex(state["ty1"])
         if "ty2" in state:
             self.ty2.setCurrentIndex(state["ty2"])
+        if "cant_load_1" in state:
+            self.cant_load_1.setValue(state["cant_load_1"])
+        if "cant_moment_1" in state:
+            self.cant_moment_1.setValue(state["cant_moment_1"])
+        if "cant_load_2" in state:
+            self.cant_load_2.setValue(state["cant_load_2"])
+        if "cant_moment_2" in state:
+            self.cant_moment_2.setValue(state["cant_moment_2"])
         if "gk" in state:
             self.gk.setValue(state["gk"])
         if "qk" in state:
@@ -270,3 +326,7 @@ class BeamPage(DesignFormPage):
                         w[4].setValue(m["wb"])
                     if "ab" in m:
                         w[5].setValue(m["ab"])
+                    if "pl" in m:
+                        w[6].setValue(m["pl"])
+                    if "ap" in m:
+                        w[7].setValue(m["ap"])

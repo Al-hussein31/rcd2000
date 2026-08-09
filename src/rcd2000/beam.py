@@ -270,6 +270,13 @@ class BeamDesigner:
                     for i in range(nn):
                         mt[i + 1] = xmt[i]
 
+            # --- End cantilever contributions (book: CLD1/CMT1, CLD2/CMT2) ---
+            # The cantilever moment applies directly at the end support
+            # (fixed-end boundary condition); the cantilever load is carried
+            # by the end reaction and is checked as the end shear.
+            mt[0] += b.cant_moment_1
+            mt[ns - 1] += b.cant_moment_2
+
             # --- Calculate span moments and shears ---
             spmt = [0.0] * nm
             sfn1 = [0.0] * nm
@@ -294,6 +301,10 @@ class BeamDesigner:
                 for i in range(1, ns - 1):
                     reactn[i] = sfn2[i - 1] + sfn1[i]
 
+            # Cantilever loads add to the end reactions (book: REACTN + CANTW)
+            reactn[0] += b.cant_load_1
+            reactn[ns - 1] += b.cant_load_2
+
             # --- Design reinforcement ---
             d = h - 50.0
             span_results = []
@@ -317,8 +328,13 @@ class BeamDesigner:
                 pt, rdb, svb = rodia_beam(sr.ast, math.pi, b.fy)
                 pt2, rdt, svt = rodia_beam(sr.asb, math.pi, b.fy)
 
-                sv_l, heck_sl = shear_links(sfn1[i], sr.ast, b.fyv, b.fcu, b.b, d)
-                sv_r, heck_sr = shear_links(sfn2[i], sr.ast, b.fyv, b.fcu, b.b, d)
+                # Shear at the cantilever end is the cantilever load itself
+                # (book: VC = CLD1), so the end-span links must resist the
+                # greater of the span end shear and the cantilever load.
+                v_l = max(sfn1[i], b.cant_load_1) if i == 0 else sfn1[i]
+                v_r = max(sfn2[i], b.cant_load_2) if i == nm - 1 else sfn2[i]
+                sv_l, heck_sl = shear_links(v_l, sr.ast, b.fyv, b.fcu, b.b, d)
+                sv_r, heck_sr = shear_links(v_r, sr.ast, b.fyv, b.fcu, b.b, d)
 
                 span_results.append(BeamSpanResult(
                     span_id=f"{b.beam_id}-S{i + 1}",
