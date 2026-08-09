@@ -97,14 +97,6 @@ class BeamPage(DesignFormPage):
         self.diagram.setVisible(False)
         layout.addWidget(self.diagram)
 
-        c4 = Card("Loads")
-        from rcd2000.gui.widgets import load_combo_group
-        load_w, self.gk, self.qk, self.load_result = load_combo_group()
-        c4.add_widget(load_w)
-        layout.addWidget(c4)
-        self._auto_clear_invalid(self.gk)
-        self._auto_clear_invalid(self.qk)
-
         c5 = Card("Member Data")
         self.member_grid = QGridLayout()
         self.member_grid.setSpacing(6)
@@ -242,6 +234,19 @@ class BeamPage(DesignFormPage):
                          fmt(s.steel_bot), fmt(s.steel_top),
                          fmt2(s.shear_left), fmt2(s.shear_right),
                          badge(s.defl_ok)])
+        # Support results (reaction, moment, top/bottom steel) - the report
+        # prints these but the on-screen grid must show them too.
+        if r.supports:
+            rows.append(["SUPPORT RESULTS", "", "", "", "", "", "", ""])
+            for s in r.supports:
+                rows.append([s.support_id, fmt2(s.reaction), fmt2(s.moment),
+                             fmt(s.steel_top), fmt(s.steel_bot), "", "",
+                             ""])
+        # heck == 0 means the steel/deflection loop bailed: the section
+        # could not be designed at the given depth (over-reinforced).
+        if r.heck == 0:
+            rows.append(["SECTION", "FAIL - increase beam depth", "", "",
+                         "", "", "", badge(False)])
         return rows
 
     def get_state(self) -> dict:
@@ -261,8 +266,6 @@ class BeamPage(DesignFormPage):
             "cant_moment_1": self.cant_moment_1.value(),
             "cant_load_2": self.cant_load_2.value(),
             "cant_moment_2": self.cant_moment_2.value(),
-            "gk": self.gk.value(),
-            "qk": self.qk.value(),
             "members": [
                 {
                     "length": w[1].value(),
@@ -308,10 +311,6 @@ class BeamPage(DesignFormPage):
             self.cant_load_2.setValue(state["cant_load_2"])
         if "cant_moment_2" in state:
             self.cant_moment_2.setValue(state["cant_moment_2"])
-        if "gk" in state:
-            self.gk.setValue(state["gk"])
-        if "qk" in state:
-            self.qk.setValue(state["qk"])
         if "members" in state and self._member_widgets:
             for i, w in enumerate(self._member_widgets):
                 if i < len(state["members"]):

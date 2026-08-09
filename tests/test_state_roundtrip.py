@@ -51,8 +51,6 @@ def _set_non_default(page):
         page.cant_moment_1.setValue(30.0)
         page.cant_load_2.setValue(15.0)
         page.cant_moment_2.setValue(20.0)
-        page.gk.setValue(15.5)
-        page.qk.setValue(8.2)
         # Member grid
         for w in page._member_widgets:
             w[1].setValue(6.5)   # length

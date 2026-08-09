@@ -292,4 +292,7 @@ class ColumnPage(DesignFormPage):
         if ci.col_type == 3:
             rows.append(["Biaxial Check", "OK" if r.biaxial_check_ok else "FAIL",
                          badge(r.biaxial_check_ok)])
+        rows.append(["Section Adequate",
+                     "OK" if r.heck == 0 else "FAIL - reduce load or enlarge section",
+                     badge(r.heck == 0)])
         return rows

@@ -167,6 +167,7 @@ class BaseDesigner:
         # Iterate for depth
         max_iter = 20
         for _ in range(max_iter):
+            r.heck = 1  # failed until the full check chain passes
             fnet = (w_total * 1.1) / ap - (h * 24.0 * 1.40) / 1000.0
             r.fnet = fnet
 
@@ -264,6 +265,7 @@ class BaseDesigner:
             r.h = h
             r.bar_type1, r.rd1, r.sp1 = rodia_slab(ast1, fy)
             r.bar_type2, r.rd2, r.sp2 = rodia_slab(ast2, fy)
+            r.heck = 0  # every check in the chain passed at this depth
             break
 
         # Dowel (starter-bar) check for the single column
@@ -433,4 +435,5 @@ class BaseDesigner:
             r.dowel_areas.append(da)
             r.dowel_counts.append(dc)
             r.dowel_oks.append(dok)
+        r.heck = 0  # combined design is single-pass and completes
         return r

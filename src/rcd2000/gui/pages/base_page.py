@@ -344,6 +344,12 @@ class BasePage(DesignFormPage):
         else:
             rows.append(["Dowel Steel Required (mm²)", fmt(r.dowel_area), ""])
             rows.append(["Dowel Bars", f"{r.dowel_count} no.", badge(r.dowel_ok)])
+        # heck == 0: the isolated depth iteration converged (all checks
+        # passed) or the combined design completed; 1: max iterations hit
+        # with a check still failing.
+        rows.append(["Design Checks",
+                     "OK" if r.heck == 0 else "FAIL - increase depth or soil capacity",
+                     badge(r.heck == 0)])
         return rows
 
     def _combined_cols_state(self) -> list:

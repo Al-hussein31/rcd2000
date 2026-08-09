@@ -160,3 +160,33 @@ Isolated square/rect path is usable, but combined footings are unreachable from 
 6. [BUG] Base combined path: fix dist unit handling (drop /1000) and center l1 on the load resultant; add combined-footing column entry to the GUI or disable the option. **DONE** (commit `3a62092` — including the nn==1 three-column Clapeyron branch and the combined column-entry grid in the GUI).
 7. [DEAD] dowel_dia: implement the dowel check or drop the input. **DONE** (commit `0a69fd8` — implemented as a documented BS 8110 extension: As_req = max(0.4% of column section, N/(0.87·fy)), reported per column for combined footings).
 8. [GAP] Column: enforce depth == dia for circular; collect L / LE / LEX / LEY (even if only for reporting; book reads them). **DONE** (commit `0e2d2c1` — shape switch locks b/x, b/y and depth for Circular and mirrors dia into depth; new "Column Height & Effective Lengths" card for L/LE/LEX/LEY; all four reported in report section A when provided; engine verified to use h = dia for circular).
+
+---
+
+## GUI VERIFICATION PASS (post-fix sweep)
+
+Automated pass over all 6 design pages (offscreen Qt): every input widget on
+every page is read by calculate()/validate() and round-trips through
+get_state/set_state (80/80 inputs wired, verified by introspection).
+
+Findings fixed in this pass:
+- [DEAD] Beam page "Loads" card (Gk/Qk): cosmetic only - calculate() never
+  read it (beam loads come from the per-member grid). Removed the card,
+  state keys, and set_state handling.
+- [GAP] Beam support results (reaction, moment, steel top/bot) existed in the
+  exported report but were invisible in the on-screen grid. Added
+  SUPPORT RESULTS rows.
+- [GAP] Beam heck (0 = section could not be designed; over-reinforced) was
+  never surfaced. Added SECTION FAIL row.
+- [GAP] Column heck (1 = steel > max % or biaxial fail) never surfaced. Added
+  Section Adequate row with badge.
+- [GAP] BaseResult.heck was never assigned (always 1, dead). Now wired:
+  isolated path sets 0 only when the full check chain passes at the final
+  depth; combined path sets 0 on completion. Added Design Checks row.
+- [GAP] Slab continuous: support moments/steels (engine filled them) not in
+  the grid. Added per-support rows.
+- [GAP] Slab two-way: long-direction SUPPORT moment/steel not shown. Added.
+- [GAP] Slab defl_required (depth needed for deflection) not shown. Added
+  "Depth for Deflection" row when nonzero.
+
+Coverage locked by tests/test_result_rows.py (8 tests). Full suite: 129.

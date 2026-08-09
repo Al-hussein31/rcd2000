@@ -318,19 +318,26 @@ class SlabPage(DesignFormPage):
             rows.append(["Shear Left (kN/m)", fmt2(r.shear_left), ""])
         if ptype == 2:
             rows.append(["Shear Right (kN/m)", fmt2(r.shear_right), ""])
+        if r.defl_required > 0:
+            rows.append(["Depth for Deflection (mm)", fmt2(r.defl_required), ""])
         if ptype == 4:
             rows += [
                 ["Long Span Moment (kN·m/m)", fmt2(r.moment_long_span), ""],
                 ["Long Span Steel (mm²/m)", fmt(r.steel_long_span), ""],
+                ["Long Support Moment (kN·m/m)", fmt2(r.moment_long_support), ""],
+                ["Long Support Steel (mm²/m)", fmt(r.steel_long_support), ""],
                 ["Support Moment (kN·m/m)", fmt2(r.moment_support), ""],
                 ["Support Steel (mm²)", fmt(r.steel_support), ""],
             ]
         if ptype == 3 and r.span_moments:
             for i, (m, a) in enumerate(zip(r.span_moments, r.span_steels)):
-                rows.append([f"Span {i+1} Moment (kN·m)", fmt2(m), ""])
-                rows.append([f"Span {i+1} Steel (mm²)", fmt(a), ""])
+                rows.append([f"Span {i + 1} Moment (kN·m)", fmt2(m), ""])
+                rows.append([f"Span {i + 1} Steel (mm²)", fmt(a), ""])
             for i, rc in enumerate(r.support_reactions):
-                rows.append([f"Support {i+1} Reaction (kN)", fmt2(rc), ""])
+                rows.append([f"Support {i + 1} Reaction (kN)", fmt2(rc), ""])
+            for i, (m, a) in enumerate(zip(r.support_moments, r.support_steels)):
+                rows.append([f"Support {i + 1} Moment (kN·m)", fmt2(m), ""])
+                rows.append([f"Support {i + 1} Steel (mm²)", fmt(a), ""])
         return rows
 
     def get_state(self) -> dict:
