@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout
 
-from rcd2000.slab import SlabDesigner, SlabPanelInput
+from rcd2000.slab import SlabDesigner, SlabPanelInput, SlabPanelResult
 from rcd2000.report import format_slab
 from rcd2000.gui.theme import fmt, fmt2
 from rcd2000.gui.widgets import (
@@ -13,6 +13,8 @@ from rcd2000.gui.pages.form_page import DesignFormPage
 
 
 class SlabPage(DesignFormPage):
+    input_cls = SlabPanelInput
+    result_cls = SlabPanelResult
     module_name = "Slab"
 
     def __init__(self):

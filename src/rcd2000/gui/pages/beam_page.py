@@ -5,7 +5,7 @@ import logging
 from PySide6.QtWidgets import QHBoxLayout, QGridLayout, QLabel
 from PySide6.QtCore import Qt
 
-from rcd2000.beam import BeamDesigner, BeamInput
+from rcd2000.beam import BeamDesigner, BeamInput, BeamResult
 from rcd2000.report import format_beam
 from rcd2000.gui.theme import TEXT_SECONDARY, fmt, fmt2
 from rcd2000.gui.widgets import (
@@ -16,6 +16,8 @@ from rcd2000.gui.pages.form_page import DesignFormPage
 
 
 class BeamPage(DesignFormPage):
+    input_cls = BeamInput
+    result_cls = BeamResult
     module_name = "Beam"
 
     def __init__(self):

@@ -419,6 +419,11 @@ class Workbench(QWidget):
         panel.state_changed.connect(self._on_state_changed)
         if hasattr(page, "set_status_callback"):
             page.set_status_callback(self._emit_status)
+        # Rebuild the last design's results from the saved payload so the
+        # user never has to re-run a calculation to see them again.
+        payload = item.state.get("_result") if isinstance(item.state, dict) else None
+        if payload:
+            panel.restore_result(payload)
         return panel
 
     def _restore_items(self):
@@ -431,7 +436,13 @@ class Workbench(QWidget):
         panel = self._panels.get(uid)
         if item is not None and panel is not None:
             item.label = panel.label
-            item.state = panel.get_state()
+            state = panel.get_state()
+            payload = panel.get_result_payload()
+            if payload is not None:
+                state["_result"] = payload
+            elif isinstance(state, dict):
+                state.pop("_result", None)
+            item.state = state
 
     def _on_state_changed(self, panel: DesignPanel):
         self._sync_item_state(panel.uid)
@@ -660,21 +671,32 @@ class Workbench(QWidget):
 
         designed = []
         skipped = 0
+        stale = 0
         for item in self.job.items:
             panel = self._panels.get(item.uid)
             if panel is None:
                 skipped += 1
                 continue
+            if panel.is_stale():
+                stale += 1
+                continue  # inputs changed - the report no longer matches
             if panel.is_designed():
                 designed.append(panel)
             else:
                 skipped += 1
 
         if not designed:
-            self._emit_status(
-                "Nothing to save - run at least one design first "
-                "(use the Design/Calculate button).", True
-            )
+            if stale:
+                self._emit_status(
+                    f"{stale} outdated design"
+                    f"{'s' if stale != 1 else ''} - inputs changed, "
+                    "click DESIGN to update before exporting.", True
+                )
+            else:
+                self._emit_status(
+                    "Nothing to save - run at least one design first "
+                    "(use the Design/Calculate button).", True
+                )
             return
 
         sections = []
@@ -692,8 +714,13 @@ class Workbench(QWidget):
                 f"Reports written to {out} ({len(designed)} design"
                 f"{'s' if len(designed) != 1 else ''})"
             )
+            notes = []
             if skipped:
-                msg += f" - {skipped} not designed, skipped."
+                notes.append(f"{skipped} not designed")
+            if stale:
+                notes.append(f"{stale} outdated - click DESIGN to update")
+            if notes:
+                msg += " - " + ", ".join(notes) + ", skipped."
             self._emit_status(msg, False)
         except Exception as exc:
             self._emit_status(f"Export failed: {exc}", True)

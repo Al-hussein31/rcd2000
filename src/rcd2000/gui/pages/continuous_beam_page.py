@@ -4,6 +4,7 @@ from PySide6.QtWidgets import QGridLayout, QLabel
 
 from rcd2000.continuous_beam import (
     ContinuousBeamAnalyzer, ContinuousBeamInput, ContinuousBeamMember,
+    ContinuousBeamResult,
 )
 from rcd2000.report import format_continuous_beam
 from rcd2000.gui.theme import TEXT_SECONDARY, fmt2
@@ -14,6 +15,8 @@ from rcd2000.gui.pages.form_page import DesignFormPage
 
 
 class ContinuousBeamPage(DesignFormPage):
+    input_cls = ContinuousBeamInput
+    result_cls = ContinuousBeamResult
     module_name = "Continuous Beam"
 
     def __init__(self):

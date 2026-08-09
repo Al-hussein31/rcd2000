@@ -17,10 +17,11 @@ import logging
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog, QMessageBox,
+    QGraphicsOpacityEffect,
 )
-from PySide6.QtCore import Qt, QStandardPaths
+from PySide6.QtCore import Qt, QStandardPaths, Signal
 
-from rcd2000.gui.theme import TEXT_MUTED, FONT_SIZE
+from rcd2000.gui.theme import TEXT_MUTED, FONT_SIZE, ERROR
 from rcd2000.gui.widgets import button, header_label, mark_invalid
 
 
@@ -36,16 +37,28 @@ class DesignFormPage(QWidget):
     #: Subclasses should override this.
     module_name: str = "Design"
 
+    #: Dataclass types for persisted-result restore.  Subclasses must
+    #: set these so a saved result payload can be rebuilt on re-entry.
+    input_cls: type | None = None
+    result_cls: type | None = None
+
+    #: Emitted whenever an input changes after a design has run (the
+    #: results are then stale).  The panel listens to autosave + badge.
+    changed = Signal()
+
     def __init__(self):
         super().__init__()
         self._last_input = None
         self._last_result = None
+        self._stale = False          # results no longer match the inputs
+        self._restoring = False      # suppress dirty while restoring state
         self._history_cb = None
         self._status_cb = None
         self._last_save_dir = None
         self._history_viewed = False
         self._suppress_history = False
         self._error_widgets: list = []
+        self._result_widgets: list = []   # result tables for blur/unblur
         self._build_ui()
 
     # ── UI construction ──────────────────────────────────────────────
@@ -89,6 +102,19 @@ class DesignFormPage(QWidget):
         # --- results area ---
         self.results_area = QVBoxLayout()
         layout.addLayout(self.results_area)
+
+        # --- stale banner: shown when inputs change after a design ---
+        self._stale_banner = QLabel(
+            "Results are outdated - the inputs changed since this design. "
+            "Click DESIGN to recalculate."
+        )
+        self._stale_banner.setWordWrap(True)
+        self._stale_banner.setVisible(False)
+        self._stale_banner.setStyleSheet(
+            "background: #3d2f14; color: #ffb648; font-size: 12px;"
+            " font-weight: 600; padding: 8px 12px; border-radius: 6px;"
+        )
+        layout.addWidget(self._stale_banner)
 
         btn_text = self._calc_button_text()
         self._results_placeholder = QLabel(
@@ -245,12 +271,14 @@ class DesignFormPage(QWidget):
 
         r = self._last_result
         rows = self._build_result_rows(r)
+        self._result_widgets = []
         if rows:
             from rcd2000.gui.widgets import make_table
-            self.results_area.addWidget(
-                make_table(["Parameter", "Value", "Status"], rows)
-            )
+            table = make_table(["Parameter", "Value", "Status"], rows)
+            self.results_area.addWidget(table)
+            self._result_widgets.append(table)
 
+        self.set_stale(False)  # a fresh design is never stale
         self.save_btn.setVisible(True)
         self.pdf_btn.setVisible(True)
         self._results_placeholder.setVisible(False)
@@ -269,11 +297,12 @@ class DesignFormPage(QWidget):
         if result is None:
             return
         rows = self._build_result_rows(result)
+        self._result_widgets = []
         if rows:
             from rcd2000.gui.widgets import make_table
-            self.results_area.addWidget(
-                make_table(["Parameter", "Value", "Status"], rows)
-            )
+            table = make_table(["Parameter", "Value", "Status"], rows)
+            self.results_area.addWidget(table)
+            self._result_widgets.append(table)
         self.save_btn.setVisible(True)
         self.pdf_btn.setVisible(True)
         self._results_placeholder.setVisible(False)
@@ -343,6 +372,8 @@ class DesignFormPage(QWidget):
             w = self.results_area.takeAt(0).widget()
             if w:
                 w.deleteLater()
+        self._result_widgets = []
+        self.set_stale(False)  # nothing to invalidate any more
         self.save_btn.setVisible(False)
         self.pdf_btn.setVisible(False)
         self._results_placeholder.setVisible(True)
@@ -354,3 +385,89 @@ class DesignFormPage(QWidget):
     def set_status_callback(self, cb):
         """Set the callback invoked for save-status messages (msg, is_error)."""
         self._status_cb = cb
+
+    # ── Result persistence + stale tracking ──────────────────────────
+
+    def _wire_dirty_inputs(self):
+        """Connect every input widget's change signal to ``_mark_dirty``.
+
+        Called once by the panel after the page is fully built.  Only
+        widgets that expose the standard Qt change signals are connected;
+        buttons and labels are skipped automatically.
+        """
+        if getattr(self, "_dirty_wired", False):
+            return
+        for w in self.findChildren(QWidget):
+            for sig in ("valueChanged", "currentIndexChanged", "textChanged",
+                        "toggled", "dateChanged", "editingFinished"):
+                if hasattr(w, sig):
+                    getattr(w, sig).connect(self._mark_dirty)
+        self._dirty_wired = True
+
+    def _mark_dirty(self, *_args):
+        """An input changed - the displayed results (if any) are stale.
+
+        Blurs the results, disables the Save/PDF buttons and flags the
+        payload as stale so the state survives re-entry.  Suppressed
+        while a saved state is being restored programmatically.
+        """
+        if self._restoring:
+            return
+        if self._last_result is None:
+            return  # nothing to invalidate yet
+        if not self._stale:
+            self.set_stale(True)
+            self.changed.emit()
+
+    def set_stale(self, stale: bool):
+        """Mark the current results stale (blurred + Save/PDF disabled)."""
+        self._stale = bool(stale)
+        self._stale_banner.setVisible(self._stale)
+        for w in self._result_widgets:
+            w.setEnabled(not stale)
+            if stale:
+                effect = QGraphicsOpacityEffect(w)
+                effect.setOpacity(0.4)
+                w.setGraphicsEffect(effect)
+            else:
+                w.setGraphicsEffect(None)
+        if self._last_result is not None:
+            self.save_btn.setEnabled(not stale)
+            self.pdf_btn.setEnabled(not stale)
+
+    def result_payload(self) -> dict | None:
+        """Return a JSON-safe snapshot of the last design, or None.
+
+        Payload: ``{"input": {...}, "output": {...}, "stale": bool}``.
+        """
+        if self._last_input is None or self._last_result is None:
+            return None
+        from rcd2000.gui.serialize import as_dict
+        return {
+            "input": as_dict(self._last_input),
+            "output": as_dict(self._last_result),
+            "stale": self._stale,
+        }
+
+    def restore_result(self, payload: dict | None):
+        """Rebuild ``_last_input``/``_last_result`` from a saved payload
+        and re-display the results without re-running the engine."""
+        self._restoring = True
+        try:
+            if not payload:
+                return
+            from rcd2000.gui.serialize import dataclass_from_dict
+            inp = dataclass_from_dict(
+                self.input_cls or dict, payload.get("input") or {}
+            )
+            result = dataclass_from_dict(
+                self.result_cls or dict, payload.get("output") or {}
+            )
+            if inp is None or result is None:
+                return
+            self._last_input = inp
+            self._last_result = result
+            self._show_result(result)
+            self.set_stale(bool(payload.get("stale")))
+        finally:
+            self._restoring = False

@@ -1,6 +1,6 @@
 """Stair design form page."""
 
-from rcd2000.stair import StairDesigner, StairInput
+from rcd2000.stair import StairDesigner, StairInput, StairResult
 from rcd2000.report import format_stair
 from rcd2000.gui.theme import fmt, fmt2
 from rcd2000.gui.widgets import (
@@ -10,6 +10,8 @@ from rcd2000.gui.pages.form_page import DesignFormPage
 
 
 class StairPage(DesignFormPage):
+    input_cls = StairInput
+    result_cls = StairResult
     module_name = "Stair"
 
     def build_inputs(self, layout):

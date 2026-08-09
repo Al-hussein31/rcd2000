@@ -122,6 +122,12 @@ class DesignPanel(QFrame):
         self.label_edit.editingFinished.connect(
             lambda: self.label_changed.emit(self)
         )
+        # Any input edit after a design makes the results stale: blur +
+        # disable Save/PDF on the page, then autosave + badge via the
+        # panel's state_changed signal (same path as a calculation).
+        if hasattr(page, "_wire_dirty_inputs"):
+            page._wire_dirty_inputs()
+            page.changed.connect(self._on_inputs_dirty)
         # notify autosave when the user runs a calculation
         if hasattr(page, "_on_calculate"):
             original = page._on_calculate
@@ -129,10 +135,17 @@ class DesignPanel(QFrame):
             def wrapped(*a, **k):
                 original(*a, **k)
                 self._designed = page._last_result is not None
+                if hasattr(page, "set_stale"):
+                    page.set_stale(False)
                 self._update_badge()
                 self.state_changed.emit(self)
 
             page._on_calculate = wrapped
+
+    def _on_inputs_dirty(self):
+        """An input changed after a design - persist + refresh badge."""
+        self._update_badge()
+        self.state_changed.emit(self)
 
     # ── API ────────────────────────────────────────────────────────
 
@@ -192,6 +205,26 @@ class DesignPanel(QFrame):
 
     def is_designed(self) -> bool:
         return self._designed or self.page._last_result is not None
+
+    def is_stale(self) -> bool:
+        """True when the shown results no longer match the inputs."""
+        return self.is_designed() and bool(getattr(self.page, "_stale", False))
+
+    def get_result_payload(self) -> dict | None:
+        """JSON-safe snapshot of the last design for job persistence."""
+        try:
+            return self.page.result_payload()
+        except Exception:
+            return None
+
+    def restore_result(self, payload: dict | None):
+        """Rebuild the results from a saved payload without re-running."""
+        try:
+            self.page.restore_result(payload)
+        except Exception:
+            return
+        self._designed = self.page._last_result is not None
+        self._update_badge()
 
     def report_text(self, header: dict) -> str:
         """Render the full report: job header block + design report."""
@@ -265,7 +298,22 @@ class DesignPanel(QFrame):
     # ── visuals ────────────────────────────────────────────────────
 
     def _update_badge(self):
-        self.badge.setText("DESIGNED" if self.is_designed() else "")
+        if self.is_stale():
+            self.badge.setText("OUTDATED")
+            self.badge.setStyleSheet(
+                f"color: #ffb648; font-size: {FONT_SIZE['xs']}px;"
+                f" font-weight: 700; background: #3d2f14;"
+                f" border-radius: 8px; padding: 2px 8px;"
+            )
+        elif self.is_designed():
+            self.badge.setText("DESIGNED")
+            self.badge.setStyleSheet(
+                f"color: {ACCENT}; font-size: {FONT_SIZE['xs']}px;"
+                f" font-weight: 700; background: {ACCENT_SOFT};"
+                f" border-radius: 8px; padding: 2px 8px;"
+            )
+        else:
+            self.badge.setText("")
 
     @staticmethod
     def _bar_btn_style() -> str:

@@ -2,7 +2,7 @@
 
 import logging
 
-from rcd2000.column import ColumnDesigner, ColumnInput
+from rcd2000.column import ColumnDesigner, ColumnInput, ColumnResult
 from rcd2000.report import format_column
 from rcd2000.gui.theme import fmt
 from rcd2000.gui.widgets import (
@@ -12,6 +12,8 @@ from rcd2000.gui.pages.form_page import DesignFormPage
 
 
 class ColumnPage(DesignFormPage):
+    input_cls = ColumnInput
+    result_cls = ColumnResult
     module_name = "Column"
 
     def build_inputs(self, layout):

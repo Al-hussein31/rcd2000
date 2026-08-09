@@ -2,7 +2,7 @@
 
 from PySide6.QtWidgets import QGridLayout, QLabel, QPushButton
 
-from rcd2000.base import BaseDesigner, BaseInput, ColumnOnBase
+from rcd2000.base import BaseDesigner, BaseInput, BaseResult, ColumnOnBase
 from rcd2000.report import format_base
 from rcd2000.gui.theme import (
     TEXT_SECONDARY, ACCENT, ACCENT_HOVER, ACCENT_PRESS, RADIUS_MD, fmt, fmt2,
@@ -14,6 +14,8 @@ from rcd2000.gui.pages.form_page import DesignFormPage
 
 
 class BasePage(DesignFormPage):
+    input_cls = BaseInput
+    result_cls = BaseResult
     module_name = "Base"
 
     def __init__(self):
