@@ -117,6 +117,10 @@ def _set_non_default(page):
         page.cb_nm.setValue(3)
         page.cb_end1.setCurrentIndex(1)
         page.cb_end2.setCurrentIndex(0)
+        page.cb_cant_load_1.setValue(20.0)
+        page.cb_cant_moment_1.setValue(35.0)
+        page.cb_cant_load_2.setValue(10.0)
+        page.cb_cant_moment_2.setValue(15.0)
         for w in page._cb_member_widgets:
             w[1].setValue(7.0)       # length
             w[2].setValue(0.005)     # inertia
@@ -125,6 +129,8 @@ def _set_non_default(page):
             w[5].setValue(12.0)      # wt
             w[6].setValue(6.0)       # wb
             w[7].setValue(3.0)       # ab
+            w[8].setValue(40.0)      # pl
+            w[9].setValue(3.5)       # ap
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────

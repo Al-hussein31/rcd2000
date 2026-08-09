@@ -43,6 +43,38 @@ class ContinuousBeamPage(DesignFormPage):
         self._auto_clear_invalid(self.cb_end1)
         self._auto_clear_invalid(self.cb_end2)
 
+        # AUDIT: end cantilever load/moment inputs were missing from the
+        # GUI (book CANTW/CANTMT read per end support). The engine adds
+        # CANTW to the end reactions (book line: REACTN(I) = REACTN(I) +
+        # CANTW(I)); CANTMT is read but only counted (KC) in the book and
+        # never applied to the moments - kept faithful to that behaviour.
+        c1b = Card("End Cantilevers")
+        self.cb_cant_load_1 = spinbox(0, 999999999, 5, 0, 1, " kN")
+        self.cb_cant_moment_1 = spinbox(0, 999999999, 5, 0, 1, " kN·m")
+        self.cb_cant_load_2 = spinbox(0, 999999999, 5, 0, 1, " kN")
+        self.cb_cant_moment_2 = spinbox(0, 999999999, 5, 0, 1, " kN·m")
+        self.cb_cant_load_1.setToolTip("Load on the left end cantilever (book CANTW(1)) - added to the end reaction")
+        self.cb_cant_moment_1.setToolTip(
+            "Moment at the left end support (book CANTMT(1)). "
+            "The book only counts it (KC) and never applies it to the "
+            "moments - recorded here for completeness."
+        )
+        self.cb_cant_load_2.setToolTip("Load on the right end cantilever (book CANTW(NS)) - added to the end reaction")
+        self.cb_cant_moment_2.setToolTip(
+            "Moment at the right end support (book CANTMT(NS)). "
+            "The book only counts it (KC) and never applies it to the "
+            "moments - recorded here for completeness."
+        )
+        c1b.add_row("Left cantilever load:", self.cb_cant_load_1)
+        c1b.add_row("Left cantilever moment:", self.cb_cant_moment_1)
+        c1b.add_row("Right cantilever load:", self.cb_cant_load_2)
+        c1b.add_row("Right cantilever moment:", self.cb_cant_moment_2)
+        layout.addWidget(c1b)
+        self._auto_clear_invalid(self.cb_cant_load_1)
+        self._auto_clear_invalid(self.cb_cant_moment_1)
+        self._auto_clear_invalid(self.cb_cant_load_2)
+        self._auto_clear_invalid(self.cb_cant_moment_2)
+
         self.diagram = SpanDiagram()
         self.diagram.setVisible(False)
         layout.addWidget(self.diagram)
@@ -64,18 +96,9 @@ class ContinuousBeamPage(DesignFormPage):
                 f"color: {TEXT_SECONDARY}; font-weight: bold; font-size: 12px; "
                 f"background: transparent;"
             )
-            # AUDIT: length 1-50 m is fine. inertia 0.0001-10 m⁴ is
-            # very small but the engine uses it directly in the stiffness
-            # matrix - zero would cause division-by-zero, but the min
-            # prevents that.
             length = spinbox(0, 999999999, 0.5, 5, 2, " m")
             inertia = spinbox(0, 999999999, 0.001, 0.001, 4)
-            # AUDIT: e_mod 0.1-10 - relative modulus, fine as-is.
-            e_mod = spinbox(0, 999999999, 0.1, 1, 1)
-            udl = spinbox(0, 999999999, 5, 0, 1, " kN/m")
-            inertia = spinbox(0, 999999999, 0.001, 0.001, 4)
             inertia.setToolTip("Second moment of area (m⁴) for stiffness calculations")
-            # AUDIT: e_mod 0.1-10 - relative modulus, fine as-is.
             e_mod = spinbox(0, 999999999, 0.1, 1, 1)
             e_mod.setToolTip("Relative modulus of elasticity (E / E_concrete)")
             udl = spinbox(0, 999999999, 5, 0, 1, " kN/m")
@@ -88,6 +111,13 @@ class ContinuousBeamPage(DesignFormPage):
             # ab/l which could exceed 1.0, producing invalid results.
             ab = spinbox(0, 999999999, 0.5, 0, 2)
             ab.setToolTip("Distance (m) from left support to load application point")
+            # AUDIT: per-member point loads were missing from the GUI
+            # (book P(I,J)/AP(I,J) read per member; the engine already
+            # adds PAF terms to the Clapeyron RHS).
+            pl = spinbox(0, 999999999, 5, 0, 1, " kN")
+            ap = spinbox(0, 999999999, 0.5, 0, 2, " m")
+            pl.setToolTip("Point load on this member (book P) - enter 0 for none")
+            ap.setToolTip("Distance (m) of the point load from the left support (book AP)")
             self._auto_clear_invalid(length)
             self._auto_clear_invalid(inertia)
             self._auto_clear_invalid(e_mod)
@@ -95,6 +125,8 @@ class ContinuousBeamPage(DesignFormPage):
             self._auto_clear_invalid(wt)
             self._auto_clear_invalid(wb)
             self._auto_clear_invalid(ab)
+            self._auto_clear_invalid(pl)
+            self._auto_clear_invalid(ap)
             self.member_grid.addWidget(lbl, row, 0)
             self.member_grid.addWidget(length, row, 1)
             self.member_grid.addWidget(inertia, row, 2)
@@ -103,9 +135,14 @@ class ContinuousBeamPage(DesignFormPage):
             self.member_grid.addWidget(wt, row, 5)
             self.member_grid.addWidget(wb, row, 6)
             self.member_grid.addWidget(ab, row, 7)
-            self._cb_member_widgets.append((lbl, length, inertia, e_mod, udl, wt, wb, ab))
+            self.member_grid.addWidget(pl, row, 8)
+            self.member_grid.addWidget(ap, row, 9)
+            self._cb_member_widgets.append(
+                (lbl, length, inertia, e_mod, udl, wt, wb, ab, pl, ap)
+            )
 
-        headers = ["", "L (m)", "I (m⁴)", "E-rel", "UDL", "Tri", "Trap", "Dist"]
+        headers = ["", "L (m)", "I (m⁴)", "E-rel", "UDL", "Tri", "Trap",
+                   "Dist", "P (kN)", "a (m)"]
         for col, h in enumerate(headers):
             self.member_grid.addWidget(
                 label(h, secondary=True, size=11), 0, col
@@ -134,6 +171,10 @@ class ContinuousBeamPage(DesignFormPage):
                 wt=w[5].value(),
                 wb=w[6].value(),
                 ab=w[7].value(),
+                npl=1 if w[8].value() > 0 else 0,
+                point_loads=(
+                    [(w[8].value(), w[9].value())] if w[8].value() > 0 else []
+                ),
             ))
         inp = ContinuousBeamInput(
             n_supports=self.cb_ns.value(),
@@ -141,6 +182,10 @@ class ContinuousBeamPage(DesignFormPage):
             members=members,
             end1_type=self.cb_end1.currentIndex(),
             end2_type=self.cb_end2.currentIndex(),
+            end1_cant_load=self.cb_cant_load_1.value(),
+            end1_cant_moment=self.cb_cant_moment_1.value(),
+            end2_cant_load=self.cb_cant_load_2.value(),
+            end2_cant_moment=self.cb_cant_moment_2.value(),
         )
         analyzer = ContinuousBeamAnalyzer()
         result = analyzer.analyze(inp)
@@ -159,6 +204,11 @@ class ContinuousBeamPage(DesignFormPage):
                 errors.append(f"Member {i+1}: distance (ab) exceeds member length")
                 self._mark_invalid(w[7])
                 self._mark_invalid(w[1])
+            if w[8].value() > 0 and not (0 < w[9].value() <= w[1].value()):
+                errors.append(
+                    f"Member {i+1} point load distance must be within the member span"
+                )
+                self._mark_invalid(w[9])
         return errors
 
     def summarize(self, inp) -> str:
@@ -192,6 +242,10 @@ class ContinuousBeamPage(DesignFormPage):
             "cb_nm": self.cb_nm.value(),
             "cb_end1": self.cb_end1.currentIndex(),
             "cb_end2": self.cb_end2.currentIndex(),
+            "cant_load_1": self.cb_cant_load_1.value(),
+            "cant_moment_1": self.cb_cant_moment_1.value(),
+            "cant_load_2": self.cb_cant_load_2.value(),
+            "cant_moment_2": self.cb_cant_moment_2.value(),
             "members": [
                 {
                     "length": w[1].value(),
@@ -201,6 +255,8 @@ class ContinuousBeamPage(DesignFormPage):
                     "wt": w[5].value(),
                     "wb": w[6].value(),
                     "ab": w[7].value(),
+                    "pl": w[8].value(),
+                    "ap": w[9].value(),
                 }
                 for w in self._cb_member_widgets
             ],
@@ -215,6 +271,14 @@ class ContinuousBeamPage(DesignFormPage):
             self.cb_end1.setCurrentIndex(state["cb_end1"])
         if "cb_end2" in state:
             self.cb_end2.setCurrentIndex(state["cb_end2"])
+        if "cant_load_1" in state:
+            self.cb_cant_load_1.setValue(state["cant_load_1"])
+        if "cant_moment_1" in state:
+            self.cb_cant_moment_1.setValue(state["cant_moment_1"])
+        if "cant_load_2" in state:
+            self.cb_cant_load_2.setValue(state["cant_load_2"])
+        if "cant_moment_2" in state:
+            self.cb_cant_moment_2.setValue(state["cant_moment_2"])
         if "members" in state and self._cb_member_widgets:
             for i, w in enumerate(self._cb_member_widgets):
                 if i < len(state["members"]):
@@ -233,3 +297,7 @@ class ContinuousBeamPage(DesignFormPage):
                         w[6].setValue(m["wb"])
                     if "ab" in m:
                         w[7].setValue(m["ab"])
+                    if "pl" in m:
+                        w[8].setValue(m["pl"])
+                    if "ap" in m:
+                        w[9].setValue(m["ap"])
