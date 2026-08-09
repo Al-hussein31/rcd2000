@@ -25,18 +25,14 @@ class ColumnPage(DesignFormPage):
         self._auto_clear_invalid(self.shape)
 
         c2 = Card("Loads & Geometry")
-        # AUDIT: load range 0-50000 kN may exceed what a rectangular column
-        # of the given dimensions can carry - the engine will return heck=1,
-        # but the user gets no early guidance. Consider adding a pre-check.
+        # AUDIT (resolved): for circular columns, depth must equal dia for the
+        # engine to work correctly. Now enforced: switching to Circular
+        # disables b/x, b/y and the depth box, and depth is auto-synced to dia
+        # (the book's H input is the diameter for circular sections).
         self.load = spinbox(0, 999999999, 100, 1000)
-        # AUDIT: bx/by range 100-2000 mm is fine, but for circular columns
-        # these are ignored - dia is used instead. No conflict.
         self.bx = spinbox(100, 999999999, 25, 300, 0)
         self.by = spinbox(100, 999999999, 25, 300, 0)
-        # AUDIT: dia 100-2000 mm is physically large but not invalid.
         self.dia = spinbox(100, 999999999, 25, 300, 0)
-        # AUDIT: depth 100-2000 mm - for circular columns, depth must equal
-        # dia for the engine to work correctly. The page doesn't enforce this.
         self.depth = spinbox(100, 999999999, 25, 300, 0)
         c2.add_row("Axial Load (kN):", self.load)
         c2.add_row("b/h width - x (mm):", self.bx)
@@ -49,6 +45,27 @@ class ColumnPage(DesignFormPage):
         self._auto_clear_invalid(self.by)
         self._auto_clear_invalid(self.dia)
         self._auto_clear_invalid(self.depth)
+
+        c5 = Card("Column Height & Effective Lengths")
+        # AUDIT (resolved): book column.f77 reads L, LE, LEX, LEY as inputs.
+        # Collected here and carried into the report for slenderness context.
+        self.length = spinbox(0, 999999999, 0.1, 3.0, 2)
+        self.le = spinbox(0, 999999999, 0.1, 3.0, 2)
+        self.lex = spinbox(0, 999999999, 0.1, 3.0, 2)
+        self.ley = spinbox(0, 999999999, 0.1, 3.0, 2)
+        self.length.setToolTip("Column height L (m) - book input L")
+        self.le.setToolTip("Effective length LE (m) - book input LE")
+        self.lex.setToolTip("Effective length about x-axis LEX (m) - book input LEX")
+        self.ley.setToolTip("Effective length about y-axis LEY (m) - book input LEY")
+        c5.add_row("Column height L (m):", self.length)
+        c5.add_row("Effective length LE (m):", self.le)
+        c5.add_row("Effective length LEX (m):", self.lex)
+        c5.add_row("Effective length LEY (m):", self.ley)
+        layout.addWidget(c5)
+        self._auto_clear_invalid(self.length)
+        self._auto_clear_invalid(self.le)
+        self._auto_clear_invalid(self.lex)
+        self._auto_clear_invalid(self.ley)
 
         c3 = Card("Materials")
         from rcd2000.gui.widgets import fcu_combo, fy_combo
@@ -88,6 +105,27 @@ class ColumnPage(DesignFormPage):
         self._auto_clear_invalid(self.moment_y)
         self._auto_clear_invalid(self.moment)
 
+        # Enforce depth == dia for circular columns (book: H is the diameter
+        # for circular sections). Switching shape toggles which geometry
+        # fields are editable; dia changes mirror into depth while circular.
+        self.shape.currentIndexChanged.connect(self._sync_shape_geometry)
+        self.dia.valueChanged.connect(self._on_dia_changed)
+        self._sync_shape_geometry()
+
+    def _sync_shape_geometry(self):
+        circular = self.shape.currentIndex() == 1
+        # Rectangular: b/x + b/y + depth editable, dia is ignored by the engine.
+        # Circular: dia drives everything; b/x + b/y + depth are locked.
+        for w in (self.bx, self.by, self.depth):
+            w.setEnabled(not circular)
+        self.dia.setEnabled(circular)
+        if circular:
+            self.depth.setValue(self.dia.value())
+
+    def _on_dia_changed(self, value):
+        if self.shape.currentIndex() == 1:
+            self.depth.setValue(value)
+
     def calculate(self):
         col_type = self.col_type.currentIndex() + 1
         fcu = int(self.col_fcu.currentText())
@@ -113,6 +151,8 @@ class ColumnPage(DesignFormPage):
             load=self.load.value(),
             bx=self.bx.value(), by=self.by.value(),
             dia=self.dia.value(), depth=self.depth.value(),
+            length=self.length.value(),
+            le=self.le.value(), lex=self.lex.value(), ley=self.ley.value(),
             moment_x=self.moment_x.value(),
             moment_y=self.moment_y.value(),
             moment=moment,
@@ -188,6 +228,10 @@ class ColumnPage(DesignFormPage):
             "by": self.by.value(),
             "dia": self.dia.value(),
             "depth": self.depth.value(),
+            "length": self.length.value(),
+            "le": self.le.value(),
+            "lex": self.lex.value(),
+            "ley": self.ley.value(),
             "col_fcu": int(self.col_fcu.currentText()),
             "col_fy": int(self.col_fy.currentText()),
             "col_max_steel": self.col_max_steel.value(),
@@ -212,6 +256,14 @@ class ColumnPage(DesignFormPage):
             self.dia.setValue(state["dia"])
         if "depth" in state:
             self.depth.setValue(state["depth"])
+        if "length" in state:
+            self.length.setValue(state["length"])
+        if "le" in state:
+            self.le.setValue(state["le"])
+        if "lex" in state:
+            self.lex.setValue(state["lex"])
+        if "ley" in state:
+            self.ley.setValue(state["ley"])
         if "col_fcu" in state:
             self._set_combo_int(self.col_fcu, state["col_fcu"])
         if "col_fy" in state:

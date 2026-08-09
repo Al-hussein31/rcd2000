@@ -17,12 +17,16 @@ def _set_non_default(page):
     """Set non-default values on every input widget of *page*."""
     if isinstance(page, ColumnPage):
         page.col_type.setCurrentIndex(2)
-        page.shape.setCurrentIndex(1)
+        page.shape.setCurrentIndex(1)  # Circular - depth auto-syncs to dia
         page.load.setValue(2500)
         page.bx.setValue(400)
         page.by.setValue(300)
         page.dia.setValue(500)
-        page.depth.setValue(600)
+        page.depth.setValue(500)  # must equal dia for circular
+        page.length.setValue(3.5)
+        page.le.setValue(3.0)
+        page.lex.setValue(2.8)
+        page.ley.setValue(2.5)
         page._set_combo_int(page.col_fcu, 35)
         page._set_combo_int(page.col_fy, 500)
         page.col_max_steel.setValue(6.0)

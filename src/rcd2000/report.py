@@ -422,6 +422,13 @@ def format_column(ci, r, job: str = "", date: str = "",
     rep.label_val("AXIAL LOAD", ci.load, "kN")
     rep.label_val("MOMENT ABOUT X - AXIS", ci.moment_x, "kN.m")
     rep.label_val("MOMENT ABOUT Y-AXIS", ci.moment_y, "kN.m")
+    # Book column.f77 reads L, LE, LEX, LEY as inputs - collect for
+    # slenderness context when provided.
+    if any(getattr(ci, f, 0.0) for f in ("length", "le", "lex", "ley")):
+        rep.label_val("COLUMN HEIGHT L", getattr(ci, "length", 0.0), "m")
+        rep.label_val("EFFECTIVE LENGTH LE", getattr(ci, "le", 0.0), "m")
+        rep.label_val("EFFECTIVE LENGTH LEX", getattr(ci, "lex", 0.0), "m")
+        rep.label_val("EFFECTIVE LENGTH LEY", getattr(ci, "ley", 0.0), "m")
     rep.blank(1)
 
     if ci.col_type != 1:

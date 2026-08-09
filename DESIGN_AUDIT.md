@@ -152,11 +152,11 @@ Isolated square/rect path is usable, but combined footings are unreachable from 
 ---
 
 ## PRIORITY FIX LIST
-1. [BUG] `deflect_beam` ignores its `sr` argument (slab deflection far too lenient for cantilever / simply supported / two-way). Fix: use the passed `sr` as the book does; keep `nn` only for the interactive steel-increase flag.
-2. [BUG] Job header Max steel % and D/H ratio are dead: wire them into ColumnDesigner (max_steel_pct, dh_ratio) on the column page.
-3. [GAP] Beam: add point-load and end-cantilever (load + moment) inputs to the beam page; make the engine actually use cant_load_1/2 and cant_moment_1/2 in the fixed-end moments.
-4. [GAP] Slab: add point-load entry (cantilever/simply), end cantilever moment/load + per-span point loads (continuous), and expose SD for two-way.
-5. [GAP] Continuous beam: add point loads + end cantilever load/moment inputs; engine must add end1/end2_cant_moment to mt[0]/mt[ns-1].
-6. [BUG] Base combined path: fix dist unit handling (drop /1000) and center l1 on the load resultant; add combined-footing column entry to the GUI or disable the option.
-7. [DEAD] dowel_dia: implement the dowel check or drop the input.
-8. [GAP] Column: enforce depth == dia for circular; collect L / LE / LEX / LEY (even if only for reporting; book reads them).
+1. [BUG] `deflect_beam` ignores its `sr` argument (slab deflection far too lenient for cantilever / simply supported / two-way). Fix: use the passed `sr` as the book does; keep `nn` only for the interactive steel-increase flag. **DONE** (commit `a3a77dd`).
+2. [BUG] Job header Max steel % and D/H ratio are dead: wire them into ColumnDesigner (max_steel_pct, dh_ratio) on the column page. **DONE** (commit `2dc9185`).
+3. [GAP] Beam: add point-load and end-cantilever (load + moment) inputs to the beam page; make the engine actually use cant_load_1/2 and cant_moment_1/2 in the fixed-end moments. **DONE** (commit `035bd1c`).
+4. [GAP] Slab: add point-load entry (cantilever/simply), end cantilever moment/load + per-span point loads (continuous), and expose SD for two-way. **DONE** (commit `64e6515`).
+5. [GAP] Continuous beam: add point loads + end cantilever load/moment inputs; engine must add end1/end2_cant_moment to mt[0]/mt[ns-1]. **DONE** (commit `b7fb5a4` — engine already adds the moments; GUI inputs added).
+6. [BUG] Base combined path: fix dist unit handling (drop /1000) and center l1 on the load resultant; add combined-footing column entry to the GUI or disable the option. **DONE** (commit `3a62092` — including the nn==1 three-column Clapeyron branch and the combined column-entry grid in the GUI).
+7. [DEAD] dowel_dia: implement the dowel check or drop the input. **DONE** (commit `0a69fd8` — implemented as a documented BS 8110 extension: As_req = max(0.4% of column section, N/(0.87·fy)), reported per column for combined footings).
+8. [GAP] Column: enforce depth == dia for circular; collect L / LE / LEX / LEY (even if only for reporting; book reads them). **DONE** (commit `0e2d2c1` — shape switch locks b/x, b/y and depth for Circular and mirrors dia into depth; new "Column Height & Effective Lengths" card for L/LE/LEX/LEY; all four reported in report section A when provided; engine verified to use h = dia for circular).
