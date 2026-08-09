@@ -1,6 +1,6 @@
 """Slab design form page."""
 
-from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtWidgets import QHBoxLayout, QVBoxLayout
 
 from rcd2000.slab import SlabDesigner, SlabPanelInput
 from rcd2000.report import format_slab
@@ -17,6 +17,7 @@ class SlabPage(DesignFormPage):
 
     def __init__(self):
         self._cont_span_widgets = []
+        self._panel_pl_widgets = []
         super().__init__()
 
     def build_inputs(self, layout):
@@ -57,10 +58,19 @@ class SlabPage(DesignFormPage):
             "I'm not certain of the exact 1-9 boundary-condition mapping; "
             "please confirm the correct reference (likely BS 8110 Table 3.13/3.14)."
         )
+        # AUDIT: the two-way span/effective-depth ratio was hard-coded to 20
+        # in the engine default; expose it (book input SR, default 20).
+        self.s_sd = spin_int(5, 60, 20)
+        self.s_sd.setToolTip(
+            "Two-way slab span/effective-depth ratio (book SR, default 20). "
+            "Use 26 for panels continuous over the short span; "
+            "lower ratios demand a deeper slab."
+        )
         c2.add_row("Depth (mm):", self.s_depth)
         c2.add_row("Span (m):", self.s_span)
         c2.add_row("Ly - long span (m):", self.s_ly)
         c2.add_row("Case (1-9):", self.s_case)
+        c2.add_row("Span/Depth Ratio:", self.s_sd)
 
         load_w, self.gk, self.qk, self.load_result = load_combo_group()
 
@@ -73,8 +83,43 @@ class SlabPage(DesignFormPage):
         self._auto_clear_invalid(self.s_span)
         self._auto_clear_invalid(self.s_ly)
         self._auto_clear_invalid(self.s_case)
+        self._auto_clear_invalid(self.s_sd)
         self._auto_clear_invalid(self.gk)
         self._auto_clear_invalid(self.qk)
+
+        # AUDIT: end cantilever moment/load inputs for continuous slabs were
+        # missing from the GUI (book CANTMT(1/2), CANTLD(1/2)); the engine
+        # already adds them to mtc[0]/mtc[ns-1] and rct[0]/rct[ns-1].
+        c2b = Card("End Cantilevers (Continuous)")
+        self.s_cant_load_1 = spinbox(0, 999999999, 5, 0, 1, " kN")
+        self.s_cant_moment_1 = spinbox(0, 999999999, 5, 0, 1, " kN·m")
+        self.s_cant_load_2 = spinbox(0, 999999999, 5, 0, 1, " kN")
+        self.s_cant_moment_2 = spinbox(0, 999999999, 5, 0, 1, " kN·m")
+        self.s_cant_load_1.setToolTip("Load on the left end cantilever (book CANTLD(1))")
+        self.s_cant_moment_1.setToolTip("Moment at the left end support (book CANTMT(1))")
+        self.s_cant_load_2.setToolTip("Load on the right end cantilever (book CANTLD(2))")
+        self.s_cant_moment_2.setToolTip("Moment at the right end support (book CANTMT(2))")
+        c2b.add_row("Left cantilever load:", self.s_cant_load_1)
+        c2b.add_row("Left cantilever moment:", self.s_cant_moment_1)
+        c2b.add_row("Right cantilever load:", self.s_cant_load_2)
+        c2b.add_row("Right cantilever moment:", self.s_cant_moment_2)
+        layout.addWidget(c2b)
+        self._auto_clear_invalid(self.s_cant_load_1)
+        self._auto_clear_invalid(self.s_cant_moment_1)
+        self._auto_clear_invalid(self.s_cant_load_2)
+        self._auto_clear_invalid(self.s_cant_moment_2)
+
+        # AUDIT: point loads for cantilever / simply supported panels were
+        # missing from the GUI (book NPL, PL/APC); the engine already sums
+        # them into the moment and shear.
+        c2c = Card("Point Loads (Cantilever / Simply Supported)")
+        self.panel_npl = spin_int(0, 999999999, 0)
+        self.panel_npl.valueChanged.connect(self._sync_panel_pls)
+        c2c.add_row("Number of Point Loads:", self.panel_npl)
+        self.panel_pl_layout = QVBoxLayout()
+        c2c.add_layout(self.panel_pl_layout)
+        layout.addWidget(c2c)
+        self._auto_clear_invalid(self.panel_npl)
 
         c3 = Card("Continuous Slab Spans")
         self.cont_nspan = spin_int(1, 999999999, 3)
@@ -90,26 +135,52 @@ class SlabPage(DesignFormPage):
         layout.addWidget(c3)
 
         self._sync_cont_spans()
+        self._sync_panel_pls()
+
+    @staticmethod
+    def _clear_layout(layout):
+        """Remove every widget/layout from a layout (reusable on rebuild)."""
+        while layout.count():
+            item = layout.takeAt(0)
+            if item.layout() is not None:
+                lay = item.layout()
+                while lay.count():
+                    li = lay.takeAt(0)
+                    w = li.widget()
+                    if w is not None:
+                        w.deleteLater()
+            elif item.widget() is not None:
+                item.widget().deleteLater()
 
     def _sync_cont_spans(self):
-        from PySide6.QtWidgets import QVBoxLayout
         n = self.cont_nspan.value()
         # Rebuild the span widgets from scratch each time (simpler than
         # tracking add/remove).
+        self._clear_layout(self.cont_span_layout)
         self._cont_span_widgets = []
         for i in range(n):
             h = QHBoxLayout()
             h.addWidget(label(f"S{i+1}:", secondary=True, size=12))
             le = spinbox(0, 999999999, 0.5, 4, 2, " m")
             ud = spinbox(0, 999999999, 5, 10, 1, " kN/m")
+            pl = spinbox(0, 999999999, 5, 0, 1, " kN")
+            ap = spinbox(0, 999999999, 0.5, 0, 2, " m")
+            pl.setToolTip("Point load on this span (book PLC) - enter 0 for none")
+            ap.setToolTip("Distance (m) of the point load from the left support (book ALC)")
             self._auto_clear_invalid(le)
             self._auto_clear_invalid(ud)
+            self._auto_clear_invalid(pl)
+            self._auto_clear_invalid(ap)
             h.addWidget(le)
             h.addWidget(ud)
+            h.addWidget(pl)
+            h.addWidget(ap)
             self.cont_span_layout.addLayout(h)
-            self._cont_span_widgets.append((le, ud))
+            self._cont_span_widgets.append((le, ud, pl, ap))
             le.valueChanged.connect(self._update_diagram)
             ud.valueChanged.connect(self._update_diagram)
+            pl.valueChanged.connect(self._update_diagram)
+            ap.valueChanged.connect(self._update_diagram)
 
         diagram_data = [
             {"length": w[0].value(), "udl": w[1].value()}
@@ -117,6 +188,24 @@ class SlabPage(DesignFormPage):
         ]
         self.cont_diagram.set_spans(diagram_data)
         self.cont_diagram.setVisible(n > 1)
+
+    def _sync_panel_pls(self):
+        n = self.panel_npl.value()
+        self._clear_layout(self.panel_pl_layout)
+        self._panel_pl_widgets = []
+        for i in range(n):
+            h = QHBoxLayout()
+            h.addWidget(label(f"P{i+1}:", secondary=True, size=12))
+            pl = spinbox(0, 999999999, 5, 0, 1, " kN")
+            ap = spinbox(0, 999999999, 0.5, 0, 2, " m")
+            pl.setToolTip("Point load on this panel (book PL)")
+            ap.setToolTip("Distance (m) of the point load from the free/support edge (book APC)")
+            self._auto_clear_invalid(pl)
+            self._auto_clear_invalid(ap)
+            h.addWidget(pl)
+            h.addWidget(ap)
+            self.panel_pl_layout.addLayout(h)
+            self._panel_pl_widgets.append((pl, ap))
 
     def _update_diagram(self):
         data = [
@@ -141,9 +230,27 @@ class SlabPage(DesignFormPage):
             udl=udl,
             span=self.s_span.value(),
             ly=self.s_ly.value(), case=self.s_case.value(),
+            span_depth_ratio=self.s_sd.value(),
+            npl=self.panel_npl.value(),
+            point_loads=[
+                (w[0].value(), w[1].value()) for w in self._panel_pl_widgets
+            ],
             nspan=self.cont_nspan.value(),
             span_lengths=[w[0].value() for w in self._cont_span_widgets],
             span_udls=[w[1].value() for w in self._cont_span_widgets],
+            span_npls=[
+                1 if w[2].value() > 0 else 0 for w in self._cont_span_widgets
+            ],
+            span_pls=[
+                [(w[2].value(), w[3].value())] if w[2].value() > 0 else []
+                for w in self._cont_span_widgets
+            ],
+            cant_loads=[
+                self.s_cant_load_1.value(), self.s_cant_load_2.value()
+            ],
+            cant_moments=[
+                self.s_cant_moment_1.value(), self.s_cant_moment_2.value()
+            ],
         )
         designer = SlabDesigner(fcu=fcu, fy=fy)
         result = designer.design([inp])[0]
@@ -163,11 +270,25 @@ class SlabPage(DesignFormPage):
             if self.s_case.value() < 1 or self.s_case.value() > 9:
                 errors.append("Case must be 1-9 for two-way slabs")
                 self._mark_invalid(self.s_case)
+        if ptype in (0, 1):
+            for i, w in enumerate(self._panel_pl_widgets):
+                if w[0].value() > 0 and not (
+                    0 < w[1].value() <= self.s_span.value()
+                ):
+                    errors.append(
+                        f"Point load {i+1} distance must be within the panel span"
+                    )
+                    self._mark_invalid(w[1])
         if ptype == 2:
             for i, w in enumerate(self._cont_span_widgets):
                 if w[0].value() <= 0:
                     errors.append(f"Span {i+1} length must be > 0")
                     self._mark_invalid(w[0])
+                if w[2].value() > 0 and not (0 < w[3].value() <= w[0].value()):
+                    errors.append(
+                        f"Span {i+1} point load distance must be within the span"
+                    )
+                    self._mark_invalid(w[3])
         return errors
 
     def summarize(self, inp) -> str:
@@ -193,6 +314,10 @@ class SlabPage(DesignFormPage):
             ["Deflection", "OK" if r.defl_ok else "FAIL", badge(r.defl_ok)],
         ]
         ptype = self.slab_type.currentIndex() + 1
+        if ptype in (1, 2):
+            rows.append(["Shear Left (kN/m)", fmt2(r.shear_left), ""])
+        if ptype == 2:
+            rows.append(["Shear Right (kN/m)", fmt2(r.shear_right), ""])
         if ptype == 4:
             rows += [
                 ["Long Span Moment (kN·m/m)", fmt2(r.moment_long_span), ""],
@@ -204,6 +329,8 @@ class SlabPage(DesignFormPage):
             for i, (m, a) in enumerate(zip(r.span_moments, r.span_steels)):
                 rows.append([f"Span {i+1} Moment (kN·m)", fmt2(m), ""])
                 rows.append([f"Span {i+1} Steel (mm²)", fmt(a), ""])
+            for i, rc in enumerate(r.support_reactions):
+                rows.append([f"Support {i+1} Reaction (kN)", fmt2(rc), ""])
         return rows
 
     def get_state(self) -> dict:
@@ -215,11 +342,22 @@ class SlabPage(DesignFormPage):
             "s_span": self.s_span.value(),
             "s_ly": self.s_ly.value(),
             "s_case": self.s_case.value(),
+            "s_sd": self.s_sd.value(),
             "gk": self.gk.value(),
             "qk": self.qk.value(),
+            "cant_load_1": self.s_cant_load_1.value(),
+            "cant_moment_1": self.s_cant_moment_1.value(),
+            "cant_load_2": self.s_cant_load_2.value(),
+            "cant_moment_2": self.s_cant_moment_2.value(),
+            "panel_npl": self.panel_npl.value(),
+            "panel_pls": [
+                {"pl": w[0].value(), "ap": w[1].value()}
+                for w in self._panel_pl_widgets
+            ],
             "cont_nspan": self.cont_nspan.value(),
             "cont_spans": [
-                {"length": w[0].value(), "udl": w[1].value()}
+                {"length": w[0].value(), "udl": w[1].value(),
+                 "pl": w[2].value(), "ap": w[3].value()}
                 for w in self._cont_span_widgets
             ],
         }
@@ -239,10 +377,30 @@ class SlabPage(DesignFormPage):
             self.s_ly.setValue(state["s_ly"])
         if "s_case" in state:
             self.s_case.setValue(state["s_case"])
+        if "s_sd" in state:
+            self.s_sd.setValue(state["s_sd"])
         if "gk" in state:
             self.gk.setValue(state["gk"])
         if "qk" in state:
             self.qk.setValue(state["qk"])
+        if "cant_load_1" in state:
+            self.s_cant_load_1.setValue(state["cant_load_1"])
+        if "cant_moment_1" in state:
+            self.s_cant_moment_1.setValue(state["cant_moment_1"])
+        if "cant_load_2" in state:
+            self.s_cant_load_2.setValue(state["cant_load_2"])
+        if "cant_moment_2" in state:
+            self.s_cant_moment_2.setValue(state["cant_moment_2"])
+        if "panel_npl" in state:
+            self.panel_npl.setValue(state["panel_npl"])
+        if "panel_pls" in state and self._panel_pl_widgets:
+            for i, w in enumerate(self._panel_pl_widgets):
+                if i < len(state["panel_pls"]):
+                    s = state["panel_pls"][i]
+                    if "pl" in s:
+                        w[0].setValue(s["pl"])
+                    if "ap" in s:
+                        w[1].setValue(s["ap"])
         if "cont_nspan" in state:
             self.cont_nspan.setValue(state["cont_nspan"])
         if "cont_spans" in state and self._cont_span_widgets:
@@ -253,3 +411,7 @@ class SlabPage(DesignFormPage):
                         w[0].setValue(s["length"])
                     if "udl" in s:
                         w[1].setValue(s["udl"])
+                    if "pl" in s:
+                        w[2].setValue(s["pl"])
+                    if "ap" in s:
+                        w[3].setValue(s["ap"])

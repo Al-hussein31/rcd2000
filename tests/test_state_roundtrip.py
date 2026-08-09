@@ -67,12 +67,23 @@ def _set_non_default(page):
         page.s_span.setValue(5.5)
         page.s_ly.setValue(7.0)
         page.s_case.setValue(3)
+        page.s_sd.setValue(24)
         page.gk.setValue(12.0)
         page.qk.setValue(6.5)
+        page.s_cant_load_1.setValue(25)
+        page.s_cant_moment_1.setValue(40)
+        page.s_cant_load_2.setValue(15)
+        page.s_cant_moment_2.setValue(20)
+        page.panel_npl.setValue(2)
+        for w in page._panel_pl_widgets:
+            w[0].setValue(50)   # pl
+            w[1].setValue(2.0)  # ap
         page.cont_nspan.setValue(4)
         for w in page._cont_span_widgets:
             w[0].setValue(5.0)   # length
             w[1].setValue(15.0)  # udl
+            w[2].setValue(30)    # pl
+            w[3].setValue(2.5)   # ap
 
     elif isinstance(page, StairPage):
         page.s_span.setValue(3.5)

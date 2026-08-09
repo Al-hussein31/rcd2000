@@ -223,6 +223,10 @@ def deflect_beam(n: int, nn: int, b: float, d: float, asb: float,
     using the span/depth ratio SR passed in by the caller (7 cantilever,
     20 simply supported, 26 continuous, user value for two-way).
 
+    heck = 0 when the required depth DI exceeds the actual effective depth D
+    (the book's DEFLEC sets HECK = 0 in that case - "deflection not OK" -
+    and the callers grow the overall depth by 25 mm and re-run the design).
+
     Returns (required_depth_mm, factor, heck).
     """
     heck = 1
@@ -234,6 +238,8 @@ def deflect_beam(n: int, nn: int, b: float, d: float, asb: float,
         fact = 2.0
 
     di = (span * 1000.0) / (sr * fact)
+    if di > d:
+        heck = 0
     return di, fact, heck
 
 

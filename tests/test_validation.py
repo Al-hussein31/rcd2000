@@ -367,6 +367,66 @@ class TestSlab:
         r = sd.design([p])[0]
         check("SLAB cantilever M=16.875", 16.875, round(r.moment_span, 3))
 
+    def test_cantilever_point_load(self):
+        # Book CANTI: MC = U.L^2/2 + sum(PL.APC); V = U.L + sum(PL)
+        sd = SlabDesigner(fcu=25, fy=460)
+        p = SlabPanelInput(panel_id="S1", panel_type=1, depth=175, fcu=25, fy=460,
+                           udl=15, span=1.5, npl=1,
+                           point_loads=[(20.0, 0.75)])
+        r = sd.design([p])[0]
+        check("SLAB cantilever PL M=31.875", 31.875, round(r.moment_span, 3))
+        check("SLAB cantilever PL V=42.5", 42.5, round(r.shear_left, 1))
+
+    def test_simply_supported_point_load(self):
+        # Point load adds PL.d.(L-d)/L to the mid moment and reactions
+        sd = SlabDesigner(fcu=25, fy=460)
+        p = SlabPanelInput(panel_id="S1", panel_type=2, depth=175, fcu=25, fy=460,
+                           udl=12, span=5, npl=1,
+                           point_loads=[(20.0, 2.0)])
+        r = sd.design([p])[0]
+        # 37.5 (UDL) + 20*2*3/5 = 24 -> 61.5
+        check("SLAB simply PL M=61.5", 61.5, round(r.moment_span, 1))
+        # Left reaction: 30 (UDL) + 20*3/5 = 12 -> 42
+        check("SLAB simply PL V_left=42", 42.0, round(r.shear_left, 1))
+
+    def test_continuous_cantilever_terms(self):
+        # Book CONTI: RCT(1) += CTL(1); MTC(1) += CTM(1)
+        sd = SlabDesigner(fcu=25, fy=460)
+        p = SlabPanelInput(
+            panel_id="S1", panel_type=3, depth=175, fcu=25, fy=460,
+            nspan=2, span_lengths=[4.0, 4.0], span_udls=[12.0, 12.0],
+            cant_loads=[10.0, 0.0], cant_moments=[5.0, 0.0],
+        )
+        r = sd.design([p])[0]
+        # End span f = 48: rct[0] = 24 + 10 = 34; mtc[0] = -48*4/9 + 5 = -16.333
+        check("SLAB cont cant rct0=34", 34.0, round(r.support_reactions[0], 1))
+        check("SLAB cont cant mtc0=-16.333", -16.333, round(r.support_moments[0], 3))
+
+    def test_continuous_point_load_in_span(self):
+        # Book CONTI: F = W.L + sum(PLC); MSC = F.L/9 for end spans
+        sd = SlabDesigner(fcu=25, fy=460)
+        p = SlabPanelInput(
+            panel_id="S1", panel_type=3, depth=175, fcu=25, fy=460,
+            nspan=2, span_lengths=[4.0, 4.0], span_udls=[12.0, 12.0],
+            span_npls=[1, 0], span_pls=[[(20.0, 2.0)], []],
+        )
+        r = sd.design([p])[0]
+        # f0 = 48 + 20 = 68 -> 68*4/9 = 30.222
+        check("SLAB cont PL span M=30.222", 30.222, round(r.span_moments[0], 3))
+        check("SLAB cont PL span2 M=21.333", 21.333, round(r.span_moments[1], 3))
+
+    def test_twoway_span_depth_ratio_honored(self):
+        # Lower SR (10) must demand a deeper section than SR 30
+        sd = SlabDesigner(fcu=25, fy=460)
+        plo = SlabPanelInput(panel_id="S1", panel_type=4, depth=150, fcu=25, fy=460,
+                             udl=12, span=4, ly=5, case=1, span_depth_ratio=10.0)
+        phi = SlabPanelInput(panel_id="S2", panel_type=4, depth=150, fcu=25, fy=460,
+                             udl=12, span=4, ly=5, case=1, span_depth_ratio=30.0)
+        rlo = sd.design([plo])[0]
+        rhi = sd.design([phi])[0]
+        assert rlo.depth > rhi.depth
+        assert rhi.defl_ok
+
 
 # ============================================================
 # 7. STAIR DESIGN
