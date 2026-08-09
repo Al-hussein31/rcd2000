@@ -330,6 +330,58 @@ class TestBase:
                   - (br.support_moments[k] + br.support_moments[k + 1]) / 2.0,
                   br.span_moments[k])
 
+    def test_dowel_isolated_load_governs(self):
+        """Dowel steel must transfer the full factored column load:
+        As = N/(0.87.fy) = 2000e3/400.2 = 4997.5 mm2 (0.4% minimum
+        only 360) -> 25 no. Y16 (24.86 -> 25)."""
+        bd = BaseDesigner(pb=150, fcu=25, fy=460)
+        br = bd.design([BaseInput(base_id="F8", base_type=1, col_type=1,
+                                  load=2000, a1=300, a2=300, h=650,
+                                  dowel_dia=16)])[0]
+        check("dowel: required area", 2000e3 / (0.87 * 460), br.dowel_area)
+        assert br.dowel_count == 25
+        assert br.dowel_ok
+
+    def test_dowel_isolated_minimum_governs(self):
+        """Small load: 0.4% of 300x300 = 360 mm2 governs over
+        N/(0.87.fy) = 249.9 -> 4 no. Y12 (3.18 -> 4)."""
+        bd = BaseDesigner(pb=150, fcu=25, fy=460)
+        br = bd.design([BaseInput(base_id="F9", base_type=1, col_type=1,
+                                  load=100, a1=300, a2=300, h=300,
+                                  dowel_dia=12)])[0]
+        check("dowel: minimum area", 360.0, br.dowel_area)
+        assert br.dowel_count == 4
+        assert br.dowel_ok
+
+    def test_dowel_isolated_zero_dia_fails(self):
+        """No dowel diameter provided -> no bars, check fails (recorded)."""
+        bd = BaseDesigner(pb=150, fcu=25, fy=460)
+        br = bd.design([BaseInput(base_id="F10", base_type=1, col_type=1,
+                                  load=2000, a1=300, a2=300, h=650,
+                                  dowel_dia=0)])[0]
+        assert br.dowel_count == 0
+        assert not br.dowel_ok
+
+    def test_dowel_combined_per_column(self):
+        """Combined: per-column dowel checks (300x300 cols, Y16):
+        C1: N=100 -> 360 mm2 min -> 2 bars; C2: N=300 -> 749.6 -> 4 bars."""
+        bd = BaseDesigner(pb=150, fcu=25, fy=460)
+        br = bd.design([BaseInput(
+            base_id="F11", base_type=3, col_type=1, load=0.0,
+            pb=150, fcu=25, fy=460, h=200, l1=0.0, l2=2.0,
+            n_columns=2,
+            columns=[
+                ColumnOnBase(load=100, dist=0.0, shape=1,
+                             a1=300, a2=300, dowel_dia=16),
+                ColumnOnBase(load=300, dist=4.0, shape=1,
+                             a1=300, a2=300, dowel_dia=16),
+            ],
+        )])[0]
+        check("dowel C1: area", 360.0, br.dowel_areas[0])
+        check("dowel C2: area", 300e3 / (0.87 * 460), br.dowel_areas[1])
+        assert br.dowel_counts == [2, 4]
+        assert br.dowel_oks == [True, True]
+
 
 # ============================================================
 # 5. BEAM DESIGN

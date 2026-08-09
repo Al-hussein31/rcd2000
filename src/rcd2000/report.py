@@ -595,6 +595,21 @@ def format_base(bi, r, job: str = "", date: str = "",
     rep.label_val("Permissible Bond", r.perm_bond, "N/mm2")
     rep.blank(1)
 
+    rep.section("D", "DOWEL BARS (STARTER BARS)")
+    if bi.base_type == 3:
+        for i, c in enumerate(bi.columns):
+            if i >= len(r.dowel_areas):
+                break
+            rep.label_val(f"Col C{i+1}: Dowel Steel Req",
+                          r.dowel_areas[i], "sq. mm")
+            rep.label_val(f"Col C{i+1}: Dowel Bars",
+                          r.dowel_counts[i], f"Y{int(c.dowel_dia)}")
+    else:
+        rep.label_val("Dowel Steel Required", r.dowel_area, "sq. mm")
+        rep.label_val("Dowel Bars Required", r.dowel_count,
+                      f"Y{int(bi.dowel_dia)}")
+    rep.blank(1)
+
     rep.footer("footing base")
     return rep.build()
 

@@ -329,12 +329,21 @@ class BasePage(DesignFormPage):
             ["Permissible Bond (N/mm²)", fmt2(r.perm_bond), ""],
         ]
         if self.base_type.currentIndex() == 2:
+            for i in range(len(r.dowel_areas)):
+                ok = r.dowel_oks[i] if i < len(r.dowel_oks) else True
+                rows.append([f"Col C{i + 1} Dowel Steel (mm²)",
+                             fmt(r.dowel_areas[i]), ""])
+                rows.append([f"Col C{i + 1} Dowel Bars",
+                             f"{r.dowel_counts[i]} no.", badge(ok)])
             for k, m in enumerate(r.support_moments):
                 rows.append([f"Support M{k + 1} (kN·m)", fmt2(m), ""])
                 rows.append([f"Support Steel S{k + 1} (mm²)", fmt(r.support_steels[k]), ""])
             for k, m in enumerate(r.span_moments):
                 rows.append([f"Span M{k + 1} (kN·m)", fmt2(m), ""])
                 rows.append([f"Span Steel {k + 1} (mm²)", fmt(r.span_steels[k]), ""])
+        else:
+            rows.append(["Dowel Steel Required (mm²)", fmt(r.dowel_area), ""])
+            rows.append(["Dowel Bars", f"{r.dowel_count} no.", badge(r.dowel_ok)])
         return rows
 
     def _combined_cols_state(self) -> list:

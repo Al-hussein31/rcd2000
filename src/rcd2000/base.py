@@ -76,6 +76,15 @@ class BaseResult:
     span_moments: List[float] = field(default_factory=list)
     span_steels: List[float] = field(default_factory=list)
     heck: int = 1
+    # Dowels (starter bars): BS 8110 practice; the book's base.f77
+    # calculation section is not in the reference set, so this is a
+    # documented extension, not a book-line-for-line match.
+    dowel_area: float = 0.0    # required dowel steel area (mm²)
+    dowel_count: int = 0       # required bars of the provided diameter
+    dowel_ok: bool = True
+    dowel_areas: List[float] = field(default_factory=list)  # per column
+    dowel_counts: List[int] = field(default_factory=list)
+    dowel_oks: List[bool] = field(default_factory=list)
 
 
 class BaseDesigner:
@@ -93,6 +102,24 @@ class BaseDesigner:
             r = self._design_base(b)
             self.results.append(r)
         return self.results
+
+    @staticmethod
+    def _dowel_check(load: float, dowel_dia: float, col_area: float,
+                     fy: float):
+        """Required starter-bar (dowel) steel for one column:
+        max(0.4% of the column section, full factored load transfer at
+        0.87·fy). Returns (area_mm2, bar_count, ok).
+
+        Extension note: the book's BASE calculation section is not in the
+        repository's f77 set, so this follows BS 8110 practice rather than
+        the book line-by-line (see DESIGN_AUDIT.md section 6).
+        """
+        as_req = max(0.004 * col_area, load * 1000.0 / (0.87 * fy))
+        if dowel_dia <= 0:
+            return as_req, 0, False
+        bar_area = math.pi / 4.0 * dowel_dia ** 2.0
+        count = int(math.ceil(as_req / bar_area))
+        return as_req, count, count * bar_area >= as_req
 
     def _design_base(self, b: BaseInput) -> BaseResult:
         pb = b.pb or self.pb
@@ -239,6 +266,16 @@ class BaseDesigner:
             r.bar_type2, r.rd2, r.sp2 = rodia_slab(ast2, fy)
             break
 
+        # Dowel (starter-bar) check for the single column
+        if b.col_type == 1:
+            cax = b.a1 if b.a1 > 0 else 300.0
+            cay = b.a2 if b.a2 > 0 else 300.0
+            col_area = cax * cay
+        else:
+            cd = b.dia if b.dia > 0 else 300.0
+            col_area = math.pi / 4.0 * cd ** 2.0
+        (r.dowel_area, r.dowel_count,
+         r.dowel_ok) = self._dowel_check(b.load, b.dowel_dia, col_area, fy)
         return r
 
     def _design_combined(self, b: BaseInput, pb: float,
@@ -384,4 +421,16 @@ class BaseDesigner:
         r.bar_type2, r.rd2, r.sp2 = rodia_slab(ant, fy)
 
         r.h = h
+
+        # Per-column dowel (starter-bar) checks
+        for c in cols:
+            if c.shape == 1:
+                ca = ((c.a1 if c.a1 > 0 else 300.0)
+                      * (c.a2 if c.a2 > 0 else 300.0))
+            else:
+                ca = math.pi / 4.0 * (c.dia if c.dia > 0 else 300.0) ** 2.0
+            da, dc, dok = self._dowel_check(c.load, c.dowel_dia, ca, fy)
+            r.dowel_areas.append(da)
+            r.dowel_counts.append(dc)
+            r.dowel_oks.append(dok)
         return r
