@@ -217,6 +217,12 @@ def deflect_beam(n: int, nn: int, b: float, d: float, asb: float,
                  as_req: float, fy: float, m: float, span: float,
                  sr: float) -> Tuple[float, float, int]:
     """Check deflection using BS 8110 basic span/effective-depth ratio.
+
+    Matches the book's DEFLEC subroutine (references/beam_subs.f77,
+    slab_subs.f77): the required depth is DI = SPAN / (SR * FACT) * 1000,
+    using the span/depth ratio SR passed in by the caller (7 cantilever,
+    20 simply supported, 26 continuous, user value for two-way).
+
     Returns (required_depth_mm, factor, heck).
     """
     heck = 1
@@ -224,14 +230,10 @@ def deflect_beam(n: int, nn: int, b: float, d: float, asb: float,
     fs = 0.667 * fy * (as_req / asb) if asb > 0 else 0.667 * fy
     fact = 120.0 * (0.9 + m / (b * d ** 2.0))
     fact = 0.55 + (477.0 - fs) / fact
-    if nn < 1:
-        sr_base = 20.0
-    else:
-        sr_base = 26.0
     if fact >= 2.0:
         fact = 2.0
 
-    di = (span * 1000.0) / (sr_base * fact)
+    di = (span * 1000.0) / (sr * fact)
     return di, fact, heck
 
 

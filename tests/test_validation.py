@@ -108,6 +108,27 @@ class TestDeflectBeam:
         assert heck == 1
         assert di > 0
 
+    def test_sr_argument_is_honored(self):
+        # Book DEFLEC: DI = SPAN / (SR * FACT) * 1000.
+        # Lower SR (cantilever = 7) must demand a deeper section than SR 20/26.
+        # Regression: the sr argument used to be ignored (sr_base from nn).
+        args = dict(b=1000, d=250, asb=1473, as_req=1473, fy=460, m=100, span=5)
+        di7, _, _ = deflect_beam(0, 1, sr=7.0, **args)
+        di20, _, _ = deflect_beam(0, 2, sr=20.0, **args)
+        di26, _, _ = deflect_beam(0, 3, sr=26.0, **args)
+        assert di7 > di20 > di26
+        # Exact book formula with FACT capped at 2.0:
+        # FS = 0.667*460 = 306.82; FACT = 0.55 + (477 - 306.82)/120*(0.9+...) > 2 -> 2.0
+        assert di7 == 5000.0 / (7.0 * 2.0)
+        assert di26 == 5000.0 / (26.0 * 2.0)
+
+    def test_same_sr_same_result_regardless_of_nn(self):
+        # nn only labels the panel type in the book; it must not change the ratio.
+        di_a, _, _ = deflect_beam(0, 0, 1000, 250, 1473, 1473, 460, 100, 5, 20)
+        di_b, _, _ = deflect_beam(0, 3, 1000, 250, 1473, 1473, 460, 100, 5, 20)
+        assert di_a == di_b
+        assert di_a == 5000.0 / (20.0 * 2.0)
+
 
 # ============================================================
 # 2. CONTINUOUS BEAM (Clapeyron)
