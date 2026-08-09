@@ -444,6 +444,16 @@ class Workbench(QWidget):
                 state.pop("_result", None)
             item.state = state
 
+    def sync_all_to_job(self):
+        """Push every panel's inputs + result payload into the job items.
+
+        This is the app's single source of truth for persistence: any
+        save path (autosave timer, leaving the job) must go through it
+        so the saved state always carries the result payload.
+        """
+        for uid in list(self._panels):
+            self._sync_item_state(uid)
+
     def _on_state_changed(self, panel: DesignPanel):
         self._sync_item_state(panel.uid)
         self.job_changed.emit()

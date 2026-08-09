@@ -179,3 +179,40 @@ def test_export_all_skips_outdated_designs(app, tmp_path):
     wb._export_all()
     assert out.exists()
     assert "Reports written" in messages[-1]
+
+
+def test_app_save_path_preserves_results(app, tmp_path):
+    """Regression: the app's save loop used to strip the result payload.
+
+    app._save_current_job re-synced state with panel.get_state() only,
+    dropping the stored results, so re-opening a job lost them.  The
+    payload must survive the exact save + reload cycle the app performs.
+    """
+    from rcd2000.gui.job import Job, DesignItem, JobStore
+    p = ColumnPage()
+    p.shape.setCurrentIndex(0)
+    p.bx.setValue(400)
+    p.by.setValue(400)
+    p.load.setValue(800)
+    p._on_calculate()
+    state = p.get_state()
+    state["_result"] = p.result_payload()
+    job = Job(slug="save-path-reg", name="Reg",
+              items=[DesignItem(uid="c1", type_key="column",
+                                label="C1", state=state)])
+
+    # Workbench as the app would build it, then the app's save routine.
+    wb = Workbench(job)
+    wb.sync_all_to_job()
+    path = JobStore.save(job)
+
+    # Re-open from disk, exactly like _open_job -> _replace_workbench.
+    job2 = JobStore.load("save-path-reg")
+    wb2 = Workbench(job2)
+    panel = wb2._panels["c1"]
+    assert panel.is_designed(), "results must survive the app save/reload"
+    assert not panel.is_stale()
+    assert panel.page._result_widgets
+
+    import os
+    os.remove(path)

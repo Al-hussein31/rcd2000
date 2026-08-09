@@ -459,12 +459,9 @@ class MainWindow(QMainWindow):
     def _save_current_job(self):
         if self._current_job is None or self._workbench is None:
             return
-        # sync panel state back into items
-        for uid, panel in self._workbench._panels.items():
-            item = self._current_job.item(uid)
-            if item is not None:
-                item.label = panel.label
-                item.state = panel.get_state()
+        # sync panel state (inputs + result payload) back into items -
+        # MUST use the workbench sync so persisted results survive
+        self._workbench.sync_all_to_job()
         try:
             JobStore.save(self._current_job)
         except Exception:
