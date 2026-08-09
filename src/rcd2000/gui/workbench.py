@@ -18,6 +18,8 @@ active type with a "+" button to add new work for that design.
 """
 
 import os
+import sys
+import subprocess
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QToolButton,
@@ -281,6 +283,15 @@ class Workbench(QWidget):
         export_btn.clicked.connect(self._export_all)
         export_btn.setStyleSheet(self._tool_btn_style())
         h.addWidget(export_btn)
+
+        self._reveal_btn = QToolButton()
+        self._reveal_btn.setText("\U0001F4C2 Reveal")
+        self._reveal_btn.setToolTip("Show the exported file in Finder")
+        self._reveal_btn.setCursor(Qt.PointingHandCursor)
+        self._reveal_btn.clicked.connect(self._reveal_last_export)
+        self._reveal_btn.setStyleSheet(self._tool_btn_style())
+        self._reveal_btn.setEnabled(False)
+        h.addWidget(self._reveal_btn)
 
         home_btn = QToolButton()
         home_btn.setText("\u2302 Home")
@@ -626,14 +637,16 @@ class Workbench(QWidget):
         if not out:
             self._emit_status("Set an Output File Name in Edit Job first.", True)
             return
-        # Guard before writing: a typed (not Browse'd) path may point at
-        # a folder that does not exist or cannot be written to.
-        parent = os.path.dirname(os.path.abspath(os.path.expanduser(out)))
-        if not os.path.isdir(parent):
-            self._emit_status(
-                f"Output folder does not exist: {parent} - "
-                "use Edit Job to fix the path.", True
-            )
+        # Defensive resolve: the header stores an absolute path, but a job
+        # saved by an older build may not.  Missing parents are created -
+        # the dialog already auto-creates the default RCD2000_output
+        # folder, so a bare name can never land in the process CWD.
+        out = os.path.abspath(os.path.expanduser(out))
+        parent = os.path.dirname(out)
+        try:
+            os.makedirs(parent, exist_ok=True)
+        except OSError as exc:
+            self._emit_status(f"Could not create output folder {parent}: {exc}", True)
             return
         if not os.access(parent, os.W_OK):
             self._emit_status(
@@ -671,6 +684,10 @@ class Workbench(QWidget):
         try:
             with open(out, "w") as f:
                 f.write("\n".join(sections))
+            self._last_export_path = out
+            if self._reveal_btn is not None:
+                self._reveal_btn.setEnabled(True)
+                self._reveal_btn.setToolTip(f"Reveal in Finder: {out}")
             msg = (
                 f"Reports written to {out} ({len(designed)} design"
                 f"{'s' if len(designed) != 1 else ''})"
@@ -680,6 +697,22 @@ class Workbench(QWidget):
             self._emit_status(msg, False)
         except Exception as exc:
             self._emit_status(f"Export failed: {exc}", True)
+
+    def _reveal_last_export(self):
+        """Open the file manager on the last exported file."""
+        path = getattr(self, "_last_export_path", None)
+        if not path:
+            self._emit_status("Export a job first.", True)
+            return
+        try:
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", "-R", path])
+            elif os.name == "nt":
+                subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+            else:
+                subprocess.Popen(["xdg-open", os.path.dirname(path)])
+        except Exception as exc:
+            self._emit_status(f"Reveal failed: {exc}", True)
 
     def _emit_status(self, message: str, is_error: bool = False):
         self.status_message.emit(message, is_error)

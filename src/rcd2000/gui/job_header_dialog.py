@@ -20,13 +20,13 @@ from pathlib import Path
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QFileDialog,
-    QPushButton, QComboBox,
+    QPushButton, QComboBox, QWidget,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QStandardPaths
 
 from rcd2000.gui.theme import (
     BG_MID, BG_LIGHT, BG_CARD, ACCENT, TEXT_PRIMARY, TEXT_SECONDARY,
-    TEXT_MUTED, BORDER, ERROR, FONT_SIZE, SPACE, RADIUS_MD,
+    TEXT_MUTED, BORDER, ERROR, FONT_SIZE, SPACE, RADIUS_MD, RADIUS_SM,
 )
 from rcd2000.gui.widgets import (
     button, label, Card, fcu_combo, fy_combo, combo, spinbox, icon,
@@ -36,23 +36,68 @@ from rcd2000.gui.settings import SettingsStore, UserProfile
 #: Default date format used by the original tool:  TUE. 14/09/26.
 _DEFAULT_DATE = lambda: datetime.now().strftime("%a. %d/%m/%y.")
 
+#: Name of the folder created inside the user's Documents folder.
+DEFAULT_OUTPUT_FOLDER = "RCD2000_output"
+
+
+def default_output_dir() -> Path:
+    """Return the default output folder, creating it if missing.
+
+    Uses Qt's DocumentsLocation (localization- and sandbox-aware on macOS,
+    e.g. ``~/Documents``) instead of a hardcoded path, so reports always
+    land somewhere the user can actually find.
+    """
+    docs = QStandardPaths.writableLocation(
+        QStandardPaths.StandardLocation.DocumentsLocation
+    )
+    base = Path(docs) if docs else Path.home() / "Documents"
+    folder = base / DEFAULT_OUTPUT_FOLDER
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        # Last resort: never let a read-only Documents block the dialog.
+        folder = Path.home() / DEFAULT_OUTPUT_FOLDER
+        folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+def resolve_output_path(text: str, base_dir: Path | None = None) -> str:
+    """Resolve a typed output file name to an absolute path.
+
+    Rules:
+    - empty text            -> "" (the field stays optional)
+    - absolute path         -> used exactly as typed (e.g. Browse results)
+    - bare name / relative  -> joined under the default output folder,
+                               NEVER the process working directory.
+    """
+    t = (text or "").strip()
+    if not t:
+        return ""
+    p = Path(os.path.expanduser(t))
+    if p.is_absolute():
+        return str(p)
+    base = base_dir if base_dir is not None else default_output_dir()
+    return str(base / p)
+
+
 
 def _today() -> str:
     return _DEFAULT_DATE()
 
 
-def check_output_path(text: str) -> tuple[bool, str]:
+def check_output_path(text: str, base_dir: Path | None = None) -> tuple[bool, str]:
     """Validate a typed output file path.
 
     Returns ``(ok, message)``.  Empty text is valid (the field is
-    optional - export simply warns).  A non-empty path is valid when
-    its parent directory exists and is writable.
+    optional - export simply warns).  Relative names resolve under the
+    default output folder (auto-created, so always valid).  An absolute
+    path is valid when its parent directory exists and is writable.
     """
     t = (text or "").strip()
     if not t:
         return True, ""
-    p = Path(os.path.expanduser(t))
-    parent = p.parent
+    resolved = resolve_output_path(t, base_dir)
+    parent = Path(resolved).parent
     if not parent.exists() or not parent.is_dir():
         return False, f"Folder does not exist: {parent}"
     if not os.access(parent, os.W_OK):
@@ -120,16 +165,58 @@ class JobHeaderDialog(QDialog):
         layout.addWidget(c1b)
 
         # ── Output file ────────────────────────────────────────────
+        # Split control: a solid, read-only folder prefix (only Browse…
+        # or Default changes it) joined to an editable file-name field,
+        # all inside one bordered container so it reads as a single input.
         c2 = Card("OUTPUT FILE")
-        file_row = QHBoxLayout()
-        file_row.setSpacing(SPACE[2])
-        self.output_file = QLineEdit(self._existing.get("output_file", ""))
-        self.output_file.setPlaceholderText("e.g. C:/designs/job1.txt")
-        self.output_file.setStyleSheet(self._input_style())
+        self._folder = QLineEdit()
+        self._folder.setReadOnly(True)
+        self._folder.setFrame(False)
+        self._folder.setCursor(Qt.ArrowCursor)
+        self._folder.setToolTip(
+            f"Folder for reports - change it with Browse… only.\n"
+            f"Default: Documents/{DEFAULT_OUTPUT_FOLDER}"
+        )
+        self._folder.setStyleSheet(
+            f"background: transparent; color: {TEXT_MUTED};"
+            f" font-size: 12px; border: none;"
+            f" padding: 0 {SPACE[1]}px;"
+        )
+        self.output_file = QLineEdit()  # file name only
+        self.output_file.setFrame(False)
+        self.output_file.setPlaceholderText("report name, e.g. job1.txt")
+        self.output_file.setToolTip(
+            "Type just a name - it lands in the folder shown on the left. "
+            "Use Browse… to save somewhere else."
+        )
+        self.output_file.setStyleSheet(
+            f"background: transparent; color: {TEXT_PRIMARY};"
+            f" font-size: 13px; border: none;"
+            f" padding: 0 {SPACE[1]}px;"
+        )
+        split = QWidget()
+        split.setStyleSheet(
+            f"background: {BG_CARD}; border: 1px solid {BORDER};"
+            f" border-radius: {RADIUS_SM}px;"
+        )
+        split_row = QHBoxLayout(split)
+        split_row.setContentsMargins(SPACE[2], 0, SPACE[2], 0)
+        split_row.setSpacing(0)
+        split_row.addWidget(self._folder, 0)
+        split_row.addWidget(self.output_file, 1)
+
         browse = button("Browse…", accent=False)
         browse.clicked.connect(self._browse_output)
-        file_row.addWidget(self.output_file, 1)
+        default_btn = button("Default", accent=False)
+        default_btn.setToolTip(
+            f"Reset the folder to Documents/{DEFAULT_OUTPUT_FOLDER}"
+        )
+        default_btn.clicked.connect(self._reset_output_folder)
+        file_row = QHBoxLayout()
+        file_row.setSpacing(SPACE[2])
+        file_row.addWidget(split, 1)
         file_row.addWidget(browse)
+        file_row.addWidget(default_btn)
         c2.add_layout(file_row)
         self._output_error = label("", secondary=True, size=11)
         self._output_error.setWordWrap(True)
@@ -139,11 +226,22 @@ class JobHeaderDialog(QDialog):
         self._output_error.hide()
         c2.add_row("", self._output_error)
         c2.add_row("", label(
-            "Reports are written here when you export the job.",
+            f"Reports are written here when you export the job. A bare name "
+            f"goes to Documents/{DEFAULT_OUTPUT_FOLDER} - use Browse… to "
+            f"save anywhere else.",
             secondary=True, size=11,
         ))
         self.output_file.editingFinished.connect(self._validate_output_path)
         layout.addWidget(c2)
+        # Prefill from a stored job: split the saved full path back into
+        # folder + name, keeping any folder the user browsed to.
+        existing_path = self._existing.get("output_file", "").strip()
+        if existing_path:
+            ep = Path(os.path.expanduser(existing_path))
+            self._folder.setText(self._display_folder(ep.parent))
+            self.output_file.setText(ep.name)
+        else:
+            self._folder.setText(self._display_folder(default_output_dir()))
 
         # ── Concrete & steel stresses ──────────────────────────────
         # Required inputs: the original book programs read these with
@@ -260,28 +358,62 @@ class JobHeaderDialog(QDialog):
             f"QLineEdit:focus {{ border: 1px solid {ACCENT}; }}"
         )
 
+    def _display_folder(self, folder: Path) -> str:
+        """Show the folder with ~ shorthand when it is under the home dir."""
+        s = str(folder)
+        home = str(Path.home())
+        if s == home:
+            return "~"
+        if s.startswith(home + os.sep):
+            return "~" + s[len(home):]
+        return s
+
+    def _joined_text(self) -> str:
+        """The full (possibly ~-shorthand) path as the user sees it."""
+        folder = self._folder.text().strip()
+        name = self.output_file.text().strip()
+        if not folder:
+            folder = str(default_output_dir())
+        return os.path.join(folder, name) if name else folder
+
     def _validate_output_path(self):
-        """Inline validation on blur: red border + message for a typed
-        path whose folder is missing or not writable.  Empty is fine -
-        the field is optional and export warns instead."""
-        ok, message = check_output_path(self.output_file.text())
+        """Run the path checks on the resolved output path; update the
+        field is optional and export warns instead."""
+        ok, message = check_output_path(self._joined_text())
         if not ok:
-            self.output_file.setStyleSheet(self._input_style(invalid=True))
+            self.output_file.setStyleSheet(
+                f"background: transparent; color: {ERROR};"
+                f" font-size: 13px; border: none;"
+                f" padding: 0 {SPACE[1]}px;"
+            )
             self._output_error.setText(message)
             self._output_error.show()
         else:
-            self.output_file.setStyleSheet(self._input_style())
+            self.output_file.setStyleSheet(
+                f"background: transparent; color: {TEXT_PRIMARY};"
+                f" font-size: 13px; border: none;"
+                f" padding: 0 {SPACE[1]}px;"
+            )
             self._output_error.hide()
 
     def _browse_output(self):
-        start = self.output_file.text().strip()
-        start_dir = os.path.dirname(start) if start else os.path.expanduser("~")
+        folder = os.path.expanduser(self._folder.text().strip())
+        if not folder:
+            folder = str(default_output_dir())
+        start = os.path.join(folder, self.output_file.text().strip())
         path, _ = QFileDialog.getSaveFileName(
-            self, "Output File Name", start_dir,
+            self, "Output File Name", start,
             "Text Files (*.txt);;All Files (*)",
         )
         if path:
-            self.output_file.setText(path)
+            p = Path(path)
+            self._folder.setText(self._display_folder(p.parent))
+            self.output_file.setText(p.name)
+            self._validate_output_path()
+
+    def _reset_output_folder(self):
+        self._folder.setText(self._display_folder(default_output_dir()))
+        self._validate_output_path()
 
     def _restore_existing(self):
         # We already layered existing values into the fields at build;
@@ -312,13 +444,18 @@ class JobHeaderDialog(QDialog):
             cb.setCurrentText(str(int(value)))
 
     def header(self) -> dict:
-        """Return the validated header dict."""
+        """Return the validated header dict.
+
+        ``output_file`` is always the RESOLVED absolute path: a bare name
+        becomes ``<Documents>/RCD2000_output/<name>`` so export can never
+        lose the file in the process working directory.
+        """
         return {
             "company": self.company.text().strip(),
             "job_ref": self.job_ref.text().strip(),
             "engineer": self.engineer.text().strip(),
             "date": self.date.text().strip() or _today(),
-            "output_file": self.output_file.text().strip(),
+            "output_file": resolve_output_path(self._joined_text()),
             "fcu": self._combo_num(self.fcu, 30),
             "fy": self._combo_num(self.fy, 460),
             "fyv": self._combo_num(self.fyv, 250),
