@@ -56,11 +56,25 @@ class ColumnPage(DesignFormPage):
         self.col_fy = fy_combo()
         self.col_fcu.setToolTip("Characteristic concrete cube strength (N/mm²) at 28 days")
         self.col_fy.setToolTip("Characteristic steel reinforcement yield strength (N/mm²)")
+        self.col_max_steel = spinbox(0, 25, 0.25, 4.0, 2, " %")
+        self.col_dh = spinbox(0, 1, 0.05, 0.85, 2)
+        self.col_max_steel.setToolTip(
+            "Maximum steel percentage for the column (book input PS). "
+            "The job header value is applied when a header is set."
+        )
+        self.col_dh.setToolTip(
+            "Ratio of effective depth d to overall depth h (book input DH). "
+            "The job header value is applied when a header is set."
+        )
         c3.add_row("fcu (N/mm²):", self.col_fcu)
         c3.add_row("fy (N/mm²):", self.col_fy)
+        c3.add_row("Max steel %:", self.col_max_steel)
+        c3.add_row("D/H ratio:", self.col_dh)
         layout.addWidget(c3)
         self._auto_clear_invalid(self.col_fcu)
         self._auto_clear_invalid(self.col_fy)
+        self._auto_clear_invalid(self.col_max_steel)
+        self._auto_clear_invalid(self.col_dh)
 
         c4 = Card("Moments")
         self.moment_x = spinbox(0, 999999999, 10, 0)
@@ -103,7 +117,11 @@ class ColumnPage(DesignFormPage):
             moment_y=self.moment_y.value(),
             moment=moment,
         )
-        designer = ColumnDesigner(fcu=fcu, fy=fy)
+        designer = ColumnDesigner(
+            fcu=fcu, fy=fy,
+            max_steel_pct=self.col_max_steel.value(),
+            dh_ratio=self.col_dh.value(),
+        )
         result = designer.design([inp])[0]
         return inp, result
 
@@ -135,6 +153,12 @@ class ColumnPage(DesignFormPage):
             errors.append("At least one moment (Mx or My) must be > 0 for biaxial design")
             self._mark_invalid(self.moment_x)
             self._mark_invalid(self.moment_y)
+        if not (0 < self.col_max_steel.value() <= 25):
+            errors.append("Max steel % must be between 0 and 25")
+            self._mark_invalid(self.col_max_steel)
+        if not (0 < self.col_dh.value() <= 1):
+            errors.append("D/H ratio must be between 0 and 1")
+            self._mark_invalid(self.col_dh)
         return errors
 
     def summarize(self, inp) -> str:
@@ -166,6 +190,8 @@ class ColumnPage(DesignFormPage):
             "depth": self.depth.value(),
             "col_fcu": int(self.col_fcu.currentText()),
             "col_fy": int(self.col_fy.currentText()),
+            "col_max_steel": self.col_max_steel.value(),
+            "col_dh": self.col_dh.value(),
             "moment_x": self.moment_x.value(),
             "moment_y": self.moment_y.value(),
             "moment": self.moment.value(),
@@ -190,6 +216,10 @@ class ColumnPage(DesignFormPage):
             self._set_combo_int(self.col_fcu, state["col_fcu"])
         if "col_fy" in state:
             self._set_combo_int(self.col_fy, state["col_fy"])
+        if "col_max_steel" in state:
+            self.col_max_steel.setValue(state["col_max_steel"])
+        if "col_dh" in state:
+            self.col_dh.setValue(state["col_dh"])
         if "moment_x" in state:
             self.moment_x.setValue(state["moment_x"])
         if "moment_y" in state:

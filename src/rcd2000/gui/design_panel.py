@@ -179,6 +179,14 @@ class DesignPanel(QFrame):
                 w = getattr(page, "base_pb", None)
                 if w is not None:
                     w.setValue(header["soil_pressure"])
+            if header.get("max_steel_pct") is not None:
+                w = getattr(page, "col_max_steel", None)
+                if w is not None:
+                    w.setValue(header["max_steel_pct"])
+            if header.get("dh") is not None:
+                w = getattr(page, "col_dh", None)
+                if w is not None:
+                    w.setValue(header["dh"])
         except Exception:
             pass
 

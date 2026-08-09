@@ -25,6 +25,8 @@ def _set_non_default(page):
         page.depth.setValue(600)
         page._set_combo_int(page.col_fcu, 35)
         page._set_combo_int(page.col_fy, 500)
+        page.col_max_steel.setValue(6.0)
+        page.col_dh.setValue(0.95)
         page.moment_x.setValue(150)
         page.moment_y.setValue(80)
         page.moment.setValue(45)
