@@ -756,6 +756,80 @@ def _store(module: str, target: dict, key: str, v: float,
         warnings.append(f"{header}: {warn}")
     target[key] = v
 
+def coerce(module: str, key: str, text: str) -> tuple[float | int | None, str | None]:
+    """Parse user-edited *text* for canonical field *key* (module aware).
+
+    Combos are matched by name/1-based index, ints via ``parse_int``,
+    floats via ``parse_value`` then clamped to the page-supported range.
+    Returns ``(value, error)`` — ``(None, msg)`` means the text is
+    unusable, ``(None, None)`` means the field was cleared.
+    """
+    v = norm_value(text)
+    if not v:
+        return None, None
+    entry = _FIELD[module].get(key)
+    if entry is None:
+        return None, "Unknown field: %r" % key
+    _, kind, unit = entry
+    if kind == "combo":
+        idx, warn = unit(v)
+        if idx is not None:
+            return idx, None
+        return None, warn or "Unknown choice: %r" % text
+    if kind == "int":
+        n, warn = parse_int(v)
+        if n is None:
+            return None, warn or "Not a number: %r" % text
+        return n, None
+    value, warn = parse_value(v, unit)
+    if value is None:
+        return None, warn or "Not a number: %r" % text
+    value, cwarn = _clamp(module, key, value)
+    return value, cwarn
+
+
+def coerce_member(mfield: str, unit: str, text: str) -> tuple[float | None, str | None]:
+    """Parse user-edited *text* for a member/span field (unit-aware)."""
+    v = norm_value(text)
+    if not v:
+        return None, None
+    value, warn = parse_value(v, unit)
+    if value is None:
+        return None, warn or "Not a number: %r" % text
+    if value < 0:
+        return 0.0, "%g outside supported range (min 0) - clamped" % value
+    return value, None
+
+
+#: derived state keys recomputed by the pages — hidden from the preview
+_DERIVED_KEYS = frozenset(("n_members", "n_supports", "panel_npl", "cont_nspan"))
+
+
+def scalar_columns(module: str) -> list[tuple[str, str]]:
+    """Canonical scalar columns for *module*: (display header, state key).
+
+    Display headers come from the template (units included) in template
+    order; any template-less fields are appended with a unit suffix.
+    Derived keys (member counts) are excluded — the pages recompute them.
+    """
+    cols: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for h in _TEMPLATE[module]:
+        key = _header_field(module, norm_token(h))
+        if (key is None or key == "_label" or key == "_member"
+                or key in seen or key in _DERIVED_KEYS):
+            continue
+        seen.add(key)
+        cols.append((h, key))
+    for key, (_, kind, unit) in _FIELD[module].items():
+        if key in seen or key in _DERIVED_KEYS:
+            continue
+        seen.add(key)
+        suffix = f" [{unit}]" if unit else ""
+        cols.append((key.upper() + suffix, key))
+    return cols
+
+
 def map_row(module: str, row: dict[str, str]) -> tuple[dict, str | None, list[str]]:
     """Map one raw row → (state dict, label, warnings).
 

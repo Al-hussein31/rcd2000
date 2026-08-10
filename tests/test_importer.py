@@ -345,6 +345,90 @@ WT = 3.5kN/m
                          [{"length": 2.0, "udl": 18.0, "wt": 3.5}])
 
 
+class CoerceTest(unittest.TestCase):
+    """Editable-cell coercion used by the import preview dialog (M2)."""
+
+    def test_coerce_float_with_unit(self):
+        self.assertEqual(I.coerce("beam", "b_b", "350.mm"), (350.0, None))
+
+    def test_coerce_unit_conversion(self):
+        self.assertEqual(I.coerce("beam", "b_b", "35.cm"), (350.0, None))
+
+    def test_coerce_clamps_out_of_range(self):
+        v, w = I.coerce("column", "bx", "50.mm")
+        self.assertEqual(v, 100.0)
+        self.assertIn("clamped", w)
+
+    def test_coerce_unknown_field(self):
+        v, w = I.coerce("beam", "bogus", "1")
+        self.assertIsNone(v)
+        self.assertIn("Unknown field", w)
+
+    def test_coerce_bad_number(self):
+        v, w = I.coerce("beam", "b_h", "abc")
+        self.assertIsNone(v)
+        self.assertIn("abc", w)
+
+    def test_coerce_empty_clears(self):
+        self.assertEqual(I.coerce("beam", "b_h", "  "), (None, None))
+
+    def test_coerce_combo_by_name(self):
+        self.assertEqual(I.coerce("column", "col_type", "Biaxial"), (2, None))
+
+    def test_coerce_combo_by_engine_index(self):
+        self.assertEqual(I.coerce("column", "col_type", "2"), (1, None))
+
+    def test_coerce_combo_unknown(self):
+        v, w = I.coerce("column", "shape", "triangle")
+        self.assertIsNone(v)
+        self.assertIn("Unknown choice", w)
+
+    def test_coerce_int(self):
+        self.assertEqual(I.coerce("beam", "n_supports", "3"), (3, None))
+
+    def test_coerce_member_converts_unit(self):
+        self.assertEqual(I.coerce_member("length", "m", "6000.mm"), (6.0, None))
+
+    def test_coerce_member_clamps_negative(self):
+        v, w = I.coerce_member("udl", "kN/m", "-5")
+        self.assertEqual(v, 0.0)
+        self.assertIn("clamped", w)
+
+    def test_coerce_member_bad(self):
+        v, w = I.coerce_member("udl", "kN/m", "x")
+        self.assertIsNone(v)
+        self.assertIn("x", w)
+
+
+class ScalarColumnsTest(unittest.TestCase):
+    """Canonical preview columns for the import dialog (M2)."""
+
+    def test_beam_columns_template_order(self):
+        cols = I.scalar_columns("beam")
+        keys = [k for _, k in cols]
+        self.assertIn("beam_fcu", keys)
+        self.assertIn("b_b", keys)
+        self.assertIn("b_h", keys)
+        # template order: FCU before B before H
+        self.assertLess(keys.index("beam_fcu"), keys.index("b_b"))
+        self.assertLess(keys.index("b_b"), keys.index("b_h"))
+
+    def test_derived_keys_excluded(self):
+        for mod in ("beam", "slab", "cont_beam", "column"):
+            keys = {k for _, k in I.scalar_columns(mod)}
+            self.assertTrue(keys.isdisjoint(I._DERIVED_KEYS), mod)
+
+    def test_every_column_resolves_to_state_key(self):
+        for mod in ("column", "beam", "slab", "stair", "base", "cont_beam"):
+            for display, key in I.scalar_columns(mod):
+                self.assertIn(key, I._FIELD[mod], (mod, display))
+
+    def test_slab_no_member_columns_in_scalars(self):
+        keys = {k for _, k in I.scalar_columns("slab")}
+        self.assertNotIn("panel_pls", keys)
+        self.assertNotIn("cont_spans", keys)
+
+
 class JobBuildTest(unittest.TestCase):
     def test_build_job_items_and_labels(self):
         job = I.build_job("my job", None, [

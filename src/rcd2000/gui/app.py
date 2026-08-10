@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QStatusBar, QSplashScreen, QDialog, QLabel, QToolButton, QHBoxLayout,
 )
 from PySide6.QtCore import Qt, QTimer, QSize
-from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence, QColor
+from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence, QColor, QCursor
 
 try:
     import qtawesome as qta
@@ -38,6 +38,9 @@ from rcd2000.gui.home_page import HomePage
 from rcd2000.gui.history_page import HistoryPage
 from rcd2000.gui.settings_page import SettingsPage
 from rcd2000.gui.job_header_dialog import JobHeaderDialog
+from rcd2000.gui.import_dialog import ImportPreviewDialog, new_job_menu
+from rcd2000.gui import importer as I
+from rcd2000.gui.modules import MODULE_BY_KEY
 from rcd2000.gui.workbench import Workbench
 from rcd2000.gui.update_banner import UpdateChecker, UpdateBanner
 
@@ -344,12 +347,63 @@ class MainWindow(QMainWindow):
     # ── job lifecycle ───────────────────────────────────────────────
 
     def _new_job(self):
+        menu = new_job_menu(self)
+        menu.exec(QCursor.pos())
+
+    def _new_blank_job(self):
         header = JobHeaderDialog.ask(self)
         if header is None:
             return
         n_items = (header.get("job_ref") or "Untitled Job").strip() or "Untitled Job"
         job = Job(slug=make_slug(n_items), name=n_items, header=header)
         self._open_workbench(job)
+
+    def _import_file(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import from File…", "",
+            "Import files (*.csv *.xlsx *.txt *.json);;All files (*)")
+        if not path:
+            return
+        try:
+            parsed = I.parse_file(path)
+        except ValueError as exc:
+            QMessageBox.critical(self, "Cannot Import", str(exc))
+            return
+        if parsed is None:
+            QMessageBox.critical(
+                self, "Cannot Import",
+                "Unrecognised file format. Use a CSV/XLSX table, a "
+                "RCD2000 output file, or an exported job JSON.")
+            return
+        if parsed.format == "jobjson":
+            job = Job.from_dict(parsed.job.to_dict())
+            job.slug = self._unique_slug(job.name)
+            self._open_workbench(job)
+            return
+        job = ImportPreviewDialog.ask(self, parsed)
+        if job is not None:
+            self._open_workbench(job)
+
+    def _download_template(self, module_key: str):
+        name = MODULE_BY_KEY[module_key][0].replace(" ", "_")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Template", f"{name.lower()}_template.csv",
+            "CSV template (*.csv)")
+        if not path:
+            return
+        if not path.lower().endswith(".csv"):
+            path += ".csv"
+        I.write_template(module_key, path)
+        self.show_status_banner(f"Template saved: {os.path.basename(path)}")
+
+    @staticmethod
+    def _unique_slug(name: str) -> str:
+        base = make_slug(name)
+        slug, i = base, 1
+        while os.path.exists(JobStore.path_for(slug)):
+            i += 1
+            slug = f"{base}-{i}"
+        return slug
 
     def _open_job(self, slug: str):
         job = JobStore.load(slug)
