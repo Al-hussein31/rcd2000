@@ -61,6 +61,26 @@ class FormatDetectionTest(unittest.TestCase):
         self.assertTrue(any("first sheet" in w for w in warnings))
         self.assertTrue(any("2 sheets" in w for w in warnings))
 
+    def test_keyvalue_section_header_warns(self):
+        # spec §12: [Beam]/[Column] sections → warning + split suggestion
+        p = self._write("[Beam]\nB = 300.mm\nH = 500.mm\n", ".txt")
+        parsed = I.parse_file(p)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed.format, "keyvalue")
+        self.assertEqual(parsed.table.headers, ["b", "h"])
+        self.assertEqual(len(parsed.table.rows[0]["b"].split(",")), 1)
+        joined = "\n".join(parsed.warnings)
+        self.assertIn("[Beam]", joined)
+        self.assertIn("one design per file", joined)
+        self.assertIn("Split the file", joined)
+
+    def test_keyvalue_no_section_no_warning(self):
+        p = self._write("Beam ID = B1\nB = 300.mm\nH = 500.mm\n", ".txt")
+        parsed = I.parse_file(p)
+        self.assertEqual(parsed.format, "keyvalue")
+        self.assertEqual(parsed.module_key, "beam")
+        self.assertFalse(any("Section header" in w for w in parsed.warnings))
+
     def test_garbage_returns_none(self):
         p = self._write("not a design file at all\njust prose\n", ".txt")
         self.assertIsNone(I.detect_format(p))

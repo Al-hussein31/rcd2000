@@ -551,13 +551,22 @@ def parse_csv_or_xlsx(path: str, warnings: list[str] | None = None) -> Table:
     return table
 
 
-def parse_keyvalue(path: str) -> Table:
-    """Parse 'Field = value' text (one design per file)."""
+def parse_keyvalue(path: str, warnings: list[str] | None = None) -> Table:
+    """Parse 'Field = value' text (one design per file).
+
+    `[Section]` headers (e.g. `[Beam]`) are not supported — one design per
+    file (spec §12); each occurrence is noted in *warnings*.
+    """
     fields: dict[str, list[str]] = {}
+    sections: list[str] = []
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
+                continue
+            sm = re.match(r"^\[([^\]]+)\]\s*$", line)
+            if sm:
+                sections.append(sm.group(1).strip())
                 continue
             m = re.match(r"^\s*([A-Za-z][A-Za-z0-9 /()\[\].-]*)\s*=\s*(.+?)\s*$", line)
             if not m:
@@ -567,6 +576,12 @@ def parse_keyvalue(path: str) -> Table:
             if key in ("jobref", "jobrefid"):
                 continue
             fields.setdefault(key, []).append(val)
+    if sections and warnings is not None:
+        warnings.append(
+            "Section header(s) found: "
+            + ", ".join(f"[{s}]" for s in sections)
+            + " — key:value imports support one design per file. "
+            "Split the file and import each design separately.")
     if not fields:
         raise ValueError("No 'Field = value' entries found.")
     table = Table(headers=list(fields.keys()), rows=[], format="keyvalue")
@@ -1209,7 +1224,7 @@ def parse_file(path: str) -> ParsedFile | None:
         return ParsedFile(fmt, table, module, name, job_ref=job_ref,
                           warnings=warnings)
     if fmt == "keyvalue":
-        table = parse_keyvalue(path)
+        table = parse_keyvalue(path, warnings)
     else:
         table = parse_csv_or_xlsx(path, warnings)
     module = detect_module(table.headers)
