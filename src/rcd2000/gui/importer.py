@@ -507,13 +507,21 @@ def _clean_cell(v) -> str:
     return norm_value(str(v))
 
 
-def parse_csv_or_xlsx(path: str) -> Table:
-    """Parse CSV (stdlib) or XLSX (openpyxl) into a Table."""
+def parse_csv_or_xlsx(path: str, warnings: list[str] | None = None) -> Table:
+    """Parse CSV (stdlib) or XLSX (openpyxl) into a Table.
+
+    XLSX: only the first sheet is imported; extra sheets are noted in
+    *warnings* (spec §12).
+    """
     ext = os.path.splitext(path)[1].lower()
     rows_raw: list[list[str]] = []
     if ext == ".xlsx":
         import openpyxl
         wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        if warnings is not None and len(wb.sheetnames) > 1:
+            warnings.append(
+                "Only the first sheet was imported "
+                f"({len(wb.sheetnames)} sheets found).")
         ws = wb.worksheets[0]
         for row in ws.iter_rows(values_only=True):
             rows_raw.append([_clean_cell(c) for c in row])
@@ -671,11 +679,14 @@ def _header_field(module: str, header: str) -> str | None:
 
 
 def score_module(module: str, headers: list[str]) -> int:
-    """Count how many headers a module's vocabulary explains."""
+    """Count how many headers a module's vocabulary explains.
+
+    Strong per-module markers score 3, generic field matches 1 (spec §5).
+    """
     score = 0
     for h in headers:
         if h in _STRONG[module]:
-            score += 2
+            score += 3
         elif _header_field(module, h) is not None:
             score += 1
     return score
@@ -1200,7 +1211,7 @@ def parse_file(path: str) -> ParsedFile | None:
     if fmt == "keyvalue":
         table = parse_keyvalue(path)
     else:
-        table = parse_csv_or_xlsx(path)
+        table = parse_csv_or_xlsx(path, warnings)
     module = detect_module(table.headers)
     if module is None:
         warnings.append("Could not auto-detect the design type - choose it in the preview.")

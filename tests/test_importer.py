@@ -44,6 +44,23 @@ class FormatDetectionTest(unittest.TestCase):
         p = self._write('{"slug": "s", "name": "n", "items": []}', ".json")
         self.assertEqual(I.detect_format(p), "jobjson")
 
+    def test_xlsx_first_sheet_only_warning(self):
+        import openpyxl
+        p = self._write("", ".xlsx")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Beam"
+        ws.append(["Beam ID", "B [mm]", "H [mm]"])
+        ws.append(["B1", "300", "500"])
+        wb.create_sheet("Column")
+        wb.save(p)
+        warnings: list[str] = []
+        table = I.parse_csv_or_xlsx(p, warnings)
+        self.assertEqual(table.headers, ["beamid", "b", "h"])
+        self.assertEqual(len(table.rows), 1)
+        self.assertTrue(any("first sheet" in w for w in warnings))
+        self.assertTrue(any("2 sheets" in w for w in warnings))
+
     def test_garbage_returns_none(self):
         p = self._write("not a design file at all\njust prose\n", ".txt")
         self.assertIsNone(I.detect_format(p))
@@ -95,6 +112,37 @@ class UnitParsingTest(unittest.TestCase):
         v, w = I.parse_int("abc")
         self.assertIsNone(v)
         self.assertIsNotNone(w)
+
+
+class DetectModuleTest(unittest.TestCase):
+    """Spec §5 — strong markers weigh 3, generic fields 1, threshold 3.
+
+    Headers arrive pre-normalised (norm_token) from the parsers.
+    """
+
+    @staticmethod
+    def _norm(headers: list[str]) -> list[str]:
+        return [I.norm_token(h) for h in headers]
+
+    def test_single_strong_marker_detects(self):
+        # 'Column ID' alone scores 3 → detected (spec strong = 3)
+        self.assertEqual(I.detect_module(self._norm(["Column ID"])), "column")
+
+    def test_beam_id_strong(self):
+        self.assertEqual(I.detect_module(self._norm(["Beam ID"])), "beam")
+
+    def test_weak_only_ambiguous(self):
+        # FCU+FY map to every module as generic fields (2 < threshold)
+        self.assertIsNone(I.detect_module(self._norm(["FCU [N/mm2]",
+                                                      "FY [N/mm2]"])))
+
+    def test_strong_plus_weak_wins(self):
+        self.assertEqual(I.detect_module(self._norm(["Column ID", "LOAD",
+                                                     "BX", "BY"])), "column")
+
+    def test_score_weights(self):
+        self.assertEqual(I.score_module("column", ["columnid"]), 3)
+        self.assertEqual(I.score_module("column", ["fcu"]), 1)
 
 
 class MappingTest(unittest.TestCase):
@@ -464,6 +512,34 @@ class JobBuildTest(unittest.TestCase):
             I.write_template(mod, p)
             content = open(p, encoding="utf-8").read()
             self.assertIn("[", content, mod)  # unit hints present
+
+    def test_jobjson_round_trip(self):
+        # test plan #7: job JSON → parse → Job with identical items/labels
+        import json
+        from rcd2000.gui.job import Job
+        job = I.build_job("Round Trip", None, [
+            ("beam", {"b_b": 300.0, "b_h": 500.0, "n_members": 2,
+                      "members": [{"length": 3.5, "udl": 18.0}]}, "B1"),
+            ("column", {"bx": 300.0, "by": 300.0, "col_fcu": 30.0}, "C1"),
+        ])
+        job.header = {"job_ref": "RT-01", "company": "Acme",
+                      "engineer": "Eng", "date": "10/08/2026",
+                      "fcu": 30.0, "fy": 460.0}
+        p = os.path.join(tempfile.mkdtemp(), "roundtrip.json")
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(json.dumps(job.to_dict()))
+        parsed = I.parse_file(p)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed.format, "jobjson")
+        rebuilt = Job.from_dict(parsed.job.to_dict())
+        self.assertEqual(rebuilt.name, "Round Trip")
+        self.assertEqual([(i.label, i.type_key) for i in rebuilt.items],
+                         [("B1", "beam"), ("C1", "column")])
+        self.assertEqual(rebuilt.items[0].state["b_b"], 300.0)
+        self.assertEqual(rebuilt.items[0].state["members"],
+                         [{"length": 3.5, "udl": 18.0}])
+        self.assertEqual(rebuilt.items[1].state["col_fcu"], 30.0)
+        self.assertEqual(rebuilt.header["job_ref"], "RT-01")
 
 
 if __name__ == "__main__":
