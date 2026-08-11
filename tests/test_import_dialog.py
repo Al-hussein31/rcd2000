@@ -1,13 +1,17 @@
-"""GUI tests for the import preview dialog + New Job menu (M2)."""
+"""GUI tests for the import preview dialog + New Job popup (M2)."""
 
 import os
 import tempfile
 
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QMessageBox, QWidget
 
 from rcd2000.gui import importer as I
-from rcd2000.gui.import_dialog import ImportPreviewDialog, MAX_BATCH, new_job_menu
+from rcd2000.gui.import_dialog import (
+    ImportPreviewDialog, MAX_BATCH, NewJobPopup, _ModuleRow, _OptionRow,
+)
 from rcd2000.gui.modules import MODULES
 
 
@@ -256,7 +260,7 @@ def test_ask_small_import_no_confirm(qapp, tmp_path, monkeypatch):
     assert answers == []
 
 
-# ── menu ────────────────────────────────────────────────────────────────
+# ── New Job popup ───────────────────────────────────────────────────────
 
 class _FakeParent(QWidget):
     def _new_blank_job(self):
@@ -269,15 +273,93 @@ class _FakeParent(QWidget):
         pass
 
 
-def test_new_job_menu_structure(qapp):
-    parent = _FakeParent()
-    menu = new_job_menu(parent)
-    texts = [a.text() for a in menu.actions()]
-    assert texts[0] == "Blank Job…"
-    assert texts[1] == "Import from File…"
-    assert texts[2] == "Download Template…"
-    tmpl_action = menu.actions()[2]
-    tmpl = tmpl_action.menu()
-    assert tmpl is not None
-    assert len(tmpl.actions()) == len(MODULES)
-    menu.deleteLater()
+def test_new_job_popup_structure(qapp):
+    popup = NewJobPopup()
+    assert [r._action for r in popup._rows] == ["blank", "import", None]
+    assert all(isinstance(r, _OptionRow) for r in popup._rows)
+    assert len(popup._module_rows) == len(MODULES)
+    assert all(isinstance(m, _ModuleRow) for m in popup._module_rows)
+    assert [m._key for m in popup._module_rows] == [m[1] for m in MODULES]
+    assert popup._template_box.isHidden()   # collapsed by default
+    popup.deleteLater()
+
+
+def test_new_job_popup_toggles_template_section(qapp):
+    popup = NewJobPopup()
+    popup._toggle_template()
+    assert not popup._template_box.isHidden()
+    popup._toggle_template()
+    assert popup._template_box.isHidden()
+    popup.deleteLater()
+
+
+def test_new_job_popup_blank_click_returns_blank(qapp):
+    popup = NewJobPopup()
+    popup.show()
+    QTest.mouseClick(popup._rows[0], Qt.LeftButton)
+    assert popup._result == "blank"
+    popup.close()
+
+
+def test_new_job_popup_import_click_returns_import(qapp):
+    popup = NewJobPopup()
+    popup.show()
+    QTest.mouseClick(popup._rows[1], Qt.LeftButton)
+    assert popup._result == "import"
+    popup.close()
+
+
+def test_new_job_popup_expander_click_stays_open(qapp):
+    popup = NewJobPopup()
+    popup.show()
+    QTest.mouseClick(popup._rows[2], Qt.LeftButton)   # Download Template…
+    assert popup._result is None
+    assert not popup._template_box.isHidden()
+    popup.close()
+
+
+def test_new_job_popup_module_click_returns_template_key(qapp):
+    popup = NewJobPopup()
+    popup.show()
+    QTest.mouseClick(popup._module_rows[1], Qt.LeftButton)   # Beam
+    assert popup._result == "template:beam"
+    popup.close()
+
+
+def test_new_job_popup_escape_dismisses(qapp):
+    popup = NewJobPopup()
+    popup.show()
+    QTest.keyClick(popup, Qt.Key_Escape)
+    assert popup._result is None
+    assert popup.result() != 1   # rejected, not accepted
+    popup.close()
+
+
+# ── app regression ──────────────────────────────────────────────────────
+
+def test_app_handlers_no_nameerror(qapp, tmp_path, monkeypatch):
+    """Regression: QFileDialog/QMessageBox were missing from app.py
+    imports, so 'Import from File…' / 'Download Template…' silently
+    NameError'd in the slot and did nothing."""
+    from rcd2000.gui import app as appmod
+    # Skip the network update check when constructing MainWindow.
+    monkeypatch.setattr(appmod.MainWindow, "_start_update_check",
+                        lambda self: None)
+    win = appmod.MainWindow()
+    # Cancel path of both handlers must complete without raising.
+    monkeypatch.setattr(appmod.QFileDialog, "getOpenFileName",
+                        staticmethod(lambda *a, **k: ("", "")))
+    win._import_file()
+    monkeypatch.setattr(appmod.QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: ("", "")))
+    win._download_template("beam")
+    # Dispatch path: import of a real CSV should reach the preview dialog.
+    p = _beam_csv(tmp_path)
+    answers = []
+    monkeypatch.setattr(appmod.QFileDialog, "getOpenFileName",
+                        staticmethod(lambda *a, **k: (p, "")))
+    monkeypatch.setattr(ImportPreviewDialog, "exec",
+                        lambda self: QMessageBox.Rejected)
+    win._import_file()   # reaches ImportPreviewDialog.ask → exec patched
+    assert answers == []
+    win.deleteLater()

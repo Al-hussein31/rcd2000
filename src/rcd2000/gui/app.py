@@ -17,9 +17,10 @@ from importlib.resources import files
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QStackedWidget,
     QStatusBar, QSplashScreen, QDialog, QLabel, QToolButton, QHBoxLayout,
+    QFileDialog, QMessageBox,
 )
 from PySide6.QtCore import Qt, QTimer, QSize
-from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence, QColor, QCursor
+from PySide6.QtGui import QPixmap, QIcon, QAction, QKeySequence, QColor
 
 try:
     import qtawesome as qta
@@ -38,7 +39,7 @@ from rcd2000.gui.home_page import HomePage
 from rcd2000.gui.history_page import HistoryPage
 from rcd2000.gui.settings_page import SettingsPage
 from rcd2000.gui.job_header_dialog import JobHeaderDialog
-from rcd2000.gui.import_dialog import ImportPreviewDialog, new_job_menu
+from rcd2000.gui.import_dialog import ImportPreviewDialog, NewJobPopup
 from rcd2000.gui import importer as I
 from rcd2000.gui.modules import MODULE_BY_KEY
 from rcd2000.gui.workbench import Workbench
@@ -347,8 +348,13 @@ class MainWindow(QMainWindow):
     # ── job lifecycle ───────────────────────────────────────────────
 
     def _new_job(self):
-        menu = new_job_menu(self)
-        menu.exec(QCursor.pos())
+        action = NewJobPopup.ask(self)
+        if action == "blank":
+            self._new_blank_job()
+        elif action == "import":
+            self._import_file()
+        elif action and action.startswith("template:"):
+            self._download_template(action[len("template:"):])
 
     def _new_blank_job(self):
         header = JobHeaderDialog.ask(self)

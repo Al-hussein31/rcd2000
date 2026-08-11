@@ -1,4 +1,4 @@
-"""Import preview dialog + New Job menu (M2 of the file-import feature).
+"""Import preview dialog + New Job popup (M2 of the file-import feature).
 
 The dialog shows the parsed file as an editable values table (one row per
 design), a design-type selector (enabled when the type is ambiguous or the
@@ -6,9 +6,9 @@ user wants to override the auto-detection), and a warnings panel.  Cells
 whose value failed to map are highlighted and carry a tooltip; editing a
 cell re-parses the value with the canonical unit and re-validates it.
 
-The "New Job" dropdown (Blank Job… | Import from File… | Download
-Template…) is built by :func:`new_job_menu` and owned by the calling
-window, which must provide the ``_new_blank_job`` / ``_import_file`` /
+The "New Job" dropdown (Blank Job | Import from File… | Download
+Template…) is a styled card popup (:class:`NewJobPopup`); the owning
+window provides the ``_new_blank_job`` / ``_import_file`` /
 ``_download_template`` slots.
 """
 
@@ -16,11 +16,11 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QCursor, QGuiApplication, QIcon
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QFileDialog, QHBoxLayout, QHeaderView, QLabel,
-    QListWidget, QMenu, QMessageBox, QPushButton, QTableWidget,
+    QComboBox, QDialog, QFileDialog, QFrame, QHBoxLayout, QHeaderView,
+    QLabel, QListWidget, QMessageBox, QPushButton, QTableWidget,
     QTableWidgetItem, QVBoxLayout,
 )
 
@@ -448,12 +448,267 @@ def _fmt(value) -> str:
 
 # ── New Job menu ────────────────────────────────────────────────────────
 
-def new_job_menu(parent) -> QMenu:
-    """Build the New Job dropdown; parent must expose the three slots."""
-    menu = QMenu(parent)
-    menu.addAction("Blank Job…", parent._new_blank_job)
-    menu.addAction("Import from File…", parent._import_file)
-    tmpl = menu.addMenu("Download Template…")
-    for name, key, *_ in MODULES:
-        tmpl.addAction(name, lambda k=key: parent._download_template(k))
-    return menu
+# ── New Job popup ───────────────────────────────────────────────────────
+
+_POPUP_QSS = """
+#NewJobCard {
+    background: #1F222A;
+    border: 1px solid #2A2F3A;
+    border-radius: 14px;
+}
+#PopupTitle { color: #ECECEE; font-size: 15px; font-weight: 700; }
+#PopupSub   { color: #9CA0AA; font-size: 12px; }
+#PopupFooter { color: #6B7280; font-size: 10px; }
+#Row        { border-radius: 9px; }
+#Row[hover="true"]   { background: #242832; }
+#ModuleRow  { border-radius: 7px; }
+#ModuleRow[hover="true"] { background: #242832; }
+#RowTitle   { color: #ECECEE; font-size: 13px; font-weight: 600; }
+#RowSub     { color: #9CA0AA; font-size: 11px; }
+#ModuleName { color: #ECECEE; font-size: 12px; font-weight: 600; }
+#ModuleTag  { color: #E6A13F; font-size: 10px; font-weight: 600;
+              background: rgba(212, 140, 40, 0.12);
+              border: 1px solid rgba(212, 140, 40, 0.35);
+              border-radius: 8px; padding: 1px 7px; }
+#RowChevron { color: #6B7280; font-size: 15px; }
+#RowBar     { background: transparent; border-radius: 2px; }
+#RowBar[on="true"] { background: #D48C28; }
+#ModuleTile { color: #D48C28; font-size: 14px; }
+"""
+
+
+def _popup_icon(name: str, color: str) -> QIcon:
+    """qtawesome icon; empty icon falls back to the unicode glyph."""
+    try:
+        import qtawesome as qta
+        return qta.icon(name, color=color)
+    except Exception:
+        return QIcon()
+
+
+class _OptionRow(QFrame):
+    """Clickable popup row: icon tile + title + subtitle + accent bar."""
+
+    # object (not str): must carry None for the expander row untouched.
+    clicked = Signal(object)  # emits the action key (None for the expander)
+
+    def __init__(self, icon_name: str, glyph: str, title: str,
+                 subtitle: str, action: str | None, parent=None):
+        super().__init__(parent)
+        self.setObjectName("Row")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedHeight(58)
+        self._action = action
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 8, 10, 8)
+        lay.setSpacing(10)
+
+        tile = QLabel()
+        tile.setFixedSize(32, 32)
+        tile.setAlignment(Qt.AlignCenter)
+        tile.setStyleSheet(
+            "background: #242832; border-radius: 7px;"
+            " color: #D48C28; font-size: 16px;")
+        icon = _popup_icon(icon_name, "#ECECEE")
+        if not icon.isNull():
+            tile.setPixmap(icon.pixmap(16, 16))
+        else:
+            tile.setText(glyph)
+        lay.addWidget(tile)
+
+        text = QVBoxLayout()
+        text.setSpacing(1)
+        t = QLabel(title)
+        t.setObjectName("RowTitle")
+        text.addWidget(t)
+        s = QLabel(subtitle)
+        s.setObjectName("RowSub")
+        text.addWidget(s)
+        lay.addLayout(text, 1)
+
+        bar = QFrame()
+        bar.setObjectName("RowBar")
+        bar.setFixedWidth(3)
+        bar.setFixedHeight(22)
+        lay.addWidget(bar)
+
+        ch = QLabel("›")
+        ch.setObjectName("RowChevron")
+        lay.addWidget(ch)
+
+        self._bar = bar
+
+    # ── interaction ────────────────────────────────────────────────
+
+    def mouseReleaseEvent(self, ev):
+        if ev.button() == Qt.LeftButton:
+            self.clicked.emit(self._action)
+        super().mouseReleaseEvent(ev)
+
+    def _set_hover(self, on: bool):
+        self.setProperty("hover", on)
+        self._bar.setProperty("on", on)
+        for w in (self, self._bar):
+            w.style().unpolish(w)
+            w.style().polish(w)
+
+    def enterEvent(self, ev):
+        self._set_hover(True)
+        super().enterEvent(ev)
+
+    def leaveEvent(self, ev):
+        self._set_hover(False)
+        super().leaveEvent(ev)
+
+
+class _ModuleRow(QFrame):
+    """Smaller row inside the expanded template list."""
+
+    clicked = Signal(str)  # emits "template:<type_key>"
+
+    def __init__(self, name: str, key: str, glyph: str, parent=None):
+        super().__init__(parent)
+        self.setObjectName("ModuleRow")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedHeight(34)
+        self._key = key
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(10, 0, 10, 0)
+        lay.setSpacing(8)
+        g = QLabel(glyph)
+        g.setObjectName("ModuleTile")
+        lay.addWidget(g)
+        n = QLabel(name)
+        n.setObjectName("ModuleName")
+        lay.addWidget(n, 1)
+        tag = QLabel(key)
+        tag.setObjectName("ModuleTag")
+        lay.addWidget(tag)
+
+    def mouseReleaseEvent(self, ev):
+        if ev.button() == Qt.LeftButton:
+            self.clicked.emit(f"template:{self._key}")
+        super().mouseReleaseEvent(ev)
+
+    def enterEvent(self, ev):
+        self.setProperty("hover", True)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        super().enterEvent(ev)
+
+    def leaveEvent(self, ev):
+        self.setProperty("hover", False)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        super().leaveEvent(ev)
+
+
+class NewJobPopup(QDialog):
+    """Frameless card popup: Blank Job | Import | Download Template.
+
+    Returns an action key from :meth:`ask`:
+
+    - ``"blank"``            → create a fresh job
+    - ``"import"``           → import from a file
+    - ``"template:<key>"``   → download a module template
+    - ``None``               → dismissed (Esc / outside click)
+    """
+
+    _ROWS = [
+        ("fa5s.plus", "+", "Blank Job",
+         "Fresh design - set the header, then build.", "blank"),
+        ("fa5s.file-import", "\u21b3", "Import from File\u2026",
+         "CSV, XLSX, RCD2000 output, or a job JSON export.", "import"),
+        ("fa5s.download", "\u21e9", "Download Template\u2026",
+         "Start from a blank module template.", None),
+    ]
+
+    def __init__(self, parent=None):
+        super().__init__(parent, Qt.Popup | Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setObjectName("NewJobPopup")
+        self._result: str | None = None
+        self._rows: list[_OptionRow] = []
+        self._module_rows: list[_ModuleRow] = []
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(8, 8, 8, 8)
+        card = QFrame()
+        card.setObjectName("NewJobCard")
+        outer.addWidget(card)
+
+        v = QVBoxLayout(card)
+        v.setContentsMargins(14, 14, 14, 12)
+        v.setSpacing(8)
+
+        title = QLabel("New Job")
+        title.setObjectName("PopupTitle")
+        v.addWidget(title)
+        sub = QLabel("Start blank or bring in an existing design")
+        sub.setObjectName("PopupSub")
+        v.addWidget(sub)
+        v.addSpacing(4)
+
+        for icon, glyph, t, s, action in self._ROWS:
+            row = _OptionRow(icon, glyph, t, s, action, card)
+            row.clicked.connect(self._on_row)
+            v.addWidget(row)
+            self._rows.append(row)
+
+        self._template_box = QFrame(card)
+        tb = QVBoxLayout(self._template_box)
+        tb.setContentsMargins(6, 0, 6, 2)
+        tb.setSpacing(2)
+        for name, key, _page, glyph, _qta in MODULES:
+            mr = _ModuleRow(name, key, glyph, self._template_box)
+            mr.clicked.connect(self._on_row)
+            tb.addWidget(mr)
+            self._module_rows.append(mr)
+        self._template_box.hide()
+        v.addWidget(self._template_box)
+
+        v.addSpacing(2)
+        sep = QFrame(card)
+        sep.setFixedHeight(1)
+        sep.setStyleSheet("background: #242832; border: none;")
+        v.addWidget(sep)
+        foot = QLabel("Esc to close  \u00b7  one design per import")
+        foot.setObjectName("PopupFooter")
+        v.addWidget(foot)
+
+        self.setStyleSheet(_POPUP_QSS)
+
+    # ── interaction ────────────────────────────────────────────────
+
+    def _on_row(self, action: str | None):
+        if action is None:            # the Download Template… expander
+            self._toggle_template()
+            return
+        self._result = action
+        self.accept()
+
+    def _toggle_template(self):
+        # Use isHidden (widget state), not isVisible (needs a shown window).
+        self._template_box.setVisible(self._template_box.isHidden())
+        self.adjustSize()
+
+    def keyPressEvent(self, ev):
+        if ev.key() == Qt.Key_Escape:
+            self.reject()
+        else:
+            super().keyPressEvent(ev)
+
+    # ── entry point ─────────────────────────────────────────────────
+
+    @classmethod
+    def ask(cls, parent=None) -> str | None:
+        """Show the popup at the cursor and return the chosen action."""
+        popup = cls(parent)
+        popup.adjustSize()
+        pos = QCursor.pos()
+        geo = QGuiApplication.screenAt(pos).availableGeometry()
+        x = min(pos.x(), geo.right() - popup.width() - 4)
+        y = min(pos.y(), geo.bottom() - popup.height() - 4)
+        popup.move(max(x, geo.left() + 4), max(y, geo.top() + 4))
+        popup.exec()
+        return popup._result
