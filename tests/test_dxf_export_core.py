@@ -30,7 +30,8 @@ class TestSetup:
 
     def test_struct50_params(self, ex):
         ds = ex.doc.dimstyles.get("STRUCT_50")
-        assert ds.dxf.dimscale == 50
+        assert ds.dxf.dimscale == 1
+        assert ds.dxf.dimlfac == 50
         assert ds.dxf.dimtxt == 2.5
         assert ds.dxf.dimasz == 2.5
 

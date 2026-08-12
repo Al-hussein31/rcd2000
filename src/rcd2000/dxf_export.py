@@ -74,6 +74,9 @@ class DxfExporter:
                 layer.dxf.linetype = lt
 
     def _setup_dimstyles(self) -> None:
+        # Detail-sheet convention: geometry is drawn at plot scale
+        # (mm / scale). DIMLFAC multiplies the measured distance back to
+        # real mm, and dimscale=1 keeps dimension text at paper size.
         for scale_name, scale_val in (
             ("STRUCT_20", 20),
             ("STRUCT_25", 25),
@@ -81,16 +84,17 @@ class DxfExporter:
             ("STRUCT_100", 100),
         ):
             ds = self.doc.dimstyles.new(scale_name)
-            ds.dxf.dimscale = scale_val
-            ds.dxf.dimasz = 2.5          # arrow size (paper mm)
-            ds.dxf.dimtxt = 2.5          # text height (paper mm)
+            ds.dxf.dimscale = 1
+            ds.dxf.dimlfac = scale_val    # linear factor -> real mm
+            ds.dxf.dimasz = 2.5            # arrow size (paper mm)
+            ds.dxf.dimtxt = 2.5            # text height (paper mm)
             ds.dxf.dimgap = 1.0
-            ds.dxf.dimtofl = 1           # force line between ext lines
+            ds.dxf.dimtofl = 1             # force line between ext lines
             ds.dxf.dimclrd = colors.CYAN
             ds.dxf.dimclrt = colors.WHITE
             ds.dxf.dimclre = colors.WHITE
-            ds.dxf.dimlwd = 10
-            ds.dxf.dimlwe = 10
+            ds.dxf.dimlwd = 9
+            ds.dxf.dimlwe = 9
 
     def _setup_textstyles(self) -> None:
         for name in ("OPEN_SANS", "OPEN_SANS_BOLD"):
@@ -347,3 +351,209 @@ class DxfExporter:
         scale: DrawingScale = DrawingScale.S1_50,
     ) -> None:
         self.blockref(layout, "BAR_MARK", pos, scale, attributes={"MARK": mark})
+
+
+# ── Beam drawing (Batch 3) ──────────────────────────────────────────
+
+    def draw_beam_plan(
+        self,
+        layout: Layout,
+        beam: "BeamDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Plan view: outline, top/bottom bars, stirrup zone, dims, marks."""
+        from .drawing_models import BeamDrawing as _B  # noqa: F401 (typing)
+
+        ox, oy = float(origin[0]), float(origin[1])
+        s = beam.scale
+        w = beam.span_mm
+        b = float(beam.b_mm)
+
+        # Concrete outline + hatch
+        self.rect(layout, ox, oy, ox + w, oy + b, scale=s)
+        self.hatch_rect(layout, ox, oy, ox + w, oy + b, scale=s)
+
+        # Centerline
+        self.line(layout, (ox, oy + b / 2), (ox + w, oy + b / 2),
+                  scale=s, layer="CENTERLINE")
+
+        # Top bars (near top edge) and bottom bars (near bottom edge)
+        for zone in beam.top_zones:
+            self._draw_plan_zone(
+                layout, zone, ox, oy, b, "top", scale=s)
+        for zone in beam.bottom_zones:
+            self._draw_plan_zone(
+                layout, zone, ox, oy, b, "bottom", scale=s)
+
+        # Stirrup zone markers (short ticks perpendicular to axis)
+        for zone in beam.stirrup_zones:
+            for bar in zone.bars:
+                n = max(bar.count, 1)
+                step = zone.length_mm / n if n > 1 else 0
+                for i in range(n):
+                    x = zone.start_mm + i * step
+                    self.line(
+                        layout,
+                        (ox + x, oy + 5),
+                        (ox + x, oy + b - 5),
+                        scale=s, layer="REBAR_STIRRUP",
+                    )
+
+        if beam.show_dimensions:
+            self.dim_linear(layout, (ox, oy), (ox + w, oy), -150, scale=s)
+            self.dim_linear(layout, (ox, oy), (ox, oy + b), 150, scale=s)
+
+    def _draw_plan_zone(self, layout, zone, ox, oy, b, side, scale):
+        """Draw one zone's bars as parallel lines in plan."""
+        x0 = ox + zone.start_mm
+        x1 = ox + zone.end_mm
+        if side == "top":
+            y = oy + b - zone.offset_from_face_mm
+        else:
+            y = oy + zone.offset_from_face_mm
+        for bar in zone.bars:
+            for i in range(max(bar.count, 1)):
+                dy = i * (b / max(bar.count + 1, 2)) if side == "bottom" else -i * (b / max(bar.count + 1, 2))
+                yy = y + dy if side == "bottom" else y - dy
+                self.line(layout, (x0, yy), (x1, yy), scale=scale,
+                          layer=zone.layer)
+
+    def draw_beam_elevation(
+        self,
+        layout: Layout,
+        beam: "BeamDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Longitudinal elevation: curtailment zones, stirrups, supports."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = beam.scale
+        w = beam.span_mm
+        D = float(beam.D_mm)
+
+        self.rect(layout, ox, oy, ox + w, oy + D, scale=s)
+        self.hatch_rect(layout, ox, oy, ox + w, oy + D, scale=s)
+
+        # Top bars at cover below top face, bottom bars at cover above bottom
+        for zone in beam.top_zones:
+            y = oy + D - zone.offset_from_face_mm
+            self._draw_elev_zone(layout, zone, ox, y, scale=s)
+        for zone in beam.bottom_zones:
+            y = oy + zone.offset_from_face_mm
+            self._draw_elev_zone(layout, zone, ox, y, scale=s)
+
+        # Stirrups: vertical ticks at spacing across full depth
+        for zone in beam.stirrup_zones:
+            for bar in zone.bars:
+                n = max(bar.count, 1)
+                step = zone.length_mm / n if n > 1 else 0
+                for i in range(n + 1):
+                    x = ox + zone.start_mm + i * step
+                    self.line(layout, (x, oy + 4), (x, oy + D - 4),
+                              scale=s, layer="REBAR_STIRRUP")
+
+        # Support marks at both ends
+        self.line(layout, (ox, oy - 30), (ox, oy + D + 30), scale=s,
+                  layer="GRID")
+        self.line(layout, (ox + w, oy - 30), (ox + w, oy + D + 30),
+                  scale=s, layer="GRID")
+
+        if beam.show_dimensions:
+            self.dim_linear(layout, (ox, oy), (ox + w, oy), -150, scale=s)
+            self.dim_linear(layout, (ox, oy), (ox, oy + D), 150, scale=s)
+
+    def _draw_elev_zone(self, layout, zone, ox, y, scale):
+        x0 = ox + zone.start_mm
+        x1 = ox + zone.end_mm
+        for bar in zone.bars:
+            self.line(layout, (x0, y), (x1, y), scale=scale, layer=zone.layer)
+
+    def draw_beam_section(
+        self,
+        layout: Layout,
+        beam: "BeamDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Cross-section: outline, bar circles, stirrup outline, dims."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = beam.scale
+        b = float(beam.b_mm)
+        D = float(beam.D_mm)
+
+        self.rect(layout, ox, oy, ox + b, oy + D, scale=s)
+
+        # Stirrup outline at cover
+        c = float(beam.cover_mm)
+        self.polyline(
+            layout,
+            [(ox + c, oy + c), (ox + b - c, oy + c),
+             (ox + b - c, oy + D - c), (ox + c, oy + D - c)],
+            scale=s, layer="REBAR_STIRRUP", close=True,
+        )
+
+        # Main bars as circles at cover offset from each face
+        def _bar_row(y_face, count, layer):
+            r = 6.0
+            xs = [ox + b / 2]
+            if count >= 2:
+                xs = [ox + c + r, ox + b - c - r]
+            if count >= 3:
+                xs = [ox + c + r, ox + b / 2, ox + b - c - r]
+            for x in xs[:count]:
+                self.circle(layout, (x, y_face), r, scale=s, layer=layer)
+
+        for zone in beam.top_zones:
+            for bar in zone.bars:
+                _bar_row(oy + D - beam.cover_mm, bar.count, zone.layer)
+        for zone in beam.bottom_zones:
+            for bar in zone.bars:
+                _bar_row(oy + beam.cover_mm, bar.count, zone.layer)
+
+        if beam.show_dimensions:
+            self.dim_linear(layout, (ox, oy), (ox + b, oy), -150, scale=s)
+            self.dim_linear(layout, (ox, oy), (ox, oy + D), 150, scale=s)
+
+    def draw_bbs(
+        self,
+        layout: Layout,
+        rows: List["BbsRow"],
+        origin: Point = (0.0, 0.0),
+        scale: DrawingScale = DrawingScale.S1_50,
+    ) -> None:
+        """Bar Bending Schedule as a simple line table."""
+        from .drawing_models import BbsRow  # noqa: F401
+
+        ox, oy = float(origin[0]), float(origin[1])
+        headers = ["MARK", "SHAPE", "Ø", "NO.", "LENGTH (mm)", "NOTE"]
+        col_w = [150, 150, 80, 80, 250, 250]
+        row_h = 60
+        x = ox
+        # Header
+        for h, cw in zip(headers, col_w):
+            self.text(layout, h, (x + cw / 2, oy + row_h / 2), height_mm=30,
+                      scale=scale, align=1)
+            x += cw
+        # Rows
+        for i, row in enumerate(rows):
+            yy = oy - (i + 1) * row_h
+            vals = [
+                row.mark, row.shape.value, str(row.dia_mm), str(row.n),
+                f"{row.length_mm:.0f}", row.bend_info,
+            ]
+            x = ox
+            for v, cw in zip(vals, col_w):
+                self.text(layout, v, (x + cw / 2, yy + row_h / 2),
+                          height_mm=25, scale=scale, align=1)
+                x += cw
+        # Border lines
+        total_w = sum(col_w)
+        total_h = row_h * (len(rows) + 1)
+        self.rect(layout, ox, oy - total_h, ox + total_w, oy, scale=scale,
+                  layer="TEXT")
+        for i in range(1, len(headers)):
+            x = ox + sum(col_w[:i])
+            self.line(layout, (x, oy), (x, oy - total_h), scale=scale,
+                      layer="TEXT")
+        for i in range(1, len(rows) + 1):
+            yy = oy - i * row_h
+            self.line(layout, (ox, yy), (ox + total_w, yy), scale=scale,
+                      layer="TEXT")
