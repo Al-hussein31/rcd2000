@@ -296,10 +296,18 @@ def main():
         ("stair", "Design reinforced concrete stairs", cmd_stair),
         ("base", "Design reinforced concrete foundations", cmd_base),
         ("continuous-beam", "Analyze continuous beams (no design)", cmd_continuous),
+        ("dxf", "Export a designed element to a DXF drawing sheet", cmd_dxf),
         ("info", "Show version and module information", cmd_info),
     ]:
         p = sub.add_parser(cmd_name, help=help_text)
-        if cmd_name != "info":
+        if cmd_name == "dxf":
+            p.add_argument("element", choices=["beam", "column", "slab", "base"],
+                           help="Element type to export")
+            p.add_argument("input", help="JSON input file")
+            p.add_argument("-o", "--output", help="Output DXF file (.dxf)")
+            p.add_argument("--scale", type=int, default=50,
+                           help="Drawing scale (20/25/50/100, default 50)")
+        elif cmd_name != "info":
             p.add_argument("input", help="JSON input file")
             p.add_argument("-o", "--output", help="Output text file")
             p.add_argument("--json", action="store_true",
@@ -315,3 +323,126 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def cmd_dxf(args):
+    """Export a designed element to a DXF drawing sheet."""
+    from rcd2000.drawing_models import DrawingScale
+    from rcd2000.cad_adapters import (
+        beam_to_drawing, column_to_drawing, slab_to_drawing,
+        footing_to_drawing,
+    )
+    from rcd2000.dxf_export import DxfExporter
+    from rcd2000.drawing_models import Sheet
+
+    data = read_json(args.input)
+    element = args.element
+    fcu = data.get("fcu", 25.0)
+    fy = data.get("fy", 460.0)
+    scale = DrawingScale(int(args.scale)) if args.scale else DrawingScale.S1_50
+
+    ex = DxfExporter()
+    msp = ex.modelspace
+    sheet_title = ""
+
+    if element == "beam":
+        b = data.get("beams", [data])[0]
+        inp = BeamInput(
+            beam_id=b.get("beam_id", "B1"),
+            n_supports=b.get("n_supports", 2),
+            n_members=b.get("n_members", 1),
+            b=b.get("b", 225), bf=b.get("bf", 225),
+            h=b.get("h", 450), hf=b.get("hf", 0),
+            fcu=fcu, fy=fy, fyv=data.get("fyv", 460.0),
+            member_lengths=b.get("member_lengths", []),
+            member_udl=b.get("member_udl", []),
+            member_wt=b.get("member_wt", []),
+            member_wb=b.get("member_wb", []),
+            member_ab=b.get("member_ab", []),
+            member_npl=b.get("member_npl", []),
+            ty1=b.get("ty1", 0), ty2=b.get("ty2", 0),
+        )
+        result = BeamDesigner(fcu=fcu, fy=fy, fyv=data.get("fyv", 460.0))\
+            .design([inp])[0]
+        drawing = beam_to_drawing(inp, result, scale)
+        ex.draw_beam_plan(msp, drawing)
+        ex.draw_beam_elevation(msp, drawing, (0, 900))
+        ex.draw_beam_section(msp, drawing, (7000, 0))
+        sheet_title = f"BEAM {inp.beam_id} - PLAN & DETAILS"
+
+    elif element == "column":
+        c = data.get("columns", [data])[0]
+        inp = ColumnInput(
+            column_id=c.get("column_id", "C1"),
+            col_type=c.get("col_type", 1),
+            shape=c.get("shape", 1),
+            load=c.get("load", 0),
+            bx=c.get("bx", 300), by=c.get("by", 300),
+            dia=c.get("dia", 0), depth=c.get("depth", 0),
+            length=c.get("length", 3.0), le=c.get("le", 3.0),
+            lex=c.get("lex", 3.0), ley=c.get("ley", 3.0),
+            moment_x=c.get("moment_x", 0),
+            moment_y=c.get("moment_y", 0),
+            moment=c.get("moment", 0),
+        )
+        result = ColumnDesigner(fcu=fcu, fy=fy).design([inp])[0]
+        drawing = column_to_drawing(inp, result, scale)
+        ex.draw_column_plan(msp, drawing)
+        ex.draw_column_elevation(msp, drawing, (1500, 0))
+        sheet_title = f"COLUMN {inp.column_id} - PLAN & ELEVATION"
+
+    elif element == "slab":
+        s = data.get("panels", [data])[0]
+        inp = SlabPanelInput(
+            panel_id=s.get("panel_id", "S1"),
+            panel_type=s.get("panel_type", 2),
+            depth=s.get("depth", 175),
+            fcu=fcu, fy=fy,
+            udl=s.get("udl", 0),
+            span=s.get("span", 0),
+            ly=s.get("ly", 0),
+        )
+        result = SlabDesigner(fcu=fcu, fy=fy).design([inp])[0]
+        drawing = slab_to_drawing(inp, result, scale)
+        ex.draw_slab_plan(msp, drawing)
+        ex.draw_slab_section(msp, drawing, (0, 3000))
+        sheet_title = f"SLAB {inp.panel_id} - REINFORCEMENT PLAN"
+
+    elif element == "base":
+        b = data.get("bases", [data])[0]
+        inp = BaseInput(
+            base_id=b.get("base_id", "F1"),
+            base_type=b.get("base_type", 1),
+            col_type=b.get("col_type", 1),
+            load=b.get("load", 0),
+            pb=b.get("pb", 150.0),
+            fcu=fcu, fy=fy,
+            a1=b.get("a1", 300), a2=b.get("a2", 300),
+            dia=b.get("dia", 0),
+            h=b.get("h", 200),
+        )
+        result = BaseDesigner(fcu=fcu, fy=fy).design([inp])[0]
+        drawing = footing_to_drawing(inp, result, scale)
+        ex.draw_footing_plan(msp, drawing)
+        ex.draw_footing_section(msp, drawing, (0, 3000))
+        sheet_title = f"FOOTING {inp.base_id} - PLAN & SECTION"
+
+    else:
+        parser.error(f"unknown dxf element: {element}")
+
+    sheet = Sheet(
+        sheet_no=data.get("sheet_no", "S-01"),
+        title=sheet_title,
+        project=data.get("job_ref", ""),
+        engineer=data.get("designer", ""),
+        date=data.get("date", ""),
+        scale_note=f"SCALE 1:{scale.value}",
+    )
+    layout = ex.new_sheet(sheet)
+    ex.add_viewport(layout, center=(380, 320), size=(700, 400),
+                    view_center=(120, 30), view_height=160)
+
+    output = args.output or f"{element}.dxf"
+    ex.save(output)
+    errors = ex.audit()
+    sys.stdout.write(f"Saved {output} (audit errors: {errors})\n")
