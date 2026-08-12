@@ -297,19 +297,21 @@ def main():
         ("base", "Design reinforced concrete foundations", cmd_base),
         ("continuous-beam", "Analyze continuous beams (no design)", cmd_continuous),
         ("dxf", "Export a designed element to a DXF drawing sheet", cmd_dxf),
+        ("ifc", "Export a designed element to an IFC4 BIM model", cmd_ifc),
         ("info", "Show version and module information", cmd_info),
     ]:
         p = sub.add_parser(cmd_name, help=help_text)
-        if cmd_name == "dxf":
+        if cmd_name in ("dxf", "ifc"):
             p.add_argument("element", choices=["beam", "column", "slab", "base"],
                            help="Element type to export")
             p.add_argument("input", help="JSON input file")
-            p.add_argument("-o", "--output", help="Output DXF file (.dxf)")
-            p.add_argument("--scale", type=int, default=50,
-                           help="Drawing scale (20/25/50/100, default 50)")
-            p.add_argument("--to-dwg", action="store_true",
-                           help="Also convert the DXF to native DWG "
-                                "(requires ODA File Converter)")
+            p.add_argument("-o", "--output", help="Output file (.dxf/.ifc)")
+            if cmd_name == "dxf":
+                p.add_argument("--scale", type=int, default=50,
+                               help="Drawing scale (20/25/50/100, default 50)")
+                p.add_argument("--to-dwg", action="store_true",
+                               help="Also convert the DXF to native DWG "
+                                    "(requires ODA File Converter)")
         elif cmd_name != "info":
             p.add_argument("input", help="JSON input file")
             p.add_argument("-o", "--output", help="Output text file")
@@ -460,3 +462,107 @@ def cmd_dxf(args):
             sys.stderr.write(f"DWG export failed: {exc}\n")
             sys.stderr.write(install_hint() + "\n")
             sys.exit(1)
+
+
+def cmd_ifc(args):
+    """Export a designed element (with reinforcement) to an IFC4 file."""
+    from rcd2000.cad_adapters import (
+        beam_to_drawing, column_to_drawing, slab_to_drawing,
+        footing_to_drawing,
+    )
+    from rcd2000.ifc_export import IfcExporter
+
+    try:
+        import ifcopenshell  # noqa: F401
+    except ImportError:
+        sys.stderr.write(
+            "IFC export requires the 'ifc' extra: pip install 'rcd2000[ifc]'\n"
+        )
+        sys.exit(1)
+
+    data = read_json(args.input)
+    element = args.element
+    fcu = data.get("fcu", 25.0)
+    fy = data.get("fy", 460.0)
+
+    drawings = []
+
+    if element == "beam":
+        b = data.get("beams", [data])[0]
+        inp = BeamInput(
+            beam_id=b.get("beam_id", "B1"),
+            n_supports=b.get("n_supports", 2),
+            n_members=b.get("n_members", 1),
+            b=b.get("b", 225), bf=b.get("bf", 225),
+            h=b.get("h", 450), hf=b.get("hf", 0),
+            fcu=fcu, fy=fy, fyv=data.get("fyv", 460.0),
+            member_lengths=b.get("member_lengths", []),
+            member_udl=b.get("member_udl", []),
+            member_wt=b.get("member_wt", []),
+            member_wb=b.get("member_wb", []),
+            member_ab=b.get("member_ab", []),
+            member_npl=b.get("member_npl", []),
+            ty1=b.get("ty1", 0), ty2=b.get("ty2", 0),
+        )
+        result = BeamDesigner(fcu=fcu, fy=fy, fyv=data.get("fyv", 460.0))\
+            .design([inp])[0]
+        drawings.append(beam_to_drawing(inp, result))
+
+    elif element == "column":
+        c = data.get("columns", [data])[0]
+        inp = ColumnInput(
+            column_id=c.get("column_id", "C1"),
+            col_type=c.get("col_type", 1),
+            shape=c.get("shape", 1),
+            load=c.get("load", 0),
+            bx=c.get("bx", 300), by=c.get("by", 300),
+            dia=c.get("dia", 0), depth=c.get("depth", 0),
+            length=c.get("length", 3.0), le=c.get("le", 3.0),
+            lex=c.get("lex", 3.0), ley=c.get("ley", 3.0),
+            moment_x=c.get("moment_x", 0),
+            moment_y=c.get("moment_y", 0),
+            moment=c.get("moment", 0),
+        )
+        result = ColumnDesigner(fcu=fcu, fy=fy).design([inp])[0]
+        drawings.append(column_to_drawing(inp, result))
+
+    elif element == "slab":
+        s = data.get("panels", [data])[0]
+        inp = SlabPanelInput(
+            panel_id=s.get("panel_id", "S1"),
+            panel_type=s.get("panel_type", 2),
+            depth=s.get("depth", 175),
+            fcu=fcu, fy=fy,
+            udl=s.get("udl", 0),
+            span=s.get("span", 0),
+            ly=s.get("ly", 0),
+        )
+        result = SlabDesigner(fcu=fcu, fy=fy).design([inp])[0]
+        drawings.append(slab_to_drawing(inp, result))
+
+    elif element == "base":
+        b = data.get("bases", [data])[0]
+        inp = BaseInput(
+            base_id=b.get("base_id", "F1"),
+            base_type=b.get("base_type", 1),
+            col_type=b.get("col_type", 1),
+            load=b.get("load", 0),
+            pb=b.get("pb", 150.0),
+            fcu=fcu, fy=fy,
+            a1=b.get("a1", 300), a2=b.get("a2", 300),
+            dia=b.get("dia", 0),
+            h=b.get("h", 200),
+        )
+        result = BaseDesigner(fcu=fcu, fy=fy).design([inp])[0]
+        drawings.append(footing_to_drawing(inp, result))
+
+    else:
+        parser.error(f"unknown ifc element: {element}")
+
+    output = args.output or f"{element}.ifc"
+    ex = IfcExporter(project_name=data.get("job_ref", "RCD2000 Project"))
+    ex.export(drawings, output)
+    issues = ex.validate()
+    sys.stdout.write(
+        f"Saved {output} (validation issues: {len(issues)})\n"
+    )

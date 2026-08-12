@@ -48,6 +48,9 @@ dxf = [
 aps = [
     "requests>=2.28",
 ]
+ifc = [
+    "ifcopenshell>=0.8,<1",
+]
 
 [project.scripts]
 rcd2000 = "rcd2000.cli:app"
