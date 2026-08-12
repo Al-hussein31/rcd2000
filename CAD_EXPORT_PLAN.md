@@ -6,7 +6,7 @@
 > reinforcement plans, footing details, bar bending schedules) — **no manual
 > CAD arrangement required**.
 >
-> **Status:** **In implementation — Batches 0–10 DONE (DXF pipeline live).** Batches 11–12 optional (APS .dwg, IFC).
+> **Status:** **ALL BATCHES 0–12 DONE — full CAD pipeline live** (DXF, DWG via ODA/APS, IFC4 BIM).
 >
 > **Primary stack:** `ezdxf 1.4.x` (headless DXF generation) — no AutoCAD license
 > required. **Fallback:** Autodesk Platform Services (Design Automation API) for
@@ -484,7 +484,7 @@ GUI button exists on each page (widget presence test); CLI exit code 0.
 
 ---
 
-### Batch 11 — (Optional) Native .dwg via Autodesk Platform Services
+### Batch 11 — ✅ DONE Native .dwg (ODA local + APS cloud)
 
 **Deliverable:** `rcd2000/aps.py` + docs + auth flow
 **Goal:** When a client demands `.dwg`, convert `.dxf` → `.dwg` in the cloud.
@@ -497,7 +497,7 @@ GUI button exists on each page (widget presence test); CLI exit code 0.
 
 ---
 
-### Batch 12 — (Optional) BIM / IFC Export via IfcOpenShell
+### Batch 12 — ✅ DONE BIM / IFC Export via IfcOpenShell
 
 **Deliverable:** `rcd2000/ifc_export.py` + `tests/test_ifc_export.py`
 **Goal:** Structural model handover for Revit/Tekla/Allplan/BIM workflows.
@@ -564,8 +564,8 @@ Install with `pip install -e ".[dxf]"`.
 - [x] Multi-sheet project export (sheet + viewport + title block)
 - [ ] GUI "Export DXF" on every result card
 - [x] 100% DXF QA pass (audit clean, renders legible, layers standard)
-- [ ] (Optional) .dwg via APS
-- [ ] (Optional) .ifc via IfcOpenShell
+- [x] .dwg via ODA File Converter (local) + APS (cloud)
+- [x] .ifc via IfcOpenShell (0 validation issues)
 
 ---
 

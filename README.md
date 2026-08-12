@@ -21,6 +21,13 @@
 
 RCD2000 is a structural engineering tool that designs beams, columns, slabs, stairs, and foundations in accordance with British Standard BS 8110. It uses the Clapeyron three-moment equation for continuous analysis and strain compatibility for column interaction curves.
 
+Beyond calculations, RCD2000 exports ready-to-use **engineering deliverables**:
+- **DXF drawings** — element detail sheets (plan / elevation / section), reinforcement on proper layers, dimensions, bar bending schedule, title block + paper-space viewports. Opens directly in AutoCAD / AutoCAD LT.
+- **DWG** — convert any DXF to native AutoCAD DWG (AC1032, the format every AutoCAD 2018–2026 uses) via the free local ODA File Converter, or in the cloud via Autodesk Platform Services.
+- **IFC4 BIM** — structural members with reinforcement as `IfcReinforcingBar` nested in `IfcBeam`/`IfcColumn`/`IfcSlab`/`IfcFooting`, with standard psets/qtos for Revit / Tekla / Allplan / BlenderBIM interoperability.
+
+See [CAD export](#cad-export-dxf--dwg--ifc) for details.
+
 ---
 
 ## Downloads
@@ -148,6 +155,18 @@ pip install "rcd2000[dev]"       # pytest, coverage
 pip install "rcd2000[gui,dev]"   # GUI + everything (add tui)
 ```
 
+### CAD export extras
+
+```bash
+pip install "rcd2000[dxf]"       # DXF drawing export (ezdxf)
+pip install "rcd2000[ifc]"       # IFC4 BIM export (ifcopenshell)
+pip install "rcd2000[aps]"       # cloud DWG conversion via APS (requests)
+pip install "rcd2000[dxf,ifc]"   # full CAD suite
+```
+
+> **Note:** local DWG conversion also needs the free **ODA File Converter**
+> installed once on your machine (see [CAD export](#cad-export-dxf--dwg--ifc)).
+
 ---
 
 ## Quick start
@@ -177,6 +196,15 @@ rcd2000 beam input.json -o results.txt
 
 # Export as JSON
 rcd2000 beam input.json --json
+
+# Export a DXF drawing sheet (plan/elevation/section + BBS + title block)
+rcd2000 dxf beam input.json -o beam.dxf --scale 50
+
+# Also convert to native DWG (requires ODA File Converter)
+rcd2000 dxf beam input.json -o beam.dxf --to-dwg
+
+# Export an IFC4 BIM model with reinforcement
+rcd2000 ifc beam input.json -o beam.ifc
 
 # List available modules
 rcd2000 info
@@ -215,6 +243,82 @@ results = designer.design([beam_input])
 
 ---
 
+## CAD export (DXF / DWG / IFC)
+
+RCD2000 turns calculation results into **ready-to-open engineering drawings** — no manual CAD arrangement needed. The pipeline is layered: `engine → DrawingModel → DXF / DWG / IFC`.
+
+```
+calculation result ──► DrawingModel (mm, typed) ──► DXF detail sheet
+                                               ├─► DWG (ODA local | APS cloud)
+                                               └─► IFC4 BIM (with rebar)
+```
+
+### DXF drawing sheets
+
+Each element exports a full detail sheet with:
+
+- **Beam** — plan, longitudinal elevation, cross-section, bar bending schedule
+- **Column** — plan (section) + elevation with tie spacing
+- **Slab** — reinforcement plan (top/bottom mesh, short/long direction) + section
+- **Footing** — plan + section with mesh and column dowels
+- **Sheet setup** — A-series paper-space layout, border, title block (project / sheet no / rev / engineer / date), model viewport, and a structural layer standard (BS 8666-inspired: `REBAR_MAIN`, `REBAR_STIRRUP`, `REBAR_DIST`, `CONCRETE_OUTLINE`, `DIMENSIONS`, …)
+- Dimensions that read true mm (DIMLFAC-scaled), so AutoCAD shows real dimensions
+
+```bash
+rcd2000 dxf beam   input.json -o beam.dxf    --scale 50
+rcd2000 dxf column input.json -o column.dxf  --scale 50
+rcd2000 dxf slab   input.json -o slab.dxf    --scale 50
+rcd2000 dxf base   input.json -o footing.dxf --scale 50
+```
+
+Scale choices: `20`, `25`, `50`, `100` (default `50`).
+
+### DWG (native AutoCAD)
+
+DXF → DWG conversion, two backends:
+
+| Backend | How it works | Requirements | Cost |
+|---|---|---|---|
+| **local** (default) | ezdxf shells out to the free **ODA File Converter** | install ODAFC once from [opendesign.com](https://www.opendesign.com/guestfiles/oda_file_converter), or set `RCD2000_ODAFC_PATH` | free, offline |
+| **cloud** | Autodesk Platform Services Automation API runs AccoreConsole (`open DXF` → `SaveAs DWG`) | `APS_CLIENT_ID` / `APS_CLIENT_SECRET` env vars | 300 free AutoCAD min/mo, then ~$3 / 12 min |
+
+```bash
+rcd2000 dxf beam input.json -o beam.dxf --to-dwg
+```
+
+Output is **AC1032 / DWG 2018** — the native save format of every AutoCAD 2018–2026, so this is what clients mean by "native DWG".
+
+### IFC4 BIM
+
+Structural members with their reinforcement as an IFC4 model for Revit / Tekla / Allplan / BlenderBIM:
+
+- `IfcProject → IfcSite → IfcBuilding → IfcBuildingStorey`
+- `IfcBeam` / `IfcColumn` / `IfcSlab` / `IfcFooting` with concrete material (`C30/37`) and swept-profile geometry
+- Reinforcement as `IfcReinforcingBar` **nested** in each member (`IfcRelNests`), sharing cached `IfcReinforcingBarType`s with `IfcSweptDiskSolid` mapped geometry — roles mapped from layers (MAIN / TRANSVERSE / SHEAR)
+- Standard property sets (`Pset_ConcreteElementGeneral` with cover + grades, `Pset_RCDDesignResults` with M_Ed/V_Ed/N_Ed/Ast) and quantities (`Qto_BeamBaseQuantities`, `Qto_ReinforcingElementBaseQuantities`)
+- Validated with `ifcopenshell.validate(express_rules=True)` — zero issues on the standard elements
+
+```bash
+rcd2000 ifc beam   input.json -o beam.ifc
+rcd2000 ifc column input.json -o column.ifc
+rcd2000 ifc slab   input.json -o slab.ifc
+rcd2000 ifc base   input.json -o footing.ifc
+```
+
+### CAD architecture
+
+| Layer | Module | Purpose |
+|---|---|---|
+| Drawing models | `rcd2000/drawing_models.py` | Qt-free dataclasses (BeamDrawing, ColumnDrawing, RebarBar, RebarZone, Sheet, …) |
+| DXF writer | `rcd2000/dxf_export.py` | ezdxf canvas: layers, dimstyles, blocks, element drawings, paper-space sheets |
+| Adapters | `rcd2000/cad_adapters.py` | engine results → DrawingModel + `bars_for_area` detailing |
+| DWG | `rcd2000/dwg_export.py` · `rcd2000/aps.py` | local ODA converter · APS cloud |
+| IFC | `rcd2000/ifc_export.py` | IfcOpenShell IFC4 with nested rebar |
+
+The full implementation plan (12 batches, all complete) lives in [`CAD_EXPORT_PLAN.md`](CAD_EXPORT_PLAN.md).
+
+---
+
 ## Input format
 
 Each module accepts a JSON file with material properties and geometric parameters:
@@ -244,10 +348,11 @@ Full input schemas with all parameters are available in the module documentation
 
 Every design module is verified against the original FORTRAN 77 source output. The test suite confirms:
 
-- 64 automated tests all passing (35 design validation + 29 state/persistence)
+- **368 automated tests, all passing** — engine design validation, GUI state round-trips, point-load editors, and the full CAD export pipeline (DXF / DWG / IFC)
 - Numerical agreement within 1% of FORTRAN reference values
 - Edge cases discovered and corrected (including a latent array bug in the original FORTRAN)
 - Punching shear unit mismatch identified and fixed (N/m² vs N/mm²)
+- CAD output validated structurally: every generated DXF passes `ezdxf` audit (0 errors), no content on layer 0, all layers on the standard; IFC output passes `ifcopenshell.validate(express_rules=True)` with zero issues
 
 Run the tests:
 

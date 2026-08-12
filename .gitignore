@@ -7,3 +7,8 @@ dist/
 build/
 .env
 *.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.venv/

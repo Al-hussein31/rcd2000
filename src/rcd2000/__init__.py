@@ -9,6 +9,11 @@ __all__ = [
     "utils",
     "materials",
     "models",
+    "drawing_models",
+    "dxf_export",
+    "cad_adapters",
+    "dwg_export",
+    "ifc_export",
 ]
 
 from rcd2000 import utils, materials, models
