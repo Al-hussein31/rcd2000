@@ -821,3 +821,107 @@ class DxfExporter:
                           scale=s, layer="REBAR_MAIN")
 
         self.dim_linear(layout, (ox, oy), (ox, oy + t), 150, scale=s)
+
+
+# ── Paper-space sheets + title block (Batch 7) ──────────────────────
+
+    def new_sheet(
+        self,
+        sheet: "Sheet",
+        border_mm: float = 10.0,
+    ) -> Paperspace:
+        """Create a paper-space layout with border + title block.
+
+        Returns the paperspace layout; caller draws viewport / content.
+        """
+        from .drawing_models import Sheet as _S  # noqa: F401
+
+        name = f"SHEET_{sheet.sheet_no.replace('-', '')}"
+        layout = self.doc.layouts.new(name)
+        pw, ph = sheet.paper
+        layout.page_setup(size=(pw, ph), units="mm", scale=1)
+
+        # Outer border (sheet frame)
+        b = border_mm
+        layout.add_lwpolyline(
+            [(b, b), (pw - b, b), (pw - b, ph - b), (b, ph - b)],
+            close=True,
+            dxfattribs={"layer": "CONCRETE_OUTLINE", "lineweight": 25},
+        )
+
+        # Inner frame
+        layout.add_lwpolyline(
+            [(b + 5, b + 5), (pw - b - 5, b + 5),
+             (pw - b - 5, ph - b - 5), (b + 5, ph - b - 5)],
+            close=True,
+            dxfattribs={"layer": "TEXT"},
+        )
+
+        self._draw_title_block(layout, sheet, pw, ph)
+        return layout
+
+    def _draw_title_block(self, layout, sheet, pw, ph) -> None:
+        """Draw a title block in the bottom-right corner of the sheet."""
+        from .drawing_models import Sheet as _S  # noqa: F401
+
+        b = 15.0
+        tw = 180.0
+        th = 45.0
+        x0, y0 = pw - tw - b, b
+
+        # Title block frame
+        layout.add_lwpolyline(
+            [(x0, y0), (x0, y0 + th), (pw - b, y0 + th),
+             (pw - b, y0), (x0, y0)],
+            close=True,
+            dxfattribs={"layer": "TEXT"},
+        )
+
+        # Title text
+        layout.add_text(
+            sheet.title,
+            dxfattribs={
+                "layer": "TEXT",
+                "style": "OPEN_SANS_BOLD",
+                "height": 5.0,
+            },
+        ).set_placement((x0 + 10, y0 + th - 15))
+
+        layout.add_text(
+            f"PROJECT: {sheet.project}",
+            dxfattribs={"layer": "TEXT", "style": "OPEN_SANS", "height": 3.0},
+        ).set_placement((x0 + 10, y0 + th - 25))
+
+        layout.add_text(
+            f"SHEET {sheet.sheet_no}  REV {sheet.rev}",
+            dxfattribs={"layer": "TEXT", "style": "OPEN_SANS", "height": 3.0},
+        ).set_placement((x0 + 10, y0 + th - 33))
+
+        layout.add_text(
+            f"ENG: {sheet.engineer}  {sheet.date}",
+            dxfattribs={"layer": "TEXT", "style": "OPEN_SANS", "height": 3.0},
+        ).set_placement((x0 + 10, y0 + 8))
+
+        layout.add_text(
+            sheet.scale_note,
+            dxfattribs={"layer": "TEXT", "style": "OPEN_SANS", "height": 3.0},
+        ).set_placement((x0 + 10, y0 + 14))
+
+    def add_viewport(
+        self,
+        paperspace: Paperspace,
+        center: Point,
+        size: Tuple[float, float],
+        view_center: Point,
+        view_height: float,
+    ) -> None:
+        """Add a model-space viewport to the paperspace layout."""
+        cx, cy = float(center[0]), float(center[1])
+        w, h = size
+        vp = paperspace.add_viewport(
+            center=(cx, cy),
+            size=(w, h),
+            view_center_point=(float(view_center[0]), float(view_center[1])),
+            view_height=view_height,
+        )
+        vp.dxf.layer = "VIEWPORT"
