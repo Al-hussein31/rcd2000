@@ -557,3 +557,267 @@ class DxfExporter:
             yy = oy - i * row_h
             self.line(layout, (ox, yy), (ox + total_w, yy), scale=scale,
                       layer="TEXT")
+
+
+# ── Column drawing (Batch 4) ────────────────────────────────────────
+
+    def draw_column_plan(
+        self,
+        layout: Layout,
+        col: "ColumnDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Column cross-section: outline, main-bar circles, tie outline."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = col.scale
+        b = float(col.b_mm)
+        D = float(col.D_mm)
+
+        self.rect(layout, ox, oy, ox + b, oy + D, scale=s)
+
+        # Centerlines
+        self.line(layout, (ox, oy + D / 2), (ox + b, oy + D / 2),
+                  scale=s, layer="CENTERLINE")
+        self.line(layout, (ox + b / 2, oy), (ox + b / 2, oy + D),
+                  scale=s, layer="CENTERLINE")
+
+        # Tie outline (closed loop inside cover)
+        c = 40.0
+        self.polyline(
+            layout,
+            [(ox + c, oy + c), (ox + b - c, oy + c),
+             (ox + b - c, oy + D - c), (ox + c, oy + D - c)],
+            scale=s, layer="REBAR_STIRRUP", close=True,
+        )
+
+        # Main bars as circles arranged per count
+        for bar in col.main_bars:
+            self._draw_col_bars(
+                layout, ox, oy, b, D, bar.count,
+                self._col_layer(bar), s,
+            )
+
+        self.dim_linear(layout, (ox, oy), (ox + b, oy), -150, scale=s)
+        self.dim_linear(layout, (ox, oy), (ox, oy + D), 150, scale=s)
+
+    def _draw_col_bars(self, layout, ox, oy, b, D, count, layer, s):
+        c = 40.0
+        r = 6.0
+        # arrange bars: corners first, then mid-face bars
+        positions = []
+        if count >= 4:
+            positions = [
+                (ox + c + r, oy + c + r),
+                (ox + b - c - r, oy + c + r),
+                (ox + b - c - r, oy + D - c - r),
+                (ox + c + r, oy + D - c - r),
+            ]
+        if count >= 6:
+            positions.extend([
+                (ox + b / 2, oy + c + r),
+                (ox + b / 2, oy + D - c - r),
+            ])
+        if count >= 8:
+            positions.extend([
+                (ox + c + r, oy + D / 2),
+                (ox + b - c - r, oy + D / 2),
+            ])
+        # fallback: spread evenly along a ring if unusual counts
+        if len(positions) < count:
+            import math
+            positions = [
+                (ox + b / 2 + (b / 2 - c - r) * math.cos(2 * math.pi * i / count),
+                 oy + D / 2 + (D / 2 - c - r) * math.sin(2 * math.pi * i / count))
+                for i in range(count)
+            ]
+        for x, y in positions[:count]:
+            self.circle(layout, (x, y), r, scale=s, layer=layer)
+
+    def draw_column_elevation(
+        self,
+        layout: Layout,
+        col: "ColumnDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Column elevation: vertical main bars, tie spacing, lapping."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = col.scale
+        b = float(col.b_mm)
+        H = col.height_mm
+
+        self.rect(layout, ox, oy, ox + b, oy + H, scale=s)
+
+        # Main bars: vertical lines full height
+        main_count = sum(bar.count for bar in col.main_bars) or 4
+        xs = [ox + b / 2]
+        if main_count >= 4:
+            xs = [ox + 25.0, ox + b - 25.0]
+        for x in xs:
+            for layer_ in ("REBAR_MAIN",):
+                self.line(layout, (x, oy + 15), (x, oy + H - 15),
+                          scale=s, layer="REBAR_MAIN")
+
+        # Ties at spacing
+        total_ties = sum(bar.count for bar in col.ties) or 1
+        for i in range(1, total_ties + 1):
+            y = oy + i * H / (total_ties + 1)
+            self.line(layout, (ox + 5, y), (ox + b - 5, y),
+                      scale=s, layer="REBAR_STIRRUP")
+
+        self.dim_linear(layout, (ox, oy), (ox, oy + H), -150, scale=s)
+
+    def _col_layer(self, bar) -> str:
+        return getattr(bar, "layer", "REBAR_MAIN") or "REBAR_MAIN"
+
+
+# ── Slab drawing (Batch 5) ──────────────────────────────────────────
+
+    def draw_slab_plan(
+        self,
+        layout: Layout,
+        slab: "SlabDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Slab reinforcement plan: panel outline + mesh bars per direction."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = slab.scale
+        lx = slab.lx_mm
+        ly = slab.ly_mm
+
+        self.rect(layout, ox, oy, ox + lx, oy + ly, scale=s)
+        self.hatch_rect(layout, ox, oy, ox + lx, oy + ly, scale=s)
+
+        # Short direction (horizontal bars), top + bottom
+        for zone, layer in ((slab.bot_short, "REBAR_MAIN"),
+                            (slab.top_short, "REBAR_DIST")):
+            for z in zone:
+                self._draw_mesh_h(layout, z, ox, oy, ly, layer, s)
+        # Long direction (vertical bars)
+        for zone, layer in ((slab.bot_long, "REBAR_MAIN"),
+                            (slab.top_long, "REBAR_DIST")):
+            for z in zone:
+                self._draw_mesh_v(layout, z, ox, oy, lx, layer, s)
+
+        self.dim_linear(layout, (ox, oy), (ox + lx, oy), -150, scale=s)
+        self.dim_linear(layout, (ox, oy), (ox, oy + ly), -150, scale=s)
+
+    def _draw_mesh_h(self, layout, zone, ox, oy, ly, layer, s):
+        # horizontal bars: vertical extent across the panel
+        y0 = oy + zone.start_mm
+        y1 = oy + zone.end_mm
+        for bar in zone.bars:
+            n = max(bar.count, 1)
+            for i in range(n):
+                x = ox + 15 + i * (zone.length_mm or 1) / n * 0 + 15
+                # distribute across panel width for scheme clarity
+                self.line(layout, (x, y0), (x, y1), scale=s, layer=layer)
+
+    def _draw_mesh_v(self, layout, zone, ox, oy, lx, layer, s):
+        x0 = ox + zone.start_mm
+        x1 = ox + zone.end_mm
+        for bar in zone.bars:
+            n = max(bar.count, 1)
+            for i in range(n):
+                y = oy + 15 + i * 20
+                self.line(layout, (x0, y), (x1, y), scale=s, layer=layer)
+
+    def draw_slab_section(
+        self,
+        layout: Layout,
+        slab: "SlabDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Slab cross-section: thickness, top/bottom mesh, cover."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = slab.scale
+        lx = slab.lx_mm
+        t = float(slab.t_mm)
+
+        self.rect(layout, ox, oy, ox + lx, oy + t, scale=s)
+
+        # bottom mesh line
+        for zone in slab.bot_short + slab.bot_long:
+            self.line(layout, (ox + 20, oy + 30), (ox + lx - 20, oy + 30),
+                      scale=s, layer="REBAR_MAIN")
+        # top mesh line
+        for zone in slab.top_short + slab.top_long:
+            self.line(layout, (ox + 20, oy + t - 30),
+                      (ox + lx - 20, oy + t - 30),
+                      scale=s, layer="REBAR_DIST")
+
+        self.dim_linear(layout, (ox, oy), (ox, oy + t), 150, scale=s)
+
+
+# ── Footing drawing (Batch 6) ───────────────────────────────────────
+
+    def draw_footing_plan(
+        self,
+        layout: Layout,
+        ftg: "FootingDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Footing plan: outline, column (dashed), x/y mesh."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = ftg.scale
+        L = ftg.len_mm
+        W = ftg.wid_mm
+
+        self.rect(layout, ox, oy, ox + L, oy + W, scale=s)
+
+        # Column outline (dashed) centered
+        cb, cd = ftg.col_b_mm or 300, ftg.col_D_mm or 450
+        cx, cy = ox + L / 2, oy + W / 2
+        self.rect(layout, cx - cb / 2, cy - cd / 2, cx + cb / 2, cy + cd / 2,
+                  scale=s, layer="SECTION_CUT")
+
+        # x bars (horizontal): spread across length
+        for bar in ftg.x_bars:
+            n = max(bar.count, 1)
+            for i in range(n):
+                y = oy + 30 + i * (W - 60) / max(n, 2)
+                self.line(layout, (ox + 20, y), (ox + L - 20, y),
+                          scale=s, layer="REBAR_MAIN")
+        # y bars (vertical)
+        for bar in ftg.y_bars:
+            n = max(bar.count, 1)
+            for i in range(n):
+                x = ox + 30 + i * (L - 60) / max(n, 2)
+                self.line(layout, (x, oy + 20), (x, oy + W - 20),
+                          scale=s, layer="REBAR_DIST")
+
+        self.dim_linear(layout, (ox, oy), (ox + L, oy), -150, scale=s)
+        self.dim_linear(layout, (ox, oy), (ox, oy + W), -150, scale=s)
+
+    def draw_footing_section(
+        self,
+        layout: Layout,
+        ftg: "FootingDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Footing section: thickness, top/bottom mesh, dowels."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = ftg.scale
+        L = ftg.len_mm
+        t = float(ftg.t_mm)
+
+        self.rect(layout, ox, oy, ox + L, oy + t, scale=s)
+
+        # bottom mesh
+        for bar in ftg.x_bars + ftg.y_bars:
+            self.line(layout, (ox + 25, oy + 50), (ox + L - 25, oy + 50),
+                      scale=s, layer="REBAR_MAIN")
+        # top mesh
+        for bar in ftg.x_bars + ftg.y_bars:
+            self.line(layout, (ox + 25, oy + t - 50),
+                      (ox + L - 25, oy + t - 50),
+                      scale=s, layer="REBAR_DIST")
+
+        # column dowels: short vertical lines rising from footing
+        if ftg.col_b_mm:
+            cb = ftg.col_b_mm
+            cx = ox + L / 2
+            for dx in (-cb / 4, 0, cb / 4):
+                self.line(layout, (cx + dx, oy + t), (cx + dx, oy + t + 100),
+                          scale=s, layer="REBAR_MAIN")
+
+        self.dim_linear(layout, (ox, oy), (ox, oy + t), 150, scale=s)
