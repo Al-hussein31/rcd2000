@@ -6,7 +6,7 @@
 > reinforcement plans, footing details, bar bending schedules) — **no manual
 > CAD arrangement required**.
 >
-> **Status:** Planning (Batch 0 complete: research + architecture decision)
+> **Status:** **In implementation — Batches 0–10 DONE (DXF pipeline live).** Batches 11–12 optional (APS .dwg, IFC).
 >
 > **Primary stack:** `ezdxf 1.4.x` (headless DXF generation) — no AutoCAD license
 > required. **Fallback:** Autodesk Platform Services (Design Automation API) for
@@ -140,7 +140,7 @@ previous. Every batch ends with: tests green + DXF file artifact + commit.
 
 ---
 
-### Batch 1 — DrawingModel Dataclasses
+### Batch 1 — ✅ DONE DrawingModel Dataclasses
 
 **Deliverable:** `src/rcd2000/drawing_models.py` + `tests/test_drawing_models.py`
 **Goal:** Type-safe, unit-clear representation of everything we draw. No Qt, no ezdxf yet.
@@ -241,7 +241,7 @@ class Sheet:
 
 ---
 
-### Batch 2 — DxfExporter Core (layers, styles, blocks, primitives)
+### Batch 2 — ✅ DONE DxfExporter Core (layers, styles, blocks, primitives)
 
 **Deliverable:** `src/rcd2000/dxf_export.py` core + `tests/test_dxf_export_core.py`
 **Goal:** A reusable, tested DXF canvas with the structural layer standard,
@@ -306,7 +306,7 @@ drawing add-on (`ezdxf draw batch2.dxf` renders PNG) with no errors.
 
 ---
 
-### Batch 3 — Beam Drawing (plan + elevation + section) ⭐ first real drawing
+### Batch 3 — ✅ DONE Beam Drawing (plan + elevation + section) ⭐ first real drawing
 
 **Deliverable:** `dxf_export.py` beam methods + `tests/test_dxf_beam.py` + sample `beam.dxf`
 **Goal:** A complete single-span beam drawing sheet.
@@ -340,7 +340,7 @@ bars inside outline, marks legible).
 
 ---
 
-### Batch 4 — Column Drawing (plan + elevation)
+### Batch 4 — ✅ DONE Column Drawing (plan + elevation)
 
 **Deliverable:** `dxf_export.py` column methods + `tests/test_dxf_column.py` + `column.dxf`
 
@@ -360,7 +360,7 @@ bars inside outline, marks legible).
 
 ---
 
-### Batch 5 — Slab Reinforcement Plan
+### Batch 5 — ✅ DONE Slab Reinforcement Plan
 
 **Deliverable:** `dxf_export.py` slab methods + `tests/test_dxf_slab.py` + `slab.dxf`
 
@@ -376,7 +376,7 @@ bars inside outline, marks legible).
 
 ---
 
-### Batch 6 — Footing Drawing (plan + section)
+### Batch 6 — ✅ DONE Footing Drawing (plan + section)
 
 **Deliverable:** `dxf_export.py` footing methods + `tests/test_dxf_footing.py` + `footing.dxf`
 
@@ -391,7 +391,7 @@ bars inside outline, marks legible).
 
 ---
 
-### Batch 7 — Paper Space Sheets + Title Block + Sheet Set
+### Batch 7 — ✅ DONE Paper Space Sheets + Title Block + Sheet Set
 
 **Deliverable:** `sheet.py` / methods in `dxf_export.py` + `tests/test_dxf_sheets.py`
 **Goal:** Production-quality multi-sheet output: A1/A2/A3, title block with
@@ -413,7 +413,7 @@ viewport exists per layout; audit clean.
 
 ---
 
-### Batch 8 — RCD2000 Adapters (calculation → drawing)
+### Batch 8 — ✅ DONE RCD2000 Adapters (calculation → drawing)
 
 **Deliverable:** `src/rcd2000/cad_adapters.py` + `tests/test_cad_adapters.py`
 **Goal:** Bridge every existing engine result into a DrawingModel.
@@ -443,7 +443,7 @@ detailing zones cover the full span; spacing code-compliant vs known inputs.
 
 ---
 
-### Batch 9 — CLI + GUI Integration
+### Batch 9 — ✅ DONE CLI + GUI Integration
 
 **Deliverable:** `python -m rcd2000 dxf` CLI + GUI "Export to CAD" buttons + tests
 
@@ -467,7 +467,7 @@ GUI button exists on each page (widget presence test); CLI exit code 0.
 
 ---
 
-### Batch 10 — Polish, Standards & Validation
+### Batch 10 — ✅ DONE Polish, Standards & Validation
 
 **Deliverable:** drawing standards doc + DXF QA harness + render snapshots
 **Goal:** Output is consistent, code-compliant, and visually verified every build.
@@ -558,12 +558,12 @@ Install with `pip install -e ".[dxf]"`.
 
 ## Deliverable Checklist (End State)
 
-- [ ] `python -m rcd2000 dxf beam beam.json -o beam.dxf` → A1 sheet with plan,
+- [x] `python -m rcd2000 dxf beam beam.json -o beam.dxf` → A1 sheet with plan,
       elevation, section, BBS, title block
-- [ ] Same for column, slab, footing, stair
-- [ ] Multi-sheet project export
+- [x] Same for column, slab, footing (stair pending)
+- [x] Multi-sheet project export (sheet + viewport + title block)
 - [ ] GUI "Export DXF" on every result card
-- [ ] 100% DXF QA pass (audit clean, renders legible, layers standard)
+- [x] 100% DXF QA pass (audit clean, renders legible, layers standard)
 - [ ] (Optional) .dwg via APS
 - [ ] (Optional) .ifc via IfcOpenShell
 
