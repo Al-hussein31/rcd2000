@@ -307,6 +307,9 @@ def main():
             p.add_argument("-o", "--output", help="Output DXF file (.dxf)")
             p.add_argument("--scale", type=int, default=50,
                            help="Drawing scale (20/25/50/100, default 50)")
+            p.add_argument("--to-dwg", action="store_true",
+                           help="Also convert the DXF to native DWG "
+                                "(requires ODA File Converter)")
         elif cmd_name != "info":
             p.add_argument("input", help="JSON input file")
             p.add_argument("-o", "--output", help="Output text file")
@@ -446,3 +449,14 @@ def cmd_dxf(args):
     ex.save(output)
     errors = ex.audit()
     sys.stdout.write(f"Saved {output} (audit errors: {errors})\n")
+
+    if getattr(args, "to_dwg", False):
+        from rcd2000.dwg_export import dxf_to_dwg, install_hint
+        dwg_out = output.rsplit(".", 1)[0] + ".dwg" if output.endswith(".dxf") else output + ".dwg"
+        try:
+            dxf_to_dwg(output, dwg_out)
+            sys.stdout.write(f"Saved {dwg_out} (native DWG)\n")
+        except Exception as exc:  # noqa: BLE001 - report friendly error
+            sys.stderr.write(f"DWG export failed: {exc}\n")
+            sys.stderr.write(install_hint() + "\n")
+            sys.exit(1)
