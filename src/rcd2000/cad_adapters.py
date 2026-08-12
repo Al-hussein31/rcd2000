@@ -21,6 +21,7 @@ from .drawing_models import (
     ColumnDrawing,
     SlabDrawing,
     FootingDrawing,
+    StairDrawing,
     BbsRow,
     bbs_row_from_bar,
 )
@@ -264,6 +265,176 @@ def footing_to_drawing(
         col_D_mm=col_D,
         scale=scale,
     )
+
+
+# ── Stair ─────────────────────────────────────────────────────────────
+
+def stair_to_drawing(
+    inp: StairInput,
+    result: StairResult,
+    scale: DrawingScale = DrawingScale.S1_50,
+) -> StairDrawing:
+    """Map a straight-flight stair to a StairDrawing.
+
+    The flight is drawn as a single sloping run: horizontal projection
+    ``span_mm``, treads/risers from the input, waist from the result.
+    """
+    span_mm = inp.span * 1000.0
+    n_treads = max(1, int(round(span_mm / (inp.tread or 280))))
+    # waist_thickness is reported in millimetres by the engine
+    waist = int(result.waist_thickness or (inp.span / 20.0) * 1000.0)
+    # flight length along the slope (approx from rise/tread geometry)
+    rise = inp.rise or 160.0
+    tread = inp.tread or 280.0
+    slope = math.sqrt(rise * rise + tread * tread)
+    flight_len = span_mm * slope / tread if tread else span_mm
+
+    main = bars_for_area(result.steel_required, flight_len,
+                         result.bar_dia, result.bar_spacing,
+                         layer="REBAR_MAIN")
+    dist = bars_for_area(
+        max(result.steel_required * 0.12, 0.1), flight_len,
+        8.0, 250.0, layer="REBAR_DIST",
+    )
+
+    return StairDrawing(
+        stair_id=inp.stair_id,
+        span_mm=span_mm,
+        tread_mm=inp.tread or 280.0,
+        rise_mm=rise,
+        waist_mm=waist,
+        width_mm=1000.0,  # design per metre width (book convention)
+        main_bars=main,
+        distribution_bars=dist,
+        design_moment_knm=result.design_moment,
+        steel_required_mm2=result.steel_required,
+        scale=scale,
+    )
+
+
+# ── Dispatcher + batch export ────────────────────────────────────────
+
+def drawing_for(inp, result, type_key: str, scale=DrawingScale.S1_50):
+    """Dispatch an engine (input, result) pair to a DrawingModel.
+
+    ``type_key`` is the GUI/persisted module key (beam/column/slab/base/
+    stair). Raises TypeError for unsupported types.
+    """
+    if type_key == "beam":
+        return beam_to_drawing(inp, result, scale)
+    if type_key == "column":
+        return column_to_drawing(inp, result, scale)
+    if type_key == "slab":
+        return slab_to_drawing(inp, result, scale)
+    if type_key == "base":
+        return footing_to_drawing(inp, result, scale)
+    if type_key == "stair":
+        return stair_to_drawing(inp, result, scale)
+    raise TypeError(f"no CAD adapter for module type: {type_key}")
+
+
+def export_drawings_dxf(
+    drawings,
+    out_dir: str,
+    scale: DrawingScale = DrawingScale.S1_50,
+    combined: bool = True,
+) -> list:
+    """Write one DXF detail sheet per drawing into ``out_dir``.
+
+    Returns the list of written paths. Each drawing is drawn via its
+    module's sheet layout (plan + elevation/section + BBS where the
+    module supports it). ``combined=True`` also writes a single
+    multi-element sheet ``_all.dxf``.
+    """
+    import os
+
+    from .dxf_export import DxfExporter
+    from .drawing_models import Sheet
+
+    os.makedirs(out_dir, exist_ok=True)
+    written: list = []
+
+    # per-drawing sheets
+    for d in drawings:
+        ex = DxfExporter()
+        msp = ex.modelspace
+        title, sheet_no = _draw_element_views(ex, msp, d, scale)
+        name = _safe_file_stem(d)
+        path = os.path.join(out_dir, f"{name}.dxf")
+        sheet = Sheet(sheet_no="S-01", title=title, scale_note=f"SCALE 1:{scale.value}")
+        layout = ex.new_sheet(sheet)
+        ex.add_viewport(layout, center=(380, 320), size=(700, 400),
+                        view_center=(120, 30), view_height=160)
+        ex.save(path)
+        written.append(path)
+
+    # optional combined multi-element sheet
+    if combined and drawings:
+        ex = DxfExporter()
+        msp = ex.modelspace
+        y = 0
+        for d in drawings:
+            _draw_element_views(ex, msp, d, scale)
+            y += 3000
+        path = os.path.join(out_dir, "_all.dxf")
+        sheet = Sheet(sheet_no="S-00", title="ALL ELEMENTS - DETAIL SHEET",
+                      scale_note=f"SCALE 1:{scale.value}")
+        layout = ex.new_sheet(sheet)
+        ex.add_viewport(layout, center=(380, 320), size=(700, 400),
+                        view_center=(120, 30), view_height=160)
+        ex.save(path)
+        written.append(path)
+
+    return written
+
+
+def _safe_file_stem(drawing) -> str:
+    """A filesystem-safe file stem from the drawing's element id."""
+    import re
+
+    ident = getattr(drawing, "beam_id", None) or getattr(drawing, "col_id", None) \
+        or getattr(drawing, "slab_id", None) or getattr(drawing, "footing_id", None) \
+        or getattr(drawing, "stair_id", None) or "element"
+    stem = re.sub(r"[^A-Za-z0-9_-]+", "-", str(ident)).strip("-") or "element"
+    return stem
+
+
+def _draw_element_views(ex, msp, drawing, scale):
+    """Draw a drawing's views; returns (title, sheet_no)."""
+    from .drawing_models import (BeamDrawing, ColumnDrawing, SlabDrawing,
+                                 FootingDrawing, StairDrawing)
+
+    if isinstance(drawing, BeamDrawing):
+        ex.draw_beam_plan(msp, drawing)
+        ex.draw_beam_elevation(msp, drawing, (0, 900))
+        ex.draw_beam_section(msp, drawing, (7000, 0))
+        rows = _bbs_rows_for_zones(
+            drawing.bottom_zones + drawing.top_zones, "B") \
+            + _bbs_rows_for_zones(drawing.stirrup_zones, "S")
+        ex.draw_bbs(msp, rows, origin=(7500, 700))
+        return f"BEAM {drawing.beam_id} - PLAN & DETAILS", "S-01"
+
+    if isinstance(drawing, ColumnDrawing):
+        ex.draw_column_plan(msp, drawing)
+        ex.draw_column_elevation(msp, drawing, (1500, 0))
+        return f"COLUMN {drawing.col_id} - PLAN & ELEVATION", "S-02"
+
+    if isinstance(drawing, SlabDrawing):
+        ex.draw_slab_plan(msp, drawing)
+        ex.draw_slab_section(msp, drawing, (0, 3000))
+        return f"SLAB {drawing.slab_id} - REINFORCEMENT PLAN", "S-03"
+
+    if isinstance(drawing, FootingDrawing):
+        ex.draw_footing_plan(msp, drawing)
+        ex.draw_footing_section(msp, drawing, (0, 3000))
+        return f"FOOTING {drawing.footing_id} - PLAN & SECTION", "S-04"
+
+    if isinstance(drawing, StairDrawing):
+        ex.draw_stair_plan(msp, drawing)
+        ex.draw_stair_section(msp, drawing, (0, 2500))
+        return f"STAIR {drawing.stair_id} - PLAN & SECTION", "S-05"
+
+    raise TypeError(f"unsupported drawing for sheet: {type(drawing)}")
 
 
 # ── Convenience: full export of one element from JSON-like inputs ────

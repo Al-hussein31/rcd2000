@@ -8,12 +8,15 @@ from rcd2000.beam import BeamDesigner, BeamInput
 from rcd2000.column import ColumnDesigner, ColumnInput
 from rcd2000.slab import SlabDesigner, SlabPanelInput
 from rcd2000.base import BaseDesigner, BaseInput
+from rcd2000.stair import StairDesigner, StairInput
 from rcd2000.cad_adapters import (
     bars_for_area,
     beam_to_drawing,
     column_to_drawing,
     slab_to_drawing,
     footing_to_drawing,
+    stair_to_drawing,
+    drawing_for,
 )
 from rcd2000.drawing_models import DrawingScale
 
@@ -124,6 +127,31 @@ class TestSlabAdapter:
         draw = slab_to_drawing(inp, result)
         assert draw.panel_type == "cantilever"
         assert draw.lx_mm == 1500
+
+
+class TestStairAdapter:
+    def test_maps_geometry(self):
+        inp = StairInput(
+            stair_id="ST1", span=3.2, tread=280, rise=160,
+            imposed_load=3.0, spl=1.5, wld=24,
+        )
+        result = StairDesigner().design([inp])[0]
+        draw = stair_to_drawing(inp, result)
+        assert draw.stair_id == "ST1"
+        assert draw.span_mm == 3200
+        assert draw.waist_mm == 160
+        assert draw.tread_mm == 280
+
+    def test_dispatcher(self):
+        inp = StairInput(stair_id="ST1", span=3.2, tread=280, rise=160,
+                         imposed_load=3.0, spl=1.5, wld=24)
+        result = StairDesigner().design([inp])[0]
+        draw = drawing_for(inp, result, "stair")
+        assert draw.stair_id == "ST1"
+
+    def test_dispatcher_unknown(self):
+        with pytest.raises(TypeError):
+            drawing_for(None, None, "cont_beam")
 
 
 class TestFootingAdapter:

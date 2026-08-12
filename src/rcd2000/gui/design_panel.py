@@ -31,6 +31,7 @@ class DesignPanel(QFrame):
     remove_requested = Signal(object)     # DesignPanel
     label_changed = Signal(object)        # DesignPanel
     state_changed = Signal(object)        # DesignPanel (for autosave)
+    export_requested = Signal(object)     # DesignPanel
 
     def __init__(self, type_key: str, label_text: str, page, uid: str,
                  parent=None):
@@ -97,6 +98,14 @@ class DesignPanel(QFrame):
         focus_btn.clicked.connect(lambda: self.focus_requested.emit(self))
         focus_btn.setStyleSheet(self._bar_btn_style())
         bar_layout.addWidget(focus_btn)
+
+        export_btn = QToolButton()
+        export_btn.setText("\u2b06")
+        export_btn.setToolTip("Export this design (report / PDF / DXF / DWG / IFC)")
+        export_btn.setCursor(Qt.PointingHandCursor)
+        export_btn.clicked.connect(lambda: self.export_requested.emit(self))
+        export_btn.setStyleSheet(self._bar_btn_style())
+        bar_layout.addWidget(export_btn)
 
         remove_btn = QToolButton()
         remove_btn.setText("\u00d7")

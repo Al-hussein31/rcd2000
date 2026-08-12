@@ -142,6 +142,23 @@ class FootingDrawing:
 
 
 @dataclass
+class StairDrawing:
+    """Complete drawing data for one straight-flight stair (plan + section)."""
+
+    stair_id: str = "ST1"
+    span_mm: float = 0.0
+    tread_mm: float = 0.0
+    rise_mm: float = 0.0
+    waist_mm: int = 0
+    width_mm: float = 0.0
+    main_bars: List[RebarBar] = field(default_factory=list)
+    distribution_bars: List[RebarBar] = field(default_factory=list)
+    design_moment_knm: float = 0.0
+    steel_required_mm2: float = 0.0
+    scale: DrawingScale = DrawingScale.S1_50
+
+
+@dataclass
 class BbsRow:
     """One row of a Bar Bending Schedule."""
 

@@ -277,10 +277,10 @@ class Workbench(QWidget):
         h.addWidget(edit_btn)
 
         export_btn = QToolButton()
-        export_btn.setText("Export All")
-        export_btn.setToolTip("Write all reports to the job output file")
+        export_btn.setText("Export")
+        export_btn.setToolTip("Export designs (report / PDF / DXF / DWG / IFC)")
         export_btn.setCursor(Qt.PointingHandCursor)
-        export_btn.clicked.connect(self._export_all)
+        export_btn.clicked.connect(self._open_export_dialog)
         export_btn.setStyleSheet(self._tool_btn_style())
         h.addWidget(export_btn)
 
@@ -417,6 +417,7 @@ class Workbench(QWidget):
         panel.remove_requested.connect(self._on_remove_requested)
         panel.label_changed.connect(self._on_label_changed)
         panel.state_changed.connect(self._on_state_changed)
+        panel.export_requested.connect(self._on_export_requested)
         if hasattr(page, "set_status_callback"):
             page.set_status_callback(self._emit_status)
         # Rebuild the last design's results from the saved payload so the
@@ -734,6 +735,310 @@ class Workbench(QWidget):
             self._emit_status(msg, False)
         except Exception as exc:
             self._emit_status(f"Export failed: {exc}", True)
+
+    # ── Export dialog (report / PDF / DXF / DWG / IFC) ──────────────
+
+    def _on_export_requested(self, panel):
+        """Per-panel export button -> dialog pre-scoped to this design."""
+        self._open_export_dialog(scope_this=panel)
+
+    def _open_export_dialog(self, scope_this: "DesignPanel | None" = None):
+        """Open the export dialog for the job.
+
+        ``scope_this`` set when launched from a panel: the dialog is
+        pre-selected to export only that design.
+        """
+        from rcd2000.gui.export_dialog import ExportDialog
+
+        items = []
+        for item in self.job.items:
+            panel = self._panels.get(item.uid)
+            designed = bool(panel and panel.is_designed())
+            stale = bool(panel and panel.is_stale())
+            items.append((item.uid, panel.label if panel else item.label,
+                          item.type_key, designed, stale))
+
+        dlg = ExportDialog(
+            items, self.job.header, parent=self,
+            default_scope="this" if scope_this else "all",
+        )
+        if dlg.exec_() != ExportDialog.Accepted:
+            return
+        self._run_export(dlg, scope_this)
+
+    def _run_export(self, dlg, scope_this):
+        """Execute the export described by *dlg*."""
+        fmt = dlg.format_ext
+        out_dir = dlg.destination_dir
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+        except OSError as exc:
+            self._emit_status(f"Could not create folder {out_dir}: {exc}", True)
+            return
+
+        # Collect target panels
+        panels = []
+        for item in self.job.items:
+            panel = self._panels.get(item.uid)
+            if panel is None:
+                continue
+            if scope_this is not None and panel is not scope_this:
+                continue
+            panels.append((item, panel))
+
+        if not panels:
+            self._emit_status("Nothing to export.", True)
+            return
+
+        if fmt == "txt":
+            self._export_all_txt(panels, out_dir, scope_this)
+        elif fmt == "pdf":
+            self._export_pdf(panels, out_dir, scope_this)
+        elif fmt == "dxf" or fmt == "dwg":
+            self._export_cad(panels, fmt, out_dir, dlg.include_combined)
+        elif fmt == "ifc":
+            self._export_ifc(panels, out_dir)
+
+    def _export_all_txt(self, panels, out_dir, scope_this):
+        """Write text reports (one combined file, matching old Export All)."""
+        out = self.job.header.get("output_file", "").strip()
+        if not out:
+            self._emit_status("Set an Output File Name in Edit Job first.", True)
+            return
+        out = os.path.abspath(os.path.expanduser(out))
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+
+        designed = []
+        skipped = 0
+        stale = 0
+        for item, panel in panels:
+            if panel.is_stale():
+                stale += 1
+                continue
+            if panel.is_designed():
+                designed.append(panel)
+            else:
+                skipped += 1
+
+        if not designed:
+            self._emit_status(
+                "Nothing to save - run at least one design first.", True
+            )
+            return
+
+        sections = []
+        for panel in designed:
+            sections.append(panel.report_text(self.job.header))
+            sections.append("\n" + "=" * 46 + "\n")
+        try:
+            with open(out, "w") as f:
+                f.write("\n".join(sections))
+            self._last_export_path = out
+            self._enable_reveal(out)
+            notes = []
+            if skipped:
+                notes.append(f"{skipped} not designed")
+            if stale:
+                notes.append(f"{stale} outdated - click DESIGN to update")
+            msg = (f"Reports written to {out} ({len(designed)} design"
+                   f"{'s' if len(designed) != 1 else ''})")
+            if notes:
+                msg += " - " + ", ".join(notes) + ", skipped."
+            self._emit_status(msg, False)
+        except Exception as exc:
+            self._emit_status(f"Export failed: {exc}", True)
+
+    def _export_pdf(self, panels, out_dir, scope_this):
+        """Write one PDF per designed item into out_dir."""
+        written = []
+        skipped = 0
+        for item, panel in panels:
+            if not panel.is_designed():
+                skipped += 1
+                continue
+            if panel.is_stale():
+                self._emit_status(
+                    f"{panel.label} is outdated - click DESIGN to update.",
+                    True,
+                )
+                continue
+            try:
+                from rcd2000.gui.pages.form_page import report_pdf_text
+                page = panel.page
+                text = page.format_report(page._last_input, page._last_result)
+                path = os.path.join(out_dir, self._safe_stem(panel.label) + ".pdf")
+                # Simple text -> PDF via the existing helper if present
+                if hasattr(page, "save_pdf"):
+                    page.save_pdf(path)
+                    written.append(path)
+                else:
+                    self._emit_status("PDF export not available for this module.", True)
+                    skipped += 1
+            except Exception as exc:
+                self._emit_status(f"PDF failed for {panel.label}: {exc}", True)
+                skipped += 1
+        if written:
+            self._last_export_path = written[0]
+            self._enable_reveal(written[0])
+            self._emit_status(
+                f"Wrote {len(written)} PDF to {out_dir}"
+                + (f" ({skipped} skipped)" if skipped else ""), False,
+            )
+
+    def _export_cad(self, panels, fmt, out_dir, include_combined):
+        """Export each designed, non-stale item as DXF/DWG in out_dir."""
+        from rcd2000.gui.export_dialog import CAD_ADAPTER_KEYS
+        from rcd2000.cad_adapters import drawing_for
+
+        written = []
+        skipped = 0
+        stale = 0
+        unsupported = 0
+        drawings = []
+        labels = []
+
+        for item, panel in panels:
+            if item.type_key not in CAD_ADAPTER_KEYS:
+                unsupported += 1
+                continue
+            if not panel.is_designed():
+                skipped += 1
+                continue
+            if panel.is_stale():
+                stale += 1
+                continue
+            page = panel.page
+            try:
+                drawing = drawing_for(
+                    page._last_input, page._last_result, item.type_key,
+                )
+            except TypeError:
+                unsupported += 1
+                continue
+            except Exception as exc:
+                self._emit_status(f"CAD failed for {panel.label}: {exc}", True)
+                skipped += 1
+                continue
+            drawings.append(drawing)
+            labels.append(panel.label)
+
+        if not drawings:
+            msg = "Nothing to export as CAD."
+            if stale:
+                msg += f" {stale} outdated - click DESIGN to update."
+            if unsupported:
+                msg += f" {unsupported} type(s) have no CAD output yet."
+            self._emit_status(msg, True)
+            return
+
+        from rcd2000.cad_adapters import export_drawings_dxf
+        try:
+            paths = export_drawings_dxf(
+                drawings, out_dir, combined=include_combined,
+            )
+        except Exception as exc:
+            self._emit_status(f"CAD export failed: {exc}", True)
+            return
+
+        if fmt == "dwg":
+            dwg_paths = []
+            for p in paths:
+                if p.endswith(".dxf"):
+                    dwg = p[:-4] + ".dwg"
+                    try:
+                        from rcd2000.dwg_export import dxf_to_dwg
+                        dxf_to_dwg(p, dwg)
+                        dwg_paths.append(dwg)
+                    except Exception as exc:
+                        self._emit_status(f"DWG failed for {p}: {exc}", True)
+            if dwg_paths:
+                self._last_export_path = dwg_paths[0]
+                self._enable_reveal(dwg_paths[0])
+            self._emit_status(
+                f"Wrote {len(dwg_paths)} DWG to {out_dir}"
+                + (f" ({len(paths)} DXF)" if False else ""), False,
+            )
+            return
+
+        if written:
+            self._last_export_path = written[0]
+            self._enable_reveal(written[0])
+        self._last_export_path = paths[0]
+        self._enable_reveal(paths[0])
+        notes = []
+        if skipped:
+            notes.append(f"{skipped} not designed")
+        if stale:
+            notes.append(f"{stale} outdated")
+        if unsupported:
+            notes.append(f"{unsupported} unsupported type")
+        msg = (f"Wrote {len(paths)} DXF to {out_dir}")
+        if notes:
+            msg += " (" + ", ".join(notes) + " skipped)"
+        self._emit_status(msg, False)
+
+    def _export_ifc(self, panels, out_dir):
+        """Export all selected designed items as one IFC4 model."""
+        from rcd2000.gui.export_dialog import CAD_ADAPTER_KEYS
+        from rcd2000.cad_adapters import drawing_for
+        from rcd2000.ifc_export import IfcExporter
+
+        drawings = []
+        skipped = 0
+        unsupported = 0
+        for item, panel in panels:
+            if item.type_key not in CAD_ADAPTER_KEYS:
+                unsupported += 1
+                continue
+            if not panel.is_designed():
+                skipped += 1
+                continue
+            if panel.is_stale():
+                skipped += 1
+                continue
+            try:
+                drawings.append(drawing_for(
+                    panel.page._last_input, panel.page._last_result,
+                    item.type_key,
+                ))
+            except Exception:
+                skipped += 1
+
+        if not drawings:
+            self._emit_status("Nothing to export as IFC.", True)
+            return
+
+        job_name = self.job.name or "job"
+        stem = self._safe_stem(job_name)
+        path = os.path.join(out_dir, f"{stem}.ifc")
+        try:
+            ex = IfcExporter(project_name=self.job.name or "RCD2000 Project")
+            ex.export(drawings, path)
+            issues = ex.validate()
+            self._last_export_path = path
+            self._enable_reveal(path)
+            self._emit_status(
+                f"Wrote IFC4 model {path} ({len(drawings)} element"
+                f"{'s' if len(drawings) != 1 else ''}, "
+                f"{len(issues)} validation issue{'s' if len(issues) != 1 else ''})",
+                False,
+            )
+        except ImportError:
+            self._emit_status(
+                "IFC export requires: pip install 'rcd2000[ifc]'", True,
+            )
+        except Exception as exc:
+            self._emit_status(f"IFC export failed: {exc}", True)
+
+    @staticmethod
+    def _safe_stem(name: str) -> str:
+        import re
+        stem = re.sub(r"[^A-Za-z0-9_-]+", "-", str(name)).strip("-")
+        return stem or "job"
+
+    def _enable_reveal(self, path: str):
+        self._reveal_btn.setEnabled(True)
+        self._reveal_btn.setToolTip(f"Reveal in Finder: {path}")
 
     def _reveal_last_export(self):
         """Open the file manager on the last exported file."""

@@ -925,3 +925,87 @@ class DxfExporter:
             view_height=view_height,
         )
         vp.dxf.layer = "VIEWPORT"
+
+
+# ── Stair drawing (Batch 12 +) ───────────────────────────────────────
+
+    def draw_stair_plan(
+        self,
+        layout: Layout,
+        stair: "StairDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Stair plan: flight outline + main bars along the run."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = stair.scale
+        w = stair.span_mm
+        width = stair.width_mm or 1000.0
+
+        self.rect(layout, ox, oy, ox + w, oy + width, scale=s)
+        self.hatch_rect(layout, ox, oy, ox + w, oy + width, scale=s)
+
+        # tread ticks
+        n = max(1, int(w / (stair.tread_mm or 280)))
+        for i in range(1, n):
+            x = ox + i * w / n
+            self.line(layout, (x, oy), (x, oy + width), scale=s, layer="GRID")
+
+        # main bars: short ticks across width at spacing
+        for bar in stair.main_bars:
+            for i in range(max(bar.count, 1)):
+                x = ox + 20 + i * (w - 40) / max(bar.count, 2)
+                self.line(layout, (x, oy + 10), (x, oy + width - 10),
+                          scale=s, layer="REBAR_MAIN")
+
+        self.dim_linear(layout, (ox, oy), (ox + w, oy), -150, scale=s)
+
+    def draw_stair_section(
+        self,
+        layout: Layout,
+        stair: "StairDrawing",
+        origin: Point = (0.0, 0.0),
+    ) -> None:
+        """Stair longitudinal section: waist + tread/rise steps + bars."""
+        ox, oy = float(origin[0]), float(origin[1])
+        s = stair.scale
+        w = stair.span_mm
+        rise = stair.rise_mm or 160.0
+        tread = stair.tread_mm or 280.0
+        waist = stair.waist_mm or 150.0
+
+        n = max(1, int(w / tread))
+        # step profile
+        pts = [(ox, oy)]
+        x = ox
+        y = oy
+        for i in range(n):
+            pts.append((x + tread, y))
+            y += rise
+            pts.append((x + tread, y))
+            x += tread
+        pts.append((x, y))
+        self.polyline(layout, pts, scale=s, layer="CONCRETE_OUTLINE")
+
+        # underside of the waist (parallel line below the steps)
+        self.polyline(
+            layout,
+            [(px, py - waist) for px, py in pts],
+            scale=s, layer="CONCRETE_OUTLINE",
+        )
+
+        # main bars: line offset from the underside by cover
+        cover = 30.0
+        self.polyline(
+            layout,
+            [(px, py - cover) for px, py in pts],
+            scale=s, layer="REBAR_MAIN",
+        )
+
+        # distribution bars
+        for bar in stair.distribution_bars:
+            self.line(layout, (ox + 20, oy - cover - 20),
+                      (ox + w - 20, oy + n * rise - cover - 20),
+                      scale=s, layer="REBAR_DIST")
+
+        self.dim_linear(layout, (ox, oy), (ox + w, oy), -150, scale=s)
+        self.dim_linear(layout, (ox, oy), (ox, oy + n * rise), 150, scale=s)
