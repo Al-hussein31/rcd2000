@@ -10,6 +10,7 @@ from rcd2000.report import format_continuous_beam
 from rcd2000.gui.theme import TEXT_SECONDARY, fmt2
 from rcd2000.gui.widgets import (
     spinbox, spin_int, combo, label, Card, SpanDiagram,
+    PointLoadsEditor,
 )
 from rcd2000.gui.pages.form_page import DesignFormPage
 
@@ -21,6 +22,8 @@ class ContinuousBeamPage(DesignFormPage):
 
     def __init__(self):
         self._cb_member_widgets = []
+        self._cb_pls: list = []   # extra point loads per member
+        self._pl_current = 0      # scope currently shown in the editor
         super().__init__()
 
     def _page_title(self):
@@ -88,7 +91,40 @@ class ContinuousBeamPage(DesignFormPage):
         c2.add_layout(self.member_grid)
         layout.addWidget(c2)
 
+        # AUDIT (resolved): the book reads NPL point loads per member and
+        # N1/N2 nodes per member span (P(I,J)/AP(I,J), N1(I), N2(I)); the
+        # GUI only exposed a single P/a pair. Point loads now live in a
+        # scoped editor card so each member carries the full NPL list.
+        c2b = Card("Point Loads (Per Member)")
+        self.pl_scope = combo([])
+        self.pl_scope.currentIndexChanged.connect(self._on_pl_scope_changed)
+        self.pl_editor = PointLoadsEditor()
+        c2b.add_row("Member:", self.pl_scope)
+        c2b.add_widget(self.pl_editor)
+        layout.addWidget(c2b)
+        self._auto_clear_invalid(self.pl_scope)
+
         self._sync_members()
+
+    def _on_pl_scope_changed(self, index):
+        # Save the outgoing scope's rows, then load the new scope.
+        if 0 <= self._pl_current < len(self._cb_pls):
+            self._cb_pls[self._pl_current] = self.pl_editor.all_loads()
+        self._pl_current = index
+        if 0 <= index < len(self._cb_pls):
+            self.pl_editor.set_value(self._cb_pls[index])
+
+    def _store_pl_editor(self):
+        # Flush the editor rows into the scoped member's store.
+        if 0 <= self._pl_current < len(self._cb_pls):
+            self._cb_pls[self._pl_current] = self.pl_editor.all_loads()
+
+    def _merge_pls(self, i, w):
+        # Primary grid load plus the editor's NPL extra loads.
+        loads = [(w[8].value(), w[9].value())] if w[8].value() > 0 else []
+        if i < len(self._cb_pls):
+            loads += [tuple(pl) for pl in self._cb_pls[i] if pl[0] > 0]
+        return loads
 
     def _sync_members(self):
         nm = self.cb_nm.value()
@@ -130,6 +166,13 @@ class ContinuousBeamPage(DesignFormPage):
             self._auto_clear_invalid(ab)
             self._auto_clear_invalid(pl)
             self._auto_clear_invalid(ap)
+            _mi = len(self._cb_member_widgets)
+            n1 = spin_int(1, 999999999, _mi + 1)
+            n2 = spin_int(1, 999999999, min(_mi + 2, self.cb_ns.value()))
+            n1.setToolTip("Left node of this member (book N1(I))")
+            n2.setToolTip("Right node of this member (book N2(I))")
+            self._auto_clear_invalid(n1)
+            self._auto_clear_invalid(n2)
             self.member_grid.addWidget(lbl, row, 0)
             self.member_grid.addWidget(length, row, 1)
             self.member_grid.addWidget(inertia, row, 2)
@@ -140,16 +183,32 @@ class ContinuousBeamPage(DesignFormPage):
             self.member_grid.addWidget(ab, row, 7)
             self.member_grid.addWidget(pl, row, 8)
             self.member_grid.addWidget(ap, row, 9)
+            self.member_grid.addWidget(n1, row, 10)
+            self.member_grid.addWidget(n2, row, 11)
             self._cb_member_widgets.append(
-                (lbl, length, inertia, e_mod, udl, wt, wb, ab, pl, ap)
+                (lbl, length, inertia, e_mod, udl, wt, wb, ab, pl, ap, n1, n2)
             )
+            self._cb_pls.append([])
 
         headers = ["", "L (m)", "I (m⁴)", "E-rel", "UDL", "Tri", "Trap",
-                   "Dist", "P (kN)", "a (m)"]
+                   "Dist", "P (kN)", "a (m)", "N1", "N2"]
         for col, h in enumerate(headers):
             self.member_grid.addWidget(
                 label(h, secondary=True, size=11), 0, col
             )
+
+        # Rebuild the point-load scope combo, keeping the selection.
+        prev = self._pl_current
+        self.pl_scope.blockSignals(True)
+        self.pl_scope.clear()
+        self.pl_scope.addItems([f"M{i+1}" for i in range(self.cb_nm.value())])
+        if prev >= self.cb_nm.value():
+            prev = self.cb_nm.value() - 1
+        self.pl_scope.setCurrentIndex(prev)
+        self.pl_scope.blockSignals(False)
+        self._pl_current = prev
+        if 0 <= prev < len(self._cb_pls):
+            self.pl_editor.set_value(self._cb_pls[prev])
 
         self._update_diagram()
 
@@ -162,6 +221,7 @@ class ContinuousBeamPage(DesignFormPage):
         self.diagram.setVisible(len(self._cb_member_widgets) > 0)
 
     def calculate(self):
+        self._store_pl_editor()
         nm = self.cb_nm.value()
         members = []
         for i, w in enumerate(self._cb_member_widgets):
@@ -174,10 +234,10 @@ class ContinuousBeamPage(DesignFormPage):
                 wt=w[5].value(),
                 wb=w[6].value(),
                 ab=w[7].value(),
-                npl=1 if w[8].value() > 0 else 0,
-                point_loads=(
-                    [(w[8].value(), w[9].value())] if w[8].value() > 0 else []
-                ),
+                npl=len(self._merge_pls(i, w)),
+                point_loads=self._merge_pls(i, w),
+                n1=w[10].value(),
+                n2=w[11].value(),
             ))
         inp = ContinuousBeamInput(
             n_supports=self.cb_ns.value(),
@@ -196,6 +256,7 @@ class ContinuousBeamPage(DesignFormPage):
 
     def validate(self) -> list[str]:
         errors = []
+        self._store_pl_editor()
         if self.cb_nm.value() < 1:
             errors.append("At least one member is required")
             self._mark_invalid(self.cb_nm)
@@ -212,6 +273,23 @@ class ContinuousBeamPage(DesignFormPage):
                     f"Member {i+1} point load distance must be within the member span"
                 )
                 self._mark_invalid(w[9])
+            for jj, (pp, aa) in enumerate(self._cb_pls[i]):
+                if pp > 0 and not (0 < aa <= w[1].value()):
+                    errors.append(
+                        f"Member {i+1} point load {jj+1} distance must be "
+                        "within the member span"
+                    )
+                    if self._pl_current == i:
+                        self._mark_invalid(self.pl_editor._rows[jj][1])
+            if w[10].value() >= w[11].value():
+                errors.append(f"Member {i+1}: N1 must be less than N2")
+                self._mark_invalid(w[10])
+                self._mark_invalid(w[11])
+            if w[11].value() > self.cb_ns.value():
+                errors.append(
+                    f"Member {i+1}: N2 exceeds the number of supports"
+                )
+                self._mark_invalid(w[11])
         return errors
 
     def summarize(self, inp) -> str:
@@ -240,6 +318,7 @@ class ContinuousBeamPage(DesignFormPage):
         return rows
 
     def get_state(self) -> dict:
+        self._store_pl_editor()
         return {
             "cb_ns": self.cb_ns.value(),
             "cb_nm": self.cb_nm.value(),
@@ -260,8 +339,13 @@ class ContinuousBeamPage(DesignFormPage):
                     "ab": w[7].value(),
                     "pl": w[8].value(),
                     "ap": w[9].value(),
+                    "n1": w[10].value(),
+                    "n2": w[11].value(),
                 }
                 for w in self._cb_member_widgets
+            ],
+            "cb_member_pls": [
+                [list(pls) for pls in mp] for mp in self._cb_pls
             ],
         }
 
@@ -304,3 +388,14 @@ class ContinuousBeamPage(DesignFormPage):
                         w[8].setValue(m["pl"])
                     if "ap" in m:
                         w[9].setValue(m["ap"])
+                    if "n1" in m:
+                        w[10].setValue(m["n1"])
+                    if "n2" in m:
+                        w[11].setValue(m["n2"])
+        if "cb_member_pls" in state:
+            self._cb_pls = [
+                [tuple(pl) for pl in (x or [])]
+                for x in state["cb_member_pls"]
+            ]
+            if self._pl_current < len(self._cb_pls):
+                self.pl_editor.set_value(self._cb_pls[self._pl_current])

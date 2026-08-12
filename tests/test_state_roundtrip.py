@@ -51,15 +51,19 @@ def _set_non_default(page):
         page.cant_moment_1.setValue(30.0)
         page.cant_load_2.setValue(15.0)
         page.cant_moment_2.setValue(20.0)
-        # Member grid
+        # Member grid (point loads now live in the scoped editor)
         for w in page._member_widgets:
             w[1].setValue(6.5)   # length
             w[2].setValue(250)   # udl
             w[3].setValue(10)     # wt
             w[4].setValue(5)      # wb
             w[5].setValue(2.0)    # ab
-            w[6].setValue(30)     # pl
-            w[7].setValue(3.0)    # ap
+        page.pl_scope.setCurrentIndex(0)
+        page.pl_editor.set_value([(30.0, 3.0)])
+        page._store_pl_editor()
+        page.pl_scope.setCurrentIndex(1)
+        page.pl_editor.set_value([(18.0, 1.5)])
+        page._store_pl_editor()
 
     elif isinstance(page, SlabPage):
         page.slab_type.setCurrentIndex(2)
@@ -86,6 +90,13 @@ def _set_non_default(page):
             w[1].setValue(15.0)  # udl
             w[2].setValue(30)    # pl
             w[3].setValue(2.5)   # ap
+        # Scoped point-load editor across multiple spans
+        page.cont_pl_scope.setCurrentIndex(0)
+        page.cont_pl_editor.set_value([(40.0, 1.0)])
+        page._store_cont_pl_editor()
+        page.cont_pl_scope.setCurrentIndex(3)
+        page.cont_pl_editor.set_value([(20.0, 4.0), (15.0, 2.0)])
+        page._store_cont_pl_editor()
 
     elif isinstance(page, StairPage):
         page.s_span.setValue(3.5)
@@ -132,7 +143,7 @@ def _set_non_default(page):
         page.cb_cant_moment_1.setValue(35.0)
         page.cb_cant_load_2.setValue(10.0)
         page.cb_cant_moment_2.setValue(15.0)
-        for w in page._cb_member_widgets:
+        for i, w in enumerate(page._cb_member_widgets):
             w[1].setValue(7.0)       # length
             w[2].setValue(0.005)     # inertia
             w[3].setValue(1.2)       # e_mod
@@ -142,6 +153,12 @@ def _set_non_default(page):
             w[7].setValue(3.0)       # ab
             w[8].setValue(40.0)      # pl
             w[9].setValue(3.5)       # ap
+            w[10].setValue(i + 1)    # N1
+            w[11].setValue(i + 2)    # N2
+        # Scoped editor: multi-load on member 3
+        page.pl_scope.setCurrentIndex(2)
+        page.pl_editor.set_value([(25.0, 2.0), (18.0, 5.0)])
+        page._store_pl_editor()
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────

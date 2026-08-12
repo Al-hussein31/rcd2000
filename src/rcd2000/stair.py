@@ -64,10 +64,16 @@ class StairDesigner:
         tm = s.tread / 1000.0
         rm = s.rise / 1000.0
 
+        # Weight density of reinforced concrete (book SLF, default 25.0).
+        # The book reads WLD (kN/m3) as an override and applies it to both
+        # the waist slab and the steps - previously the engine hard-coded
+        # 25.0 and ignored the GUI's WLD input entirely.
+        slf = s.wld if s.wld and s.wld > 0 else s.concrete_weight
+
         # Self-weight of waist slab (sloping) on plan
-        sws = s.concrete_weight * waist * math.sqrt(tm ** 2 + rm ** 2) / tm
+        sws = slf * waist * math.sqrt(tm ** 2 + rm ** 2) / tm
         # Self-weight of steps
-        sts = 0.5 * rm * s.concrete_weight
+        sts = 0.5 * rm * slf
         # Finishes
         fin = 1.0
         # Total dead load

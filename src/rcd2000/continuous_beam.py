@@ -35,6 +35,8 @@ class ContinuousBeamMember:
     ab: float = 0.0        # m - distance for trapezoidal load
     npl: int = 0
     point_loads: List[Tuple[float, float]] = field(default_factory=list)
+    n1: int = 0            # support number at the left end (book N1, 1-based; 0 = sequential)
+    n2: int = 0            # support number at the right end (book N2, 1-based; 0 = sequential)
 
     span_moment: float = 0.0
     shear_left: float = 0.0
@@ -209,9 +211,15 @@ class ContinuousBeamAnalyzer:
         sfn1 = [0.0] * nm
         sfn2 = [0.0] * nm
 
+        # Book N1/N2 name the actual support numbers at each end of the
+        # member (the matrix assembly stays sequential; N1/N2 are only used
+        # here, in the results module). Defaults: member i connects supports
+        # i and i+1 (0-based), matching the sequential case.
         for i in range(nm):
-            n1 = i
-            n2 = min(i + 1, ns - 1)
+            n1 = members[i].n1 - 1 if members[i].n1 > 0 else i
+            n2 = members[i].n2 - 1 if members[i].n2 > 0 else min(i + 1, ns - 1)
+            n1 = max(0, min(n1, ns - 1))
+            n2 = max(0, min(n2, ns - 1))
             spmt[i] = freemt[i] - (mt[n1] + mt[n2]) * 0.5
             diffmt = (mt[n1] - mt[n2]) / l[i] if l[i] > 0 else 0.0
             sfn1[i] = srn1[i] + diffmt

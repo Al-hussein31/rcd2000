@@ -7,7 +7,7 @@ from rcd2000.report import format_slab
 from rcd2000.gui.theme import fmt, fmt2
 from rcd2000.gui.widgets import (
     spinbox, spin_int, combo, label, Card, fcu_combo, fy_combo, badge,
-    load_combo_group, SpanDiagram,
+    load_combo_group, SpanDiagram, PointLoadsEditor,
 )
 from rcd2000.gui.pages.form_page import DesignFormPage
 
@@ -20,6 +20,8 @@ class SlabPage(DesignFormPage):
     def __init__(self):
         self._cont_span_widgets = []
         self._panel_pl_widgets = []
+        self._cont_pl_extra: list = []   # extra point loads per continuous span
+        self._cont_pl_current = 0        # span scope currently in the editor
         super().__init__()
 
     def build_inputs(self, layout):
@@ -136,6 +138,21 @@ class SlabPage(DesignFormPage):
         c3.add_layout(self.cont_span_layout)
         layout.addWidget(c3)
 
+        # AUDIT (resolved): the book reads NPL point loads per continuous
+        # span (PLC(I,J)/ALC(I,J)); the GUI exposed a single P/a pair per
+        # span. Point loads now live in a scoped editor card so each span
+        # carries the full NPL list.
+        c3b = Card("Point Loads (Per Continuous Span)")
+        self.cont_pl_scope = combo([])
+        self.cont_pl_scope.currentIndexChanged.connect(
+            self._on_cont_pl_scope_changed
+        )
+        self.cont_pl_editor = PointLoadsEditor()
+        c3b.add_row("Span:", self.cont_pl_scope)
+        c3b.add_widget(self.cont_pl_editor)
+        layout.addWidget(c3b)
+        self._auto_clear_invalid(self.cont_pl_scope)
+
         self._sync_cont_spans()
         self._sync_panel_pls()
 
@@ -154,12 +171,35 @@ class SlabPage(DesignFormPage):
             elif item.widget() is not None:
                 item.widget().deleteLater()
 
+    def _on_cont_pl_scope_changed(self, index):
+        if 0 <= self._cont_pl_current < len(self._cont_pl_extra):
+            self._cont_pl_extra[self._cont_pl_current] = (
+                self.cont_pl_editor.all_loads()
+            )
+        self._cont_pl_current = index
+        if 0 <= index < len(self._cont_pl_extra):
+            self.cont_pl_editor.set_value(self._cont_pl_extra[index])
+
+    def _store_cont_pl_editor(self):
+        if 0 <= self._cont_pl_current < len(self._cont_pl_extra):
+            self._cont_pl_extra[self._cont_pl_current] = (
+                self.cont_pl_editor.all_loads()
+            )
+
+    def _merge_span_pls(self, i, w):
+        # Primary grid load plus the editor's extra loads for span i.
+        loads = [(w[2].value(), w[3].value())] if w[2].value() > 0 else []
+        if i < len(self._cont_pl_extra):
+            loads += [tuple(pl) for pl in self._cont_pl_extra[i] if pl[0] > 0]
+        return loads
+
     def _sync_cont_spans(self):
         n = self.cont_nspan.value()
         # Rebuild the span widgets from scratch each time (simpler than
         # tracking add/remove).
         self._clear_layout(self.cont_span_layout)
         self._cont_span_widgets = []
+        self._cont_pl_extra = []
         for i in range(n):
             h = QHBoxLayout()
             h.addWidget(label(f"S{i+1}:", secondary=True, size=12))
@@ -179,10 +219,23 @@ class SlabPage(DesignFormPage):
             h.addWidget(ap)
             self.cont_span_layout.addLayout(h)
             self._cont_span_widgets.append((le, ud, pl, ap))
+            self._cont_pl_extra.append([])
             le.valueChanged.connect(self._update_diagram)
             ud.valueChanged.connect(self._update_diagram)
             pl.valueChanged.connect(self._update_diagram)
             ap.valueChanged.connect(self._update_diagram)
+
+        prev = self._cont_pl_current
+        self.cont_pl_scope.blockSignals(True)
+        self.cont_pl_scope.clear()
+        self.cont_pl_scope.addItems([f"S{i+1}" for i in range(n)])
+        if prev >= n:
+            prev = n - 1
+        self.cont_pl_scope.setCurrentIndex(prev)
+        self.cont_pl_scope.blockSignals(False)
+        self._cont_pl_current = prev
+        if 0 <= prev < len(self._cont_pl_extra):
+            self.cont_pl_editor.set_value(self._cont_pl_extra[prev])
 
         diagram_data = [
             {"length": w[0].value(), "udl": w[1].value()}
@@ -222,6 +275,11 @@ class SlabPage(DesignFormPage):
         fy = int(self.slab_fy.currentText())
 
         udl = 1.4 * self.gk.value() + 1.6 * self.qk.value()
+        self._store_cont_pl_editor()
+        span_pls = [
+            self._merge_span_pls(i, w)
+            for i, w in enumerate(self._cont_span_widgets)
+        ]
         self.udl_label.setText(f"Design UDL = {udl:.1f} kN/m²")
 
         inp = SlabPanelInput(
@@ -240,13 +298,8 @@ class SlabPage(DesignFormPage):
             nspan=self.cont_nspan.value(),
             span_lengths=[w[0].value() for w in self._cont_span_widgets],
             span_udls=[w[1].value() for w in self._cont_span_widgets],
-            span_npls=[
-                1 if w[2].value() > 0 else 0 for w in self._cont_span_widgets
-            ],
-            span_pls=[
-                [(w[2].value(), w[3].value())] if w[2].value() > 0 else []
-                for w in self._cont_span_widgets
-            ],
+            span_npls=[len(pls) for pls in span_pls],
+            span_pls=span_pls,
             cant_loads=[
                 self.s_cant_load_1.value(), self.s_cant_load_2.value()
             ],
@@ -260,6 +313,7 @@ class SlabPage(DesignFormPage):
 
     def validate(self) -> list[str]:
         errors = []
+        self._store_cont_pl_editor()
         ptype = self.slab_type.currentIndex()
         if ptype == 3:
             if self.s_ly.value() < self.s_span.value():
@@ -291,6 +345,16 @@ class SlabPage(DesignFormPage):
                         f"Span {i+1} point load distance must be within the span"
                     )
                     self._mark_invalid(w[3])
+                for jj, (pp, aa) in enumerate(self._cont_pl_extra[i]):
+                    if pp > 0 and not (0 < aa <= w[0].value()):
+                        errors.append(
+                            f"Span {i+1} point load {jj+1} distance "
+                            "must be within the span"
+                        )
+                        if self._cont_pl_current == i:
+                            self._mark_invalid(
+                                self.cont_pl_editor._rows[jj][1]
+                            )
         return errors
 
     def summarize(self, inp) -> str:
@@ -343,6 +407,7 @@ class SlabPage(DesignFormPage):
         return rows
 
     def get_state(self) -> dict:
+        self._store_cont_pl_editor()
         return {
             "slab_type": self.slab_type.currentIndex(),
             "slab_fcu": int(self.slab_fcu.currentText()),
@@ -368,6 +433,9 @@ class SlabPage(DesignFormPage):
                 {"length": w[0].value(), "udl": w[1].value(),
                  "pl": w[2].value(), "ap": w[3].value()}
                 for w in self._cont_span_widgets
+            ],
+            "cont_span_pls": [
+                [list(pls) for pls in mp] for mp in self._cont_pl_extra
             ],
         }
 
@@ -424,3 +492,12 @@ class SlabPage(DesignFormPage):
                         w[2].setValue(s["pl"])
                     if "ap" in s:
                         w[3].setValue(s["ap"])
+        if "cont_span_pls" in state:
+            self._cont_pl_extra = [
+                [tuple(pl) for pl in (x or [])]
+                for x in state["cont_span_pls"]
+            ]
+            if self._cont_pl_current < len(self._cont_pl_extra):
+                self.cont_pl_editor.set_value(
+                    self._cont_pl_extra[self._cont_pl_current]
+                )

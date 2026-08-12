@@ -48,22 +48,37 @@ class ColumnPage(DesignFormPage):
         self._auto_clear_invalid(self.dia)
         self._auto_clear_invalid(self.depth)
 
-        c5 = Card("Column Height & Effective Lengths")
-        # AUDIT (resolved): book column.f77 reads L, LE, LEX, LEY as inputs.
-        # Collected here and carried into the report for slenderness context.
+        c5 = Card("Column Height, Bracing & Effective Lengths")
+        # AUDIT (resolved): book column.f77 reads L, LE, LEX, LEY as inputs
+        # and applies a slenderness check (book BRC: 1=braced, 2=unbraced).
+        # LEX/LEY now drive the check: SR = LEX(mm)/h > 15 (braced) or
+        # > 10 (unbraced) adds the additional moment Madd = N*ba*h/1000.
+        self.brc = combo(["Braced", "Unbraced"])
+        self.brc.setToolTip(
+            "Bracing condition (book BRC). Braced columns are slender when "
+            "LEX/h or LEY/h exceeds 15; unbraced columns when it exceeds 10."
+        )
         self.length = spinbox(0, 999999999, 0.1, 3.0, 2)
         self.le = spinbox(0, 999999999, 0.1, 3.0, 2)
         self.lex = spinbox(0, 999999999, 0.1, 3.0, 2)
         self.ley = spinbox(0, 999999999, 0.1, 3.0, 2)
         self.length.setToolTip("Column height L (m) - book input L")
         self.le.setToolTip("Effective length LE (m) - book input LE")
-        self.lex.setToolTip("Effective length about x-axis LEX (m) - book input LEX")
-        self.ley.setToolTip("Effective length about y-axis LEY (m) - book input LEY")
+        self.lex.setToolTip(
+            "Effective length about x-axis LEX (m) - book input LEX. "
+            "Used for the slenderness ratio SRX = LEX*1000/bx."
+        )
+        self.ley.setToolTip(
+            "Effective length about y-axis LEY (m) - book input LEY. "
+            "Used for the slenderness ratio SRY = LEY*1000/by."
+        )
+        c5.add_row("Bracing:", self.brc)
         c5.add_row("Column height L (m):", self.length)
         c5.add_row("Effective length LE (m):", self.le)
         c5.add_row("Effective length LEX (m):", self.lex)
         c5.add_row("Effective length LEY (m):", self.ley)
         layout.addWidget(c5)
+        self._auto_clear_invalid(self.brc)
         self._auto_clear_invalid(self.length)
         self._auto_clear_invalid(self.le)
         self._auto_clear_invalid(self.lex)
@@ -155,6 +170,7 @@ class ColumnPage(DesignFormPage):
             dia=self.dia.value(), depth=self.depth.value(),
             length=self.length.value(),
             le=self.le.value(), lex=self.lex.value(), ley=self.ley.value(),
+            brc=self.brc.currentIndex() + 1,
             moment_x=self.moment_x.value(),
             moment_y=self.moment_y.value(),
             moment=moment,

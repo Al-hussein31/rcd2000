@@ -400,6 +400,11 @@ def format_column(ci, r, job: str = "", date: str = "",
     """Formatted report for a column result."""
     col_types = {1: "Axially Loaded", 2: "Uniaxial Bending", 3: "Biaxial Bending"}
     ctype = col_types.get(ci.col_type, "Unknown")
+    # A slender axially loaded column may be redesigned as uniaxial/biaxial
+    # (book: "an axially loaded column may end up being designed as biaxially
+    # loaded"). Surface the effective type when it differs.
+    if getattr(r, "design_type", 0) in (1, 2, 3) and r.design_type != ci.col_type:
+        ctype = f"{ctype} (designed as {col_types.get(r.design_type, '')})"
 
     rep = Report()
     rep.title("COLUMN ANALYSIS AND DESIGN - BS 8110")
@@ -429,15 +434,34 @@ def format_column(ci, r, job: str = "", date: str = "",
         rep.label_val("EFFECTIVE LENGTH LE", getattr(ci, "le", 0.0), "m")
         rep.label_val("EFFECTIVE LENGTH LEX", getattr(ci, "lex", 0.0), "m")
         rep.label_val("EFFECTIVE LENGTH LEY", getattr(ci, "ley", 0.0), "m")
+        rep.label_val(
+            "BRACING (BRC)",
+            "BRACED" if getattr(ci, "brc", 1) == 1 else "UNBRACED",
+            "",
+        )
     rep.blank(1)
 
+    # Slenderness check (book: braced SR > 15, unbraced SR > 10) and the
+    # additional moment Madd = N * (1/2000)(le/b')^2 * h / 1000 when slender.
+    if getattr(r, "srx", 0.0) > 0 or getattr(r, "sry", 0.0) > 0:
+        rep.section("B", "SLENDERNESS CHECK")
+        limit = 15 if getattr(ci, "brc", 1) == 1 else 10
+        rep.label_val("LIMIT (BRACED 15 / UNBRACED 10)", limit, "")
+        rep.label_val("SLENDERNESS RATIO LEX/HX", getattr(r, "srx", 0.0), "")
+        rep.label_val("SLENDERNESS RATIO LEY/HY", getattr(r, "sry", 0.0), "")
+        if getattr(r, "slender_x", False):
+            rep.label_val("ADD. MOMENT MADX", getattr(r, "madx", 0.0), "kN.m")
+        if getattr(r, "slender_y", False):
+            rep.label_val("ADD. MOMENT MADY", getattr(r, "mady", 0.0), "kN.m")
+        rep.blank(1)
+
     if ci.col_type != 1:
-        rep.section("B", "FINAL INPUT MOMENTS")
+        rep.section("C", "FINAL INPUT MOMENTS")
         rep.label_val("MOMENT ABOUT X - AXIS", ci.moment_x or ci.moment, "kN.m")
         rep.label_val("MOMENT ABOUT Y-AXIS", ci.moment_y, "kN.m")
         rep.blank(1)
 
-    rep.section("C", "OUTPUT DATA")
+    rep.section("D", "OUTPUT DATA")
     rep.label_val("AREA OF STEEL REQUIRED", r.steel_required, "Sq.mm")
     rep.label_blank_val("MAIN BARS: Provide", "_____ BARS")
     rep.label_blank_val("LINKS : Provide", "___@___c/c")

@@ -283,7 +283,9 @@ class BeamDesigner:
             sfn2 = [0.0] * nm
 
             for i in range(nm):
-                n1 = i
+                # Members connect consecutive supports (book BEAM contract);
+                # clamp so a mismatched member/support count cannot crash.
+                n1 = min(i, ns - 1)
                 n2 = min(i + 1, ns - 1)
                 spmt[i] = freemt[i] - (mt[n1] + mt[n2]) * 0.5
                 diffmt = (mt[n1] - mt[n2]) / l[i] if l[i] > 0 else 0.0

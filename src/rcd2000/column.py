@@ -30,6 +30,7 @@ class ColumnInput:
     moment_x: float = 0.0   # kN.m
     moment_y: float = 0.0   # kN.m
     moment: float = 0.0     # kN.m (for uniaxial)
+    brc: int = 1            # bracing: 1=braced, 2=unbraced (book BRC)
 
 
 @dataclass
@@ -44,6 +45,13 @@ class ColumnResult:
     steel_percent: float
     heck: int                # 0=ok, 1=section inadequate
     biaxial_check_ok: bool = True
+    srx: float = 0.0         # slenderness ratio about x-axis (lex/hx)
+    sry: float = 0.0         # slenderness ratio about y-axis (ley/hy)
+    madx: float = 0.0        # additional moment about x-axis (kN.m)
+    mady: float = 0.0        # additional moment about y-axis (kN.m)
+    slender_x: bool = False  # slender about x-axis
+    slender_y: bool = False  # slender about y-axis
+    design_type: int = 0     # effective design type used (1/2/3, 0=as input)
 
 
 def _steel_stress(e: float, fy: float) -> float:
@@ -87,15 +95,87 @@ class ColumnDesigner:
 
         if c.shape == 1:
             ag = c.bx * c.by
+            hx, hy = c.bx, c.by
         else:
             ag = math.pi * c.dia ** 2.0 / 4.0
+            hx = hy = c.dia
 
-        if c.col_type == 1:
-            self._axial(c, ag, r)
+        # ── Slenderness check (book: braced SR > 15, unbraced SR > 10) ──
+        # When slender, an additional moment is added:
+        #   ba = (1/2000) * (le/b')^2   where b' = smaller dimension
+        #   au = ba * 1.0 * h           (h = section depth in that plane)
+        #   Madd = N * au / 1000        (kN.m)
+        # Verified against book Example 7.8: b'=225, le=4080 mm
+        #   -> ba = (4080/225)^2/2000 = 0.164, Madd = 0.164*0.225*1200
+        #   = 44.28 kN.m.
+        srx = sry = 0.0
+        madx = mady = 0.0
+        slender_x = slender_y = False
+        if hx > 0 and hy > 0 and c.brc in (1, 2):
+            limit = 15.0 if c.brc == 1 else 10.0
+            bp = min(hx, hy)
+            lex_mm = c.lex * 1000.0
+            ley_mm = c.ley * 1000.0
+            if lex_mm > 0:
+                srx = lex_mm / hx
+                if srx > limit:
+                    slender_x = True
+                    ba = (1.0 / 2000.0) * (lex_mm / bp) ** 2.0
+                    madx = c.load * ba * hx / 1000.0
+            if ley_mm > 0:
+                sry = ley_mm / hy
+                if sry > limit:
+                    slender_y = True
+                    ba = (1.0 / 2000.0) * (ley_mm / bp) ** 2.0
+                    mady = c.load * ba * hy / 1000.0
+
+        r.srx = srx
+        r.sry = sry
+        r.madx = madx
+        r.mady = mady
+        r.slender_x = slender_x
+        r.slender_y = slender_y
+
+        # ── Amplify the design moments with the slenderness additions ──
+        if c.col_type == 3:
+            mix, miy = c.moment_x, c.moment_y
         elif c.col_type == 2:
-            self._uniaxial(c, ag, r)
-        elif c.col_type == 3:
-            self._biaxial(c, ag, r)
+            mix, miy = c.moment, 0.0
+        else:
+            mix = miy = 0.0
+        mx = mix + madx
+        my = miy + mady
+
+        # ── Design-type selection (book TY) ──
+        # The book re-derives the type from the amplified moments using
+        # MMIN = min(0.05*BMAX, 20)*pi/1000, so an axially loaded column
+        # that is slender in either direction is redesigned as uniaxial or
+        # biaxial ("an axially loaded column may end up being designed as
+        # biaxially loaded"). Explicit user types (2/3) are respected.
+        eff_type = c.col_type
+        if c.col_type == 1:
+            bmax = max(hx, hy)
+            ect = min(0.05 * bmax, 20.0)
+            mmin = ect * math.pi / 1000.0
+            if mx <= mmin and my <= mmin:
+                eff_type = 1
+            elif mx > mmin and my <= mmin:
+                eff_type = 2
+            else:
+                eff_type = 3
+        r.design_type = eff_type
+
+        dc = ColumnInput(
+            column_id=c.column_id, col_type=eff_type, shape=c.shape,
+            load=c.load, bx=c.bx, by=c.by, dia=c.dia, depth=c.depth,
+            moment_x=mx, moment_y=my, moment=mx,
+        )
+        if eff_type == 1:
+            self._axial(dc, ag, r)
+        elif eff_type == 2:
+            self._uniaxial(dc, ag, r)
+        elif eff_type == 3:
+            self._biaxial(dc, ag, r)
 
         r.steel_percent = r.steel_required * 100.0 / ag if ag > 0 else 0.0
 

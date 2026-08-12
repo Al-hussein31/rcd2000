@@ -271,6 +271,90 @@ class Card(QFrame):
 # (per design brief: clear and instant beats flashy motion)
 # ═══════════════════════════════════════════════════════════════════
 
+class PointLoadsEditor(QWidget):
+    """Multi-point-load editor (book NPL plus P/AP per load).
+
+    Compact widget: an NPL spinbox plus one row of (P, a) spinboxes per
+    load. Used wherever the book accepts several point loads on one
+    member or span (beam member NPL, continuous-beam member NPL, slab
+    span NPL). Engines already consume a list of (P, a) tuples, so the
+    page passes ``loads()`` straight through.
+    """
+
+    max_loads = 20
+
+    def __init__(self, label_text: str = "Number of Point Loads:", parent=None):
+        super().__init__(parent)
+        self._rows: list = []
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+
+        head = QHBoxLayout()
+        self.npl = spin_int(0, self.max_loads, 0)
+        self.npl.setToolTip(
+            "Number of point loads on this member/span (book NPL)"
+        )
+        self.npl.valueChanged.connect(self._sync_rows)
+        head.addWidget(label(label_text, secondary=True, size=12))
+        head.addWidget(self.npl)
+        head.addStretch()
+        layout.addLayout(head)
+
+        self._rows_layout = QVBoxLayout()
+        self._rows_layout.setSpacing(2)
+        layout.addLayout(self._rows_layout)
+
+    def _sync_rows(self):
+        n = self.npl.value()
+        while self._rows_layout.count():
+            item = self._rows_layout.takeAt(0)
+            if item.layout() is not None:
+                lay = item.layout()
+                while lay.count():
+                    li = lay.takeAt(0)
+                    w = li.widget()
+                    if w is not None:
+                        w.deleteLater()
+            elif item.widget() is not None:
+                item.widget().deleteLater()
+        self._rows = []
+        for i in range(n):
+            h = QHBoxLayout()
+            h.addWidget(label(f"P{i+1}:", secondary=True, size=12))
+            pl = spinbox(0, 999999999, 5, 0, 1, " kN")
+            ap = spinbox(0, 999999999, 0.5, 0, 2, " m")
+            pl.setToolTip("Point load magnitude (kN) - book PL")
+            ap.setToolTip(
+                "Distance (m) of the point load from the left support "
+                "- book AP"
+            )
+            h.addWidget(pl)
+            h.addWidget(ap)
+            h.addStretch()
+            self._rows_layout.addLayout(h)
+            self._rows.append((pl, ap))
+
+    def loads(self) -> list:
+        """(P, a) pairs entered so far (only rows with P > 0)."""
+        return [
+            (w[0].value(), w[1].value())
+            for w in self._rows if w[0].value() > 0
+        ]
+
+    def all_loads(self) -> list:
+        """Every (P, a) pair as entered, including zero rows."""
+        return [(w[0].value(), w[1].value()) for w in self._rows]
+
+    def set_value(self, loads) -> None:
+        """Populate the editor from a list of (P, a) pairs."""
+        rows = list(loads or [])
+        self.npl.setValue(len(rows))
+        for w, (p, a) in zip(self._rows, rows):
+            w[0].setValue(float(p))
+            w[1].setValue(float(a))
+
+
 class CollapsibleSection(QWidget):
     """A titled section whose body can be toggled open/closed by
     clicking the header. Use for sidebar history, optional advanced
