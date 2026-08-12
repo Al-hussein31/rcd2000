@@ -80,10 +80,7 @@ def _set_non_default(page):
         page.s_cant_moment_1.setValue(40)
         page.s_cant_load_2.setValue(15)
         page.s_cant_moment_2.setValue(20)
-        page.panel_npl.setValue(2)
-        for w in page._panel_pl_widgets:
-            w[0].setValue(50)   # pl
-            w[1].setValue(2.0)  # ap
+        page.panel_pl_editor.set_value([(50.0, 2.0), (30.0, 4.0)])
         page.cont_nspan.setValue(4)
         for w in page._cont_span_widgets:
             w[0].setValue(5.0)   # length
