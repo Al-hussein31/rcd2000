@@ -42,6 +42,9 @@ gui = [
 tui = [
     "textual>=1.0",
 ]
+dxf = [
+    "ezdxf>=1.4,<2",
+]
 
 [project.scripts]
 rcd2000 = "rcd2000.cli:app"
