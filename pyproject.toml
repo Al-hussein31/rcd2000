@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rcd2000"
-version = "1.0.0"
+version = "1.1.0"
 description = "Reinforced Concrete Design to BS 8110 - Modern port of Oyenuga's RCD2000"
 readme = "README.md"
 license = {text = "MIT"}

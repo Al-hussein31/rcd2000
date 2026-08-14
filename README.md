@@ -26,7 +26,7 @@ Beyond calculations, RCD2000 exports ready-to-use **engineering deliverables**:
 - **DXF** — the interchange/master copy, always written alongside DWG.
 - **IFC4 BIM** — structural members with reinforcement as `IfcReinforcingBar` nested in `IfcBeam`/`IfcColumn`/`IfcSlab`/`IfcFooting`, with standard psets/qtos for Revit / Tekla / Allplan / BlenderBIM interoperability.
 
-See [CAD export](#cad-export-dxf--dwg--ifc) for details.
+See [CAD export](#cad-export-dwg--dxf--ifc) for details.
 
 ---
 
@@ -158,14 +158,16 @@ pip install "rcd2000[gui,dev]"   # GUI + everything (add tui)
 ### CAD export extras
 
 ```bash
-pip install "rcd2000[dxf]"       # DXF drawing export (ezdxf)
+pip install "rcd2000[dxf]"       # DWG + DXF drawing export (ezdxf + ODA)
 pip install "rcd2000[ifc]"       # IFC4 BIM export (ifcopenshell)
 pip install "rcd2000[aps]"       # cloud DWG conversion via APS (requests)
 pip install "rcd2000[dxf,ifc]"   # full CAD suite
 ```
 
-> **Note:** local DWG conversion also needs the free **ODA File Converter**
-> installed once on your machine (see [CAD export](#cad-export-dxf--dwg--ifc)).
+> **Note:** local DWG conversion uses the free **ODA File Converter**
+> (installed separately, once per machine — see [CAD export](#cad-export-dwg--dxf--ifc)).
+> The `[dxf]` extra provides the ezdxf writer; the converter is the
+> external binary it shells out to.
 
 ---
 
@@ -244,24 +246,43 @@ results = designer.design([beam_input])
 
 ---
 
-## CAD export (DXF / DWG / IFC)
+## CAD export (DWG / DXF / IFC)
 
-RCD2000 turns calculation results into **ready-to-open engineering drawings** — no manual CAD arrangement needed. The pipeline is layered: `engine → DrawingModel → DXF / DWG / IFC`.
+RCD2000 turns calculation results into **ready-to-open engineering drawings** — no manual CAD arrangement needed. The pipeline is layered: `engine → DrawingModel → DWG / DXF / IFC`. **DWG (the native AutoCAD format) is the default deliverable.**
 
 ```
-calculation result ──► DrawingModel (mm, typed) ──► DXF detail sheet
-                                               ├─► DWG (ODA local | APS cloud)
-                                               └─► IFC4 BIM (with rebar)
+calculation result ──► DrawingModel (mm, typed) ──► DWG detail sheet   (default, native AutoCAD)
+                                                ├─► DXF master copy    (always alongside)
+                                                └─► IFC4 BIM (with rebar)
 ```
 
-### DXF drawing sheets
+### DWG (native AutoCAD — the default)
 
-Each element exports a full detail sheet with:
+Every export writes the native **DWG** (AC1032 — the exact format every AutoCAD 2018–2026 saves natively), plus a `.dxf` master/interchange copy. DWG is the default selection in both the GUI export dialog and the CLI.
+
+| Backend | How it works | Requirements | Cost |
+|---|---|---|---|
+| **local** (default) | ezdxf shells out to the free **ODA File Converter** | install ODAFC once from [opendesign.com](https://www.opendesign.com/guestfiles/oda_file_converter), or set `RCD2000_ODAFC_PATH` | free, offline |
+| **cloud** | Autodesk Platform Services Automation API runs AccoreConsole (`open DXF` → `SaveAs DWG`) | `APS_CLIENT_ID` / `APS_CLIENT_SECRET` env vars | 300 free AutoCAD min/mo, then ~$3 / 12 min |
+
+```bash
+# DWG written automatically; DXF written alongside as the master copy
+rcd2000 dxf beam input.json -o beam.dxf
+# DXF only (skip the DWG conversion)
+rcd2000 dxf beam input.json -o beam.dxf --no-dwg
+```
+
+**DWG format:** AC1032 / DWG 2018 — the native save format of every AutoCAD 2018–2026 (and the format AutoCAD 2027 opens by default).
+
+### DXF drawing sheets (master copy)
+
+Each element's detail sheet is written as DXF (the interchange/master copy) and DWG:
 
 - **Beam** — plan, longitudinal elevation, cross-section, bar bending schedule
 - **Column** — plan (section) + elevation with tie spacing
 - **Slab** — reinforcement plan (top/bottom mesh, short/long direction) + section
 - **Footing** — plan + section with mesh and column dowels
+- **Stair** — plan (treads + main bars) + longitudinal section
 - **Sheet setup** — A-series paper-space layout, border, title block (project / sheet no / rev / engineer / date), model viewport, and a structural layer standard (BS 8666-inspired: `REBAR_MAIN`, `REBAR_STIRRUP`, `REBAR_DIST`, `CONCRETE_OUTLINE`, `DIMENSIONS`, …)
 - Dimensions that read true mm (DIMLFAC-scaled), so AutoCAD shows real dimensions
 
@@ -275,24 +296,6 @@ rcd2000 dxf stair  input.json -o stair.dxf   --scale 50
 
 Scale choices: `20`, `25`, `50`, `100` (default `50`). Each command writes the
 `.dxf` **and** a native `.dwg` next to it (unless `--no-dwg`).
-
-### DWG (native AutoCAD — the default)
-
-Every DXF export automatically also writes the native **DWG** (AC1032, the format every AutoCAD 2018–2026 saves natively). DWG is the default deliverable in both the GUI export dialog and the CLI.
-
-| Backend | How it works | Requirements | Cost |
-|---|---|---|---|
-| **local** (default) | ezdxf shells out to the free **ODA File Converter** | install ODAFC once from [opendesign.com](https://www.opendesign.com/guestfiles/oda_file_converter), or set `RCD2000_ODAFC_PATH` | free, offline |
-| **cloud** | Autodesk Platform Services Automation API runs AccoreConsole (`open DXF` → `SaveAs DWG`) | `APS_CLIENT_ID` / `APS_CLIENT_SECRET` env vars | 300 free AutoCAD min/mo, then ~$3 / 12 min |
-
-```bash
-# DWG written automatically; DXF is the master copy
-rcd2000 dxf beam input.json -o beam.dxf
-# DXF only
-rcd2000 dxf beam input.json -o beam.dxf --no-dwg
-```
-
-Output is **AC1032 / DWG 2018** — the native save format of every AutoCAD 2018–2026, so this is what clients mean by "native DWG".
 
 ### IFC4 BIM
 
@@ -309,6 +312,7 @@ rcd2000 ifc beam   input.json -o beam.ifc
 rcd2000 ifc column input.json -o column.ifc
 rcd2000 ifc slab   input.json -o slab.ifc
 rcd2000 ifc base   input.json -o footing.ifc
+rcd2000 ifc stair  input.json -o stair.ifc
 ```
 
 ### CAD architecture
@@ -354,11 +358,11 @@ Full input schemas with all parameters are available in the module documentation
 
 Every design module is verified against the original FORTRAN 77 source output. The test suite confirms:
 
-- **368 automated tests, all passing** — engine design validation, GUI state round-trips, point-load editors, and the full CAD export pipeline (DXF / DWG / IFC)
+- **381 automated tests, all passing** — engine design validation, GUI state round-trips, point-load editors, and the full CAD export pipeline (DWG / DXF / IFC)
 - Numerical agreement within 1% of FORTRAN reference values
 - Edge cases discovered and corrected (including a latent array bug in the original FORTRAN)
 - Punching shear unit mismatch identified and fixed (N/m² vs N/mm²)
-- CAD output validated structurally: every generated DXF passes `ezdxf` audit (0 errors), no content on layer 0, all layers on the standard; IFC output passes `ifcopenshell.validate(express_rules=True)` with zero issues
+- CAD output validated structurally: every generated DXF passes `ezdxf` audit (0 errors), no content on layer 0, all layers on the standard; DWG files verified as native AC1032 (AutoCAD 2018+); IFC output passes `ifcopenshell.validate(express_rules=True)` with zero issues
 
 Run the tests:
 
