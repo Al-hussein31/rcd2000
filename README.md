@@ -22,8 +22,8 @@
 RCD2000 is a structural engineering tool that designs beams, columns, slabs, stairs, and foundations in accordance with British Standard BS 8110. It uses the Clapeyron three-moment equation for continuous analysis and strain compatibility for column interaction curves.
 
 Beyond calculations, RCD2000 exports ready-to-use **engineering deliverables**:
-- **DXF drawings** — element detail sheets (plan / elevation / section), reinforcement on proper layers, dimensions, bar bending schedule, title block + paper-space viewports. Opens directly in AutoCAD / AutoCAD LT.
-- **DWG** — convert any DXF to native AutoCAD DWG (AC1032, the format every AutoCAD 2018–2026 uses) via the free local ODA File Converter, or in the cloud via Autodesk Platform Services.
+- **DWG drawings (default)** — the native AutoCAD format; every design exports as `.dwg` automatically (plus the `.dxf` master copy). Element detail sheets (plan / elevation / section), reinforcement on proper layers, dimensions, bar bending schedule, title block + paper-space viewports.
+- **DXF** — the interchange/master copy, always written alongside DWG.
 - **IFC4 BIM** — structural members with reinforcement as `IfcReinforcingBar` nested in `IfcBeam`/`IfcColumn`/`IfcSlab`/`IfcFooting`, with standard psets/qtos for Revit / Tekla / Allplan / BlenderBIM interoperability.
 
 See [CAD export](#cad-export-dxf--dwg--ifc) for details.
@@ -198,10 +198,11 @@ rcd2000 beam input.json -o results.txt
 rcd2000 beam input.json --json
 
 # Export a DXF drawing sheet (plan/elevation/section + BBS + title block)
+# DWG (native AutoCAD) is written automatically alongside the DXF
 rcd2000 dxf beam input.json -o beam.dxf --scale 50
 
-# Also convert to native DWG (requires ODA File Converter)
-rcd2000 dxf beam input.json -o beam.dxf --to-dwg
+# Skip the automatic DWG conversion if you only want DXF
+rcd2000 dxf beam input.json -o beam.dxf --no-dwg
 
 # Export an IFC4 BIM model with reinforcement
 rcd2000 ifc beam input.json -o beam.ifc
@@ -269,13 +270,15 @@ rcd2000 dxf beam   input.json -o beam.dxf    --scale 50
 rcd2000 dxf column input.json -o column.dxf  --scale 50
 rcd2000 dxf slab   input.json -o slab.dxf    --scale 50
 rcd2000 dxf base   input.json -o footing.dxf --scale 50
+rcd2000 dxf stair  input.json -o stair.dxf   --scale 50
 ```
 
-Scale choices: `20`, `25`, `50`, `100` (default `50`).
+Scale choices: `20`, `25`, `50`, `100` (default `50`). Each command writes the
+`.dxf` **and** a native `.dwg` next to it (unless `--no-dwg`).
 
-### DWG (native AutoCAD)
+### DWG (native AutoCAD — the default)
 
-DXF → DWG conversion, two backends:
+Every DXF export automatically also writes the native **DWG** (AC1032, the format every AutoCAD 2018–2026 saves natively). DWG is the default deliverable in both the GUI export dialog and the CLI.
 
 | Backend | How it works | Requirements | Cost |
 |---|---|---|---|
@@ -283,7 +286,10 @@ DXF → DWG conversion, two backends:
 | **cloud** | Autodesk Platform Services Automation API runs AccoreConsole (`open DXF` → `SaveAs DWG`) | `APS_CLIENT_ID` / `APS_CLIENT_SECRET` env vars | 300 free AutoCAD min/mo, then ~$3 / 12 min |
 
 ```bash
-rcd2000 dxf beam input.json -o beam.dxf --to-dwg
+# DWG written automatically; DXF is the master copy
+rcd2000 dxf beam input.json -o beam.dxf
+# DXF only
+rcd2000 dxf beam input.json -o beam.dxf --no-dwg
 ```
 
 Output is **AC1032 / DWG 2018** — the native save format of every AutoCAD 2018–2026, so this is what clients mean by "native DWG".

@@ -51,11 +51,12 @@ from rcd2000.gui.widgets import label, combo, Card
 
 
 # Format descriptors: (label, extension, needs_extra)
+# DWG is the native AutoCAD format and RCD2000's default deliverable.
 FORMATS = [
+    ("DWG drawing (.dwg)", "dwg", None),
+    ("DXF drawing (.dxf)", "dxf", None),
     ("Text report (.txt)", "txt", None),
     ("PDF report (.pdf)", "pdf", None),
-    ("DXF drawing (.dxf)", "dxf", None),
-    ("DWG drawing (.dwg)", "dwg", None),
     ("IFC4 BIM model (.ifc)", "ifc", "ifc"),
 ]
 

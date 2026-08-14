@@ -310,9 +310,10 @@ def main():
             if cmd_name == "dxf":
                 p.add_argument("--scale", type=int, default=50,
                                help="Drawing scale (20/25/50/100, default 50)")
-                p.add_argument("--to-dwg", action="store_true",
-                               help="Also convert the DXF to native DWG "
-                                    "(requires ODA File Converter)")
+                p.add_argument("--no-dwg", action="store_true",
+                               help="Skip the native DWG conversion "
+                                    "(DWG is the default output; DXF is "
+                                    "always written first)")
         elif cmd_name != "info":
             p.add_argument("input", help="JSON input file")
             p.add_argument("-o", "--output", help="Output text file")
@@ -471,7 +472,9 @@ def cmd_dxf(args):
     errors = ex.audit()
     sys.stdout.write(f"Saved {output} (audit errors: {errors})\n")
 
-    if getattr(args, "to_dwg", False):
+    # DWG is the native AutoCAD format and the default deliverable; the
+    # DXF is always written first as the exchange/master copy.
+    if not getattr(args, "no_dwg", False):
         from rcd2000.dwg_export import dxf_to_dwg, install_hint
         dwg_out = output.rsplit(".", 1)[0] + ".dwg" if output.endswith(".dxf") else output + ".dwg"
         try:

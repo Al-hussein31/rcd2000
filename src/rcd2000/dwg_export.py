@@ -22,6 +22,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
+import ezdxf
 from ezdxf.addons import odafc
 
 # Env override so users can point at an ODA converter not on PATH
@@ -36,8 +37,42 @@ class DwgExportError(RuntimeError):
     """Raised when a DWG conversion cannot be performed."""
 
 
+def _spawn_env() -> dict:
+    """Environment for spawning the ODA Qt converter.
+
+    The converter is a Qt GUI app: if the parent process forced
+    QT_QPA_PLATFORM=offscreen (e.g. headless test runners), unset it so
+    the converter can pick its own native platform plugin (cocoa/windows/
+    xcb). Keeps the rest of the environment intact.
+    """
+    env = dict(os.environ)
+    env.pop("QT_QPA_PLATFORM", None)
+    return env
+
+
+def _configure_odafc() -> None:
+    """Ensure ezdxf's odafc addon knows where the converter lives.
+
+    Order of precedence: RCD2000_ODAFC_PATH env var -> ezdxf's own config
+    (which the user may have set) -> PATH.
+    """
+    env = os.environ.get(ODAFC_ENV)
+    if env and Path(env).is_file():
+        # mirror ezdxf's key name so is_installed()/convert() pick it up
+        ezdxf.options.set(
+            "odafc-addon", "unix_exec_path", f'"{env}"'
+        )
+        return
+    # leave ezdxf's own config / PATH detection alone
+
+
 def find_converter() -> Optional[Path]:
-    """Locate ODAFileConverter: env override -> ezdxf config -> PATH."""
+    """Locate ODAFileConverter: env override -> ezdxf config -> PATH.
+
+    Returns the resolved executable path when known, else None (in which
+    case ezdxf's own detection is trusted).
+    """
+    _configure_odafc()
     env = os.environ.get(ODAFC_ENV)
     if env and Path(env).is_file():
         return Path(env)
@@ -52,6 +87,7 @@ def find_converter() -> Optional[Path]:
 
 def is_available() -> bool:
     """True if the local ODA backend is usable."""
+    _configure_odafc()
     return bool(find_converter() or odafc.is_installed())
 
 
@@ -79,6 +115,8 @@ def dxf_to_dwg(
             f"or set {ODAFC_ENV} to its executable path."
         )
 
+    _configure_odafc()
+    saved_qt = os.environ.pop("QT_QPA_PLATFORM", None)
     try:
         odafc.convert(str(src), str(dst), version=version, audit=True,
                       replace=replace)
@@ -89,6 +127,9 @@ def dxf_to_dwg(
         ) from exc
     except odafc.ODAFCError as exc:  # type: ignore[attr-defined]
         raise DwgExportError(f"ODA File Converter failed: {exc}") from exc
+    finally:
+        if saved_qt is not None:
+            os.environ["QT_QPA_PLATFORM"] = saved_qt
 
     if not dst.exists():
         raise DwgExportError(
@@ -114,11 +155,16 @@ def export_doc_to_dwg(
             "https://www.opendesign.com/guestfiles/oda_file_converter "
             f"or set {ODAFC_ENV}."
         )
+    _configure_odafc()
+    saved_qt = os.environ.pop("QT_QPA_PLATFORM", None)
     try:
         odafc.export_dwg(doc, str(dst), version=version, audit=True,
                          replace=replace)
     except odafc.ODAFCError as exc:  # type: ignore[attr-defined]
         raise DwgExportError(f"ODA File Converter failed: {exc}") from exc
+    finally:
+        if saved_qt is not None:
+            os.environ["QT_QPA_PLATFORM"] = saved_qt
     if not dst.exists():
         raise DwgExportError(f"Conversion produced no output file ({dst})")
     return dst

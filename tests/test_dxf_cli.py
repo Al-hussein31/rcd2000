@@ -49,7 +49,7 @@ class TestDxfCli:
     def test_beam_export(self, tmp_path, beam_json):
         out = tmp_path / "beam.dxf"
         code, stdout, stderr = run_cli([
-            "dxf", "beam", str(beam_json), "-o", str(out),
+            "dxf", "beam", str(beam_json), "-o", str(out), "--no-dwg",
         ])
         assert code == 0, stderr
         assert out.exists() and out.stat().st_size > 1000
@@ -59,7 +59,7 @@ class TestDxfCli:
     def test_column_export(self, tmp_path, col_json):
         out = tmp_path / "col.dxf"
         code, _, stderr = run_cli([
-            "dxf", "column", str(col_json), "-o", str(out),
+            "dxf", "column", str(col_json), "-o", str(out), "--no-dwg",
         ])
         assert code == 0, stderr
         doc = ezdxf.readfile(str(out))
@@ -68,7 +68,7 @@ class TestDxfCli:
     def test_scale_flag(self, tmp_path, beam_json):
         out = tmp_path / "beam_100.dxf"
         code, _, stderr = run_cli([
-            "dxf", "beam", str(beam_json), "-o", str(out), "--scale", "100",
+            "dxf", "beam", str(beam_json), "-o", str(out), "--scale", "100", "--no-dwg",
         ])
         assert code == 0, stderr
         doc = ezdxf.readfile(str(out))
@@ -78,12 +78,12 @@ class TestDxfCli:
     def test_sheet_layout_created(self, tmp_path, beam_json):
         out = tmp_path / "beam_sheet.dxf"
         code, _, stderr = run_cli([
-            "dxf", "beam", str(beam_json), "-o", str(out),
+            "dxf", "beam", str(beam_json), "-o", str(out), "--no-dwg",
         ])
         assert code == 0, stderr
         doc = ezdxf.readfile(str(out))
         assert any(l.name.startswith("SHEET_") for l in doc.layouts)
 
     def test_invalid_element(self, tmp_path, beam_json):
-        code, _, _ = run_cli(["dxf", "stair", str(beam_json)])
+        code, _, _ = run_cli(["dxf", "not-a-element", str(beam_json)])
         assert code != 0

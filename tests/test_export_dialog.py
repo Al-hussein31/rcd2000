@@ -66,11 +66,18 @@ def _scope_items(wb):
 class TestExportDialog:
     def test_formats_defined(self):
         exts = [f[1] for f in FORMATS]
-        assert exts == ["txt", "pdf", "dxf", "dwg", "ifc"]
+        # DWG is the native AutoCAD format and the default deliverable
+        assert exts == ["dwg", "dxf", "txt", "pdf", "ifc"]
+        assert FORMATS[0][1] == "dwg"
+
+    def test_default_format_is_dwg(self, wb):
+        dlg = ExportDialog(_scope_items(wb), wb.job.header)
+        assert dlg.format_ext == "dwg"
+        assert dlg.include_combined is True
 
     def test_dialog_builds(self, wb):
         dlg = ExportDialog(_scope_items(wb), wb.job.header)
-        assert dlg.format_ext == "txt"
+        assert dlg.format_ext == "dwg"  # DWG is the default deliverable
         assert dlg.scope_this is False
 
     def test_dialog_scope_this(self, wb):
@@ -83,7 +90,7 @@ class TestExportDialog:
 
     def test_format_switch_shows_combined(self, wb):
         dlg = ExportDialog(_scope_items(wb), wb.job.header)
-        dlg.format_combo.setCurrentIndex(2)  # DXF
+        dlg.format_combo.setCurrentIndex(1)  # DXF
         assert dlg.include_combined is True
 
 
@@ -102,7 +109,7 @@ class TestWorkbenchExport:
         dlg = ExportDialog(_scope_items(wb), wb.job.header,
                            default_scope="this")
         dlg._out_dir = out
-        dlg.format_combo.setCurrentIndex(2)  # DXF
+        dlg.format_combo.setCurrentIndex(1)  # DXF
         wb._run_export(dlg, scope_this=wb._panels[item.uid])
         files = os.listdir(out)
         assert any(f.startswith("B") and f.endswith(".dxf") for f in files)
@@ -129,7 +136,7 @@ class TestWorkbenchExport:
         dlg = ExportDialog(_scope_items(wb), wb.job.header,
                            default_scope="this")
         dlg._out_dir = out
-        dlg.format_combo.setCurrentIndex(2)  # DXF
+        dlg.format_combo.setCurrentIndex(1)  # DXF
         wb._run_export(dlg, scope_this=panel)
         # nothing new written (stale design skipped)
         dxfs = [f for f in os.listdir(out) if f.endswith(".dxf")]
@@ -143,7 +150,7 @@ class TestWorkbenchExport:
         dlg = ExportDialog(_scope_items(wb), wb.job.header,
                            default_scope="this")
         dlg._out_dir = out
-        dlg.format_combo.setCurrentIndex(3)  # DWG
+        dlg.format_combo.setCurrentIndex(0)  # DWG (default)
         # should not raise even without ODA converter
         wb._run_export(dlg, scope_this=wb._panels[item.uid])
         if not is_available():

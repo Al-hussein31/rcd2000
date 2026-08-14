@@ -19,9 +19,10 @@ from rcd2000 import aps
 
 
 class TestDetection:
-    def test_find_converter_returns_none_when_absent(self):
-        # In CI/clean environments there is no converter; must not crash.
-        assert find_converter() in (None, None)  # noqa: PLR0133
+    def test_find_converter_never_crashes(self):
+        # Whether or not a converter is installed, detection must not crash.
+        result = find_converter()
+        assert result is None or result.is_file()
 
     def test_is_available_boolean(self):
         assert isinstance(is_available(), bool)
@@ -36,19 +37,21 @@ class TestDwgExportErrors:
         with pytest.raises(DwgExportError, match="not found"):
             dxf_to_dwg(tmp_path / "nope.dxf")
 
-    def test_export_skips_when_no_converter(self, tmp_path):
-        """When converter absent, raises a friendly DwgExportError."""
+    def test_export_with_or_without_converter(self, tmp_path):
+        """With converter: produces a real DWG. Without: friendly error."""
         from rcd2000.dxf_export import DxfExporter
         ex = DxfExporter()
         out = tmp_path / "b.dxf"
         ex.save(str(out))
-        if not is_available():
-            with pytest.raises(DwgExportError):
-                dxf_to_dwg(str(out), str(tmp_path / "b.dwg"))
-        # else: converter present — just make sure it produces a file
-        else:
+        if is_available():
             result = dxf_to_dwg(str(out), str(tmp_path / "b.dwg"))
             assert result.exists()
+            # DWG magic bytes = AC1032 (native AutoCAD 2018 format)
+            with open(result, "rb") as f:
+                assert f.read(6) == b"AC1032"
+        else:
+            with pytest.raises(DwgExportError):
+                dxf_to_dwg(str(out), str(tmp_path / "b.dwg"))
 
 
 class TestApsModule:
