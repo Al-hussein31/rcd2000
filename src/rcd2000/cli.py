@@ -302,7 +302,8 @@ def main():
     ]:
         p = sub.add_parser(cmd_name, help=help_text)
         if cmd_name in ("dxf", "ifc"):
-            p.add_argument("element", choices=["beam", "column", "slab", "base"],
+            p.add_argument("element",
+                           choices=["beam", "column", "slab", "base", "stair"],
                            help="Element type to export")
             p.add_argument("input", help="JSON input file")
             p.add_argument("-o", "--output", help="Output file (.dxf/.ifc)")
@@ -335,7 +336,7 @@ def cmd_dxf(args):
     from rcd2000.drawing_models import DrawingScale
     from rcd2000.cad_adapters import (
         beam_to_drawing, column_to_drawing, slab_to_drawing,
-        footing_to_drawing,
+        footing_to_drawing, stair_to_drawing,
     )
     from rcd2000.dxf_export import DxfExporter
     from rcd2000.drawing_models import Sheet
@@ -432,6 +433,24 @@ def cmd_dxf(args):
         ex.draw_footing_section(msp, drawing, (0, 3000))
         sheet_title = f"FOOTING {inp.base_id} - PLAN & SECTION"
 
+    elif element == "stair":
+        s = data.get("stairs", [data])[0]
+        inp = StairInput(
+            stair_id=s.get("stair_id", "ST1"),
+            stair_type=s.get("stair_type", 1),
+            span=s.get("span", 0),
+            tread=s.get("tread", 280),
+            rise=s.get("rise", 160),
+            imposed_load=s.get("imposed_load", 0),
+            spl=s.get("spl", 0),
+            wld=s.get("wld", 24),
+        )
+        result = StairDesigner(fcu=fcu, fy=fy).design([inp])[0]
+        drawing = stair_to_drawing(inp, result, scale)
+        ex.draw_stair_plan(msp, drawing)
+        ex.draw_stair_section(msp, drawing, (0, 2500))
+        sheet_title = f"STAIR {inp.stair_id} - PLAN & SECTION"
+
     else:
         parser.error(f"unknown dxf element: {element}")
 
@@ -468,7 +487,7 @@ def cmd_ifc(args):
     """Export a designed element (with reinforcement) to an IFC4 file."""
     from rcd2000.cad_adapters import (
         beam_to_drawing, column_to_drawing, slab_to_drawing,
-        footing_to_drawing,
+        footing_to_drawing, stair_to_drawing,
     )
     from rcd2000.ifc_export import IfcExporter
 
@@ -555,6 +574,21 @@ def cmd_ifc(args):
         )
         result = BaseDesigner(fcu=fcu, fy=fy).design([inp])[0]
         drawings.append(footing_to_drawing(inp, result))
+
+    elif element == "stair":
+        s = data.get("stairs", [data])[0]
+        inp = StairInput(
+            stair_id=s.get("stair_id", "ST1"),
+            stair_type=s.get("stair_type", 1),
+            span=s.get("span", 0),
+            tread=s.get("tread", 280),
+            rise=s.get("rise", 160),
+            imposed_load=s.get("imposed_load", 0),
+            spl=s.get("spl", 0),
+            wld=s.get("wld", 24),
+        )
+        result = StairDesigner(fcu=fcu, fy=fy).design([inp])[0]
+        drawings.append(stair_to_drawing(inp, result))
 
     else:
         parser.error(f"unknown ifc element: {element}")
